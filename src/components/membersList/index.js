@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import clientConfig from '../../config/client_config.js';
 import './index.css';
@@ -17,7 +17,7 @@ const MembersList = () => {
         return window.location.origin;
     };
 
-    const fetchMembers = async () => {
+    const fetchMembers = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -41,11 +41,11 @@ const MembersList = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchMembers();
-    }, []);
+    }, [fetchMembers]);
 
     const handleRefresh = () => {
         fetchMembers();

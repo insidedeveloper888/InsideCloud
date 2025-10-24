@@ -1,5 +1,4 @@
 import './index.css';
-import logo from '../../logo.svg'
 
 function UserInfo(props) {
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './index.css';
 
 const BitableTables = () => {
@@ -7,7 +7,7 @@ const BitableTables = () => {
     const [error, setError] = useState(null);
     const [appToken, setAppToken] = useState('J8tAbd9oEaxuLZsQbLwlNuHdgoc');
 
-    const fetchTables = async () => {
+    const fetchTables = useCallback(async () => {
         setLoading(true);
         setError(null);
         
@@ -26,11 +26,11 @@ const BitableTables = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [appToken]);
 
     useEffect(() => {
         fetchTables();
-    }, []);
+    }, [fetchTables]);
 
     const handleRefresh = () => {
         fetchTables();
