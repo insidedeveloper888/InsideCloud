@@ -1,5 +1,5 @@
 {
-  "name": "web_app_quick_start",
+  "name": "inside-cloud",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
@@ -7,6 +7,8 @@
     "crypto-js": "^4.1.1",
     "fs-extra": "^11.1.0",
     "js-cookie": "^3.0.1",
+    "jsonwebtoken": "^9.0.0",
+    "cookie": "^0.5.0",
     "koa": "^2.14.1",
     "koa-router": "^12.0.0",
     "koa-session": "^6.4.0",
@@ -20,9 +22,14 @@
     "start": "npm run start:server & npm run start:web",
     "start:web": "BROWSER=none react-scripts start",
     "start:server": "node ./server/server.js",
+    "start:with-ngrok": "npm run start:server & npm run start:web & ngrok http 3000",
     "build": "react-scripts build",
+    "vercel-build": "react-scripts build",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel",
     "config": "node ./cli/cli.js config"
   },
+  "proxy": "http://localhost:8989",
   "eslintConfig": {
     "extends": [
       "react-app",

@@ -1,0 +1,24 @@
+{
+  "departments": [
+    {
+      "id": "od-732f0cb3ffb2f778921f534499249884",
+      "name": "Testing Department",
+      "description": "Replace with your actual department ID from Lark"
+    }
+  ],
+  "instructions": {
+    "how_to_add_departments": [
+      "1. Go to Lark Developer Console",
+      "2. Use the API Explorer to test 'Obtain the list of users directly under a department'",
+      "3. Find the department_id that works for your organization",
+      "4. Add the department_id, name, and description to the departments array above",
+      "5. You can add multiple departments by adding more objects to the array"
+    ],
+    "api_reference": "https://open.larkoffice.com/document/server-docs/contact-v3/user/list_users_by_department",
+    "example_department_object": {
+      "id": "your_department_id_here",
+      "name": "Your Department Name",
+      "description": "Optional description"
+    }
+  }
+}

@@ -13,7 +13,7 @@ export async function handleJSAPIAccess(complete) {
     console.log("接入方前端[JSAPI鉴权处理]第① 步: 请求JSAPI鉴权参数")
     // 向接入方服务端发起请求，获取鉴权参数（appId、timestamp、nonceStr、signature）
     const res = await axios.get(`${getOrigin(clientConfig.apiPort)}${clientConfig.getSignParametersPath}?url=${url}`,
-        { withCredentials: true }
+        { withCredentials: true, headers: { 'ngrok-skip-browser-warning': 'true' } }
     )
     if (!res.data) {
         console.error(`${clientConfig.get_auth_parameters} fail`)
@@ -117,7 +117,7 @@ function requestUserAccessToken(code, complete) {
     // 获取user_access_token信息
     console.log("接入方前端[免登处理]第② 步: 去接入方服务端获取user_access_token信息")
     axios.get(`${getOrigin(clientConfig.apiPort)}${clientConfig.getUserAccessTokenPath}?code=${code}`,
-        { withCredentials: true }   //调用时设置 请求带上cookie
+        { withCredentials: true, headers: { 'ngrok-skip-browser-warning': 'true' } }   //调用时设置 请求带上cookie
     ).then(function (response) {  // ignore_security_alert
         if (!response.data) {
             console.error(`${clientConfig.getUsee} response is null`)
@@ -143,9 +143,12 @@ function requestUserAccessToken(code, complete) {
 }
 
 function getOrigin(apiPort) {
-    // console.log('process.env', process.env)
-    let hostname = window.location.hostname
-    return `http://${hostname}:${apiPort}`
+    const configuredOrigin = clientConfig.apiOrigin;
+    if (configuredOrigin && configuredOrigin.length > 0) {
+        return configuredOrigin;
+    }
+    // Default: use same-origin so CRA proxy can forward /api to localhost:8989
+    return window.location.origin;
 }
 
 

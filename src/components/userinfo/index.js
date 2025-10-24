@@ -10,8 +10,6 @@ function UserInfo(props) {
 
     return (
         <div className='userinfo'>
-            <img className='avatar' src= {userInfo.avatar_url || logo} alt='' /> 
-            <span className='name'>{ userInfo.name && userInfo.name.length > 0 ? 'Welcome to Lark' : ''}</span>
         </div>
     );
 }
