@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { config, handleCors, okResponse, failResponse, getAuthFromCookie } = require('./_utils');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     // Handle CORS
     if (handleCors(req, res)) return;
 
