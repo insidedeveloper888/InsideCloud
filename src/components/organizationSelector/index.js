@@ -117,14 +117,6 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
     }
   };
 
-  const handleSkip = () => {
-    // Skip to default organization (org-002)
-    const defaultOrgSlug = 'org-002';
-    localStorage.setItem(ORGANIZATION_SLUG_KEY, defaultOrgSlug);
-    // Directly proceed with org-002 (validation will happen in parent component)
-    onOrganizationSelected(defaultOrgSlug, null);
-  };
-
   return (
     <div className="organization-selector-container">
       <motion.div
@@ -148,7 +140,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
                 type="text"
                 value={organizationSlug || ''}
                 onChange={handleSlugChange}
-                placeholder="e.g., testing, org-002"
+                placeholder="e.g., cloud, inside"
                 className={`org-input ${isValidating ? 'validating' : ''} ${isValid ? 'valid' : ''} ${validationError && organizationSlug.trim().length > 0 && !isValidating ? 'error' : ''}`}
                 autoFocus
                 autoComplete="off"
@@ -195,21 +187,14 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
             >
               Continue
             </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={handleSkip}
-            >
-              Skip (Use org-002)
-            </button>
           </div>
         </form>
 
         <div className="organization-selector-help">
           <p><strong>Available organizations:</strong></p>
           <ul>
-            <li><code>testing</code> - Testing Organization</li>
-            <li><code>org-002</code> - Organization 2</li>
+            <li><code>cloud</code> - Cloud Organization</li>
+            <li><code>inside</code> - Inside Organization</li>
           </ul>
         </div>
       </motion.div>
