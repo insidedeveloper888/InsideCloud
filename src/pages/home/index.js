@@ -849,14 +849,12 @@ const Home = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
-  const [organizationSlug, setOrganizationSlug] = useState(null);
   const [showOrganizationSelector, setShowOrganizationSelector] = useState(true);
 
   useEffect(() => {
     // Check if organization is already selected
     const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
     if (savedOrgSlug) {
-      setOrganizationSlug(savedOrgSlug);
       setShowOrganizationSelector(false);
       initializeAuth(savedOrgSlug);
     } else {
@@ -866,7 +864,6 @@ const Home = () => {
 
   const handleOrganizationSelected = (slug, orgInfo) => {
     if (slug) {
-      setOrganizationSlug(slug);
       setShowOrganizationSelector(false);
       setIsLoading(true);
       initializeAuth(slug);
