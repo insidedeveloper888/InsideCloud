@@ -82,6 +82,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
 
   const handleSlugChange = (e) => {
     const value = e.target.value; // Don't trim while typing
+    console.log('Input changed:', value); // Debug log
     setOrganizationSlug(value);
     
     // Clear previous debounce timer
@@ -97,6 +98,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
     // Only validate if there's content and after user stops typing (500ms delay)
     if (value.trim().length > 0) {
       debounceTimerRef.current = setTimeout(() => {
+        console.log('Validating:', value.trim()); // Debug log
         validateOrganization(value.trim());
       }, 500); // Wait 500ms after user stops typing
     } else {
@@ -142,11 +144,13 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
               <input
                 id="org-slug"
                 type="text"
-                value={organizationSlug}
+                value={organizationSlug || ''}
                 onChange={handleSlugChange}
                 placeholder="e.g., testing, org-002"
                 className={`org-input ${isValidating ? 'validating' : ''} ${isValid ? 'valid' : ''} ${validationError && organizationSlug.trim().length > 0 && !isValidating ? 'error' : ''}`}
                 autoFocus
+                autoComplete="off"
+                spellCheck="false"
               />
               {isValidating && (
                 <Loader2 className="input-icon loading" />

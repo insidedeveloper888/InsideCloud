@@ -5,6 +5,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
+  color: #1a202c; /* Ensure dark text color */
 }
 
 .organization-selector-card {
@@ -15,6 +16,7 @@
   max-width: 500px;
   width: 100%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  color: #1a202c; /* Ensure dark text color */
 }
 
 .organization-selector-header {
@@ -68,14 +70,27 @@
   border: 2px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
+  color: #1a202c !important;
+  background-color: #ffffff !important;
   transition: all 0.2s;
   box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-family: inherit;
+}
+
+.org-input::placeholder {
+  color: #a0aec0 !important;
+  opacity: 1;
 }
 
 .org-input:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  color: #1a202c !important;
+  background-color: #ffffff !important;
 }
 
 .org-input.validating {
