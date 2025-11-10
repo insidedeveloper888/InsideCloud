@@ -1,22 +1,35 @@
 import axios from 'axios';
 import clientConfig from '../config/client_config.js';
 import Cookies from 'js-cookie';
+import { ORGANIZATION_SLUG_KEY } from '../components/organizationSelector/index.js';
 
 const LJ_TOKEN_KEY = 'lk_token'
 
 /// ---------------- JSAPI鉴权 部分 -------------------------
 
-export async function handleJSAPIAccess(complete) {
+export async function handleJSAPIAccess(complete, organizationSlug = null) {
 
     console.log("\n----------[接入方网页JSAPI鉴权处理 BEGIN]----------")
+    
+    // Get organization slug from parameter or localStorage
+    const orgSlug = organizationSlug || localStorage.getItem(ORGANIZATION_SLUG_KEY) || null;
+    
     const url = encodeURIComponent(window.location.href.split("#")[0]);
     console.log("接入方前端[JSAPI鉴权处理]第① 步: 请求JSAPI鉴权参数")
+    
+    // Build query string with organization_slug if available
+    let queryString = `url=${url}`;
+    if (orgSlug) {
+        queryString += `&organization_slug=${encodeURIComponent(orgSlug)}`;
+        console.log(`🔍 Multi-tenant mode: Using organization slug: ${orgSlug}`);
+    }
+    
     // 向接入方服务端发起请求，获取鉴权参数（appId、timestamp、nonceStr、signature）
-    const res = await axios.get(`${getOrigin(clientConfig.apiPort)}${clientConfig.getSignParametersPath}?url=${url}`,
+    const res = await axios.get(`${getOrigin(clientConfig.apiPort)}${clientConfig.getSignParametersPath}?${queryString}`,
         { withCredentials: true, headers: { 'ngrok-skip-browser-warning': 'true' } }
     )
     if (!res.data) {
-        console.error(`${clientConfig.get_auth_parameters} fail`)
+        console.error(`${clientConfig.getSignParametersPath} fail`)
         complete(false)
         return
     }
@@ -75,13 +88,20 @@ function configJSAPIAccess(data, complete) {
 
 /// ---------------- 应用免登 部分 -------------------------
 //处理用户免登逻辑
-export async function handleUserAuth(complete) {
+export async function handleUserAuth(complete, organizationSlug = null) {
 
     console.log("\n----------[接入方网页免登处理 BEGIN]----------")
+    
+    // Get organization slug from parameter or localStorage
+    const orgSlug = organizationSlug || localStorage.getItem(ORGANIZATION_SLUG_KEY) || null;
+    if (orgSlug) {
+        console.log(`🔍 Multi-tenant mode: Using organization slug: ${orgSlug}`);
+    }
+    
     let lj_tokenString = Cookies.get(LJ_TOKEN_KEY) || ""
     if (lj_tokenString.length > 0) {
         console.log("接入方前端[免登处理]第① 步: 用户已登录，请求后端验证...")
-        requestUserAccessToken("", complete)
+        requestUserAccessToken("", complete, orgSlug)
     } else {
         if (!window.h5sdk) {
             console.log('invalid h5sdk')
@@ -100,7 +120,7 @@ export async function handleUserAuth(complete) {
                         console.error('auth code为空')
                         complete()
                     } else {
-                        requestUserAccessToken(code, complete)
+                        requestUserAccessToken(code, complete, orgSlug)
                     }
                 },
                 fail: (error) => {
@@ -112,15 +132,22 @@ export async function handleUserAuth(complete) {
     }
 }
 
-function requestUserAccessToken(code, complete) {
+function requestUserAccessToken(code, complete, organizationSlug = null) {
 
     // 获取user_access_token信息
     console.log("接入方前端[免登处理]第② 步: 去接入方服务端获取user_access_token信息")
-    axios.get(`${getOrigin(clientConfig.apiPort)}${clientConfig.getUserAccessTokenPath}?code=${code}`,
+    
+    // Build query string with organization_slug if available
+    let queryString = `code=${code}`;
+    if (organizationSlug) {
+        queryString += `&organization_slug=${encodeURIComponent(organizationSlug)}`;
+    }
+    
+    axios.get(`${getOrigin(clientConfig.apiPort)}${clientConfig.getUserAccessTokenPath}?${queryString}`,
         { withCredentials: true, headers: { 'ngrok-skip-browser-warning': 'true' } }   //调用时设置 请求带上cookie
     ).then(function (response) {  // ignore_security_alert
         if (!response.data) {
-            console.error(`${clientConfig.getUsee} response is null`)
+            console.error(`${clientConfig.getUserAccessTokenPath} response is null`)
             complete()
             return
         }
@@ -136,7 +163,7 @@ function requestUserAccessToken(code, complete) {
             console.log("----------[接入网页方免登处理 END]----------\n")
         }
     }).catch(function (error) {
-        console.log(`${clientConfig.getSignParametersPath} error:`, error)
+        console.log(`${clientConfig.getUserAccessTokenPath} error:`, error)
         complete()
         console.log("----------[接入网页方免登处理 END]----------\n")
     })

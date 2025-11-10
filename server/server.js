@@ -5,6 +5,7 @@ const CryptoJS = require('crypto-js')
 const session = require('koa-session');
 const serverConfig = require('./server_config')
 const serverUtil = require('./server_util')
+const { getLarkCredentials, validateOrganization, getOrganizationInfo } = require('./organization_helper')
 
 const LJ_JSTICKET_KEY = 'lk_jsticket'
 const LJ_TOKEN_KEY = 'lk_token'
@@ -15,6 +16,31 @@ async function getUserAccessToken(ctx) {
     console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------")
     serverUtil.configAccessControl(ctx)
     console.log(`接入服务方第① 步: 接收到前端免登请求`)
+    
+    // Get organization_id from query or session
+    const organizationSlug = ctx.query["organization_slug"] || ctx.session.organization_slug || ""
+    
+    // Get Lark credentials for this organization
+    let larkCredentials = null
+    if (organizationSlug) {
+        console.log(`🔍 Multi-tenant mode: Using organization slug: ${organizationSlug}`)
+        larkCredentials = await getLarkCredentials(organizationSlug)
+        if (!larkCredentials) {
+            ctx.body = serverUtil.failResponse(`Organization '${organizationSlug}' not found or Lark credentials not configured`)
+            return
+        }
+        // Store organization_slug in session
+        ctx.session.organization_slug = organizationSlug
+        ctx.session.organization_id = larkCredentials.organization_id
+    } else {
+        console.log(`⚠️  No organization_slug provided, falling back to default config`)
+        // Fallback to default config for backward compatibility
+        larkCredentials = {
+            lark_app_id: serverConfig.config.appId,
+            lark_app_secret: serverConfig.config.appSecret
+        }
+    }
+    
     const accessToken = ctx.session.userinfo
     const lkToken = ctx.cookies.get(LJ_TOKEN_KEY) || ''
     if (accessToken && accessToken.access_token && lkToken.length > 0 && accessToken.access_token == lkToken) {
@@ -34,8 +60,8 @@ async function getUserAccessToken(ctx) {
     //【请求】app_access_token：https://open.larksuite.com/document/ukTMukTMukTM/ukDNz4SO0MjL5QzM/auth-v3/auth/app_access_token_internal
     console.log("接入服务方第③ 步: 根据AppID和App Secret请求应用授权凭证app_access_token")
     const internalRes = await axios.post("https://open.larksuite.com/open-apis/auth/v3/app_access_token/internal", {
-        "app_id": serverConfig.config.appId,
-        "app_secret": serverConfig.config.appSecret
+        "app_id": larkCredentials.lark_app_id,
+        "app_secret": larkCredentials.lark_app_secret
     }, { headers: { "Content-Type": "application/json" } })
 
     if (!internalRes.data) {
@@ -88,11 +114,36 @@ async function getSignParameters(ctx) {
     serverUtil.configAccessControl(ctx)
     console.log(`接入服务方第① 步: 接收到前端鉴权请求`)
 
+    // Get organization_id from query or session
+    const organizationSlug = ctx.query["organization_slug"] || ctx.session.organization_slug || ""
+    
+    // Get Lark credentials for this organization
+    let larkCredentials = null
+    if (organizationSlug) {
+        console.log(`🔍 Multi-tenant mode: Using organization slug: ${organizationSlug}`)
+        larkCredentials = await getLarkCredentials(organizationSlug)
+        if (!larkCredentials) {
+            ctx.body = serverUtil.failResponse(`Organization '${organizationSlug}' not found or Lark credentials not configured`)
+            return
+        }
+        // Store organization_slug in session
+        ctx.session.organization_slug = organizationSlug
+        ctx.session.organization_id = larkCredentials.organization_id
+    } else {
+        console.log(`⚠️  No organization_slug provided, falling back to default config`)
+        // Fallback to default config for backward compatibility
+        larkCredentials = {
+            lark_app_id: serverConfig.config.appId,
+            lark_app_secret: serverConfig.config.appSecret,
+            noncestr: serverConfig.config.noncestr
+        }
+    }
+
     const url = ctx.query["url"] ||""
     const tickeString = ctx.cookies.get(LJ_JSTICKET_KEY) || ""
     if (tickeString.length > 0) {
         console.log(`接入服务方第② 步: Cookie中获取jsapi_ticket，计算JSAPI鉴权参数，返回`)
-        const signParam = calculateSignParam(tickeString, url)
+        const signParam = calculateSignParam(tickeString, url, larkCredentials.lark_app_id, larkCredentials.noncestr)
         ctx.body = serverUtil.okResponse(signParam)
         console.log("-------------------[接入方服务端鉴权处理 END]-----------------------------\n")
         return
@@ -101,8 +152,8 @@ async function getSignParameters(ctx) {
     console.log(`接入服务方第② 步: 未检测到jsapi_ticket，根据AppID和App Secret请求自建应用授权凭证tenant_access_token`)
     //【请求】tenant_access_token：https://open.larksuite.com/document/ukTMukTMukTM/ukDNz4SO0MjL5QzM/auth-v3/auth/tenant_access_token_internal
     const internalRes = await axios.post("https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal", {
-        "app_id": serverConfig.config.appId,
-        "app_secret": serverConfig.config.appSecret
+        "app_id": larkCredentials.lark_app_id,
+        "app_secret": larkCredentials.lark_app_secret
     }, { headers: { "Content-Type": "application/json" } })
 
     if (!internalRes.data) {
@@ -142,7 +193,7 @@ async function getSignParameters(ctx) {
     }
 
     console.log(`接入服务方第⑥ 步: 计算出JSAPI鉴权参数，并返回给前端`)
-    const signParam = calculateSignParam(newTicketString, url)
+    const signParam = calculateSignParam(newTicketString, url, larkCredentials.lark_app_id, larkCredentials.noncestr)
     ctx.body = serverUtil.okResponse(signParam)
     console.log("-------------------[接入方服务端鉴权处理 END]-----------------------------\n")
 }
@@ -603,14 +654,19 @@ async function getBitableTables(ctx) {
     }
 }
 
-function calculateSignParam(tickeString, url) {
+//计算鉴权参数 - Updated to support multi-tenant with org-specific appId and noncestr
+function calculateSignParam(tickeString, url, appId, noncestr) {
+    // Use provided appId and noncestr, or fallback to default config
+    const finalAppId = appId || serverConfig.config.appId
+    const finalNoncestr = noncestr || serverConfig.config.noncestr
+    
     const timestamp = (new Date()).getTime()
-    const verifyStr = `jsapi_ticket=${tickeString}&noncestr=${serverConfig.config.noncestr}&timestamp=${timestamp}&url=${url}`
+    const verifyStr = `jsapi_ticket=${tickeString}&noncestr=${finalNoncestr}&timestamp=${timestamp}&url=${url}`
     let signature = CryptoJS.SHA1(verifyStr).toString(CryptoJS.enc.Hex)
     const signParam = {
-        "app_id": serverConfig.config.appId,
+        "app_id": finalAppId,
         "signature": signature,
-        "noncestr": serverConfig.config.noncestr,
+        "noncestr": finalNoncestr,
         "timestamp": timestamp,
     }
     return signParam
@@ -634,9 +690,55 @@ const koaSessionConfig = {
 app.use(session(koaSessionConfig, app));
 
 
+//处理获取组织配置请求，验证组织是否存在
+async function getOrganizationConfig(ctx) {
+    console.log("\n-------------------[获取组织配置 BEGIN]-----------------------------")
+    serverUtil.configAccessControl(ctx)
+    
+    const organizationSlug = ctx.query["organization_slug"] || ""
+    
+    if (!organizationSlug) {
+        ctx.body = serverUtil.failResponse("organization_slug parameter is required")
+        return
+    }
+    
+    // Validate organization exists
+    const isValid = await validateOrganization(organizationSlug)
+    if (!isValid) {
+        ctx.body = serverUtil.failResponse(`Organization '${organizationSlug}' not found or inactive`)
+        return
+    }
+    
+    // Get organization info
+    const orgInfo = await getOrganizationInfo(organizationSlug)
+    if (!orgInfo) {
+        ctx.body = serverUtil.failResponse(`Failed to retrieve organization info`)
+        return
+    }
+    
+    // Get Lark credentials to verify they're configured
+    const larkCredentials = await getLarkCredentials(organizationSlug)
+    if (!larkCredentials) {
+        ctx.body = serverUtil.failResponse(`Lark credentials not configured for organization '${organizationSlug}'`)
+        return
+    }
+    
+    // Return organization config (without secrets)
+    ctx.body = serverUtil.okResponse({
+        organization_slug: orgInfo.slug,
+        organization_name: orgInfo.name,
+        organization_id: orgInfo.id,
+        lark_app_id: larkCredentials.lark_app_id, // Safe to return app_id
+        is_active: orgInfo.is_active
+    })
+    
+    console.log("-------------------[获取组织配置 END]-----------------------------\n")
+}
+
 //注册服务端路由和处理
 router.get(serverConfig.config.getUserAccessTokenPath, getUserAccessToken)
 router.get(serverConfig.config.getSignParametersPath, getSignParameters)
+router.get("/api/get_organization_config", getOrganizationConfig) // New endpoint
 router.get(serverConfig.config.getOrganizationMembersPath, getOrganizationMembers)
 router.get(serverConfig.config.getDepartmentsPath, getDepartments)
 router.get(serverConfig.config.getDepartmentUsersPath, getDepartmentUsers)
