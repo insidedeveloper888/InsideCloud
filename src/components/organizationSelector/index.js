@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { Building2, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -21,9 +21,10 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
   const [validationError, setValidationError] = useState(null);
   const [isValid, setIsValid] = useState(false);
   const [orgInfo, setOrgInfo] = useState(null);
+  const debounceTimerRef = useRef(null);
 
   // Check if organization is already selected
-  React.useEffect(() => {
+  useEffect(() => {
     const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
     if (savedOrgSlug) {
       setOrganizationSlug(savedOrgSlug);
@@ -31,11 +32,21 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
     }
   }, []);
 
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   const validateOrganization = async (slug) => {
     if (!slug || slug.trim().length === 0) {
       setValidationError(null);
       setIsValid(false);
       setOrgInfo(null);
+      setIsValidating(false);
       return;
     }
 
@@ -70,11 +81,26 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
   };
 
   const handleSlugChange = (e) => {
-    const value = e.target.value.trim();
+    const value = e.target.value; // Don't trim while typing
     setOrganizationSlug(value);
-    if (value.length > 0) {
-      validateOrganization(value);
+    
+    // Clear previous debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Clear validation state while typing
+    setValidationError(null);
+    setIsValid(false);
+    setIsValidating(false);
+
+    // Only validate if there's content and after user stops typing (500ms delay)
+    if (value.trim().length > 0) {
+      debounceTimerRef.current = setTimeout(() => {
+        validateOrganization(value.trim());
+      }, 500); // Wait 500ms after user stops typing
     } else {
+      // Clear everything if input is empty
       setIsValid(false);
       setValidationError(null);
       setOrgInfo(null);
@@ -119,8 +145,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
                 value={organizationSlug}
                 onChange={handleSlugChange}
                 placeholder="e.g., testing, org-002"
-                className={`org-input ${isValidating ? 'validating' : ''} ${isValid ? 'valid' : ''} ${validationError ? 'error' : ''}`}
-                disabled={isValidating}
+                className={`org-input ${isValidating ? 'validating' : ''} ${isValid ? 'valid' : ''} ${validationError && organizationSlug.trim().length > 0 && !isValidating ? 'error' : ''}`}
                 autoFocus
               />
               {isValidating && (
@@ -134,7 +159,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
               )}
             </div>
             
-            {validationError && (
+            {validationError && organizationSlug.trim().length > 0 && !isValidating && (
               <motion.div
                 className="error-message"
                 initial={{ opacity: 0, height: 0 }}
