@@ -1,5 +1,6 @@
 const axios = require('axios');
-const { config, handleCors, okResponse, failResponse, setAuthCookie, getAuthFromCookie } = require('./_utils');
+const { handleCors, okResponse, failResponse, setAuthCookie, getAuthFromCookie } = require('./_utils');
+const { getLarkCredentials } = require('./supabase_helper');
 
 module.exports = async function handler(req, res) {
     // Handle CORS
@@ -17,6 +18,28 @@ module.exports = async function handler(req, res) {
         return;
     }
 
+    // Get organization slug from query
+    const organizationSlug = req.query.organization_slug || "";
+    
+    // Get Lark credentials for this organization
+    let larkCredentials = null;
+    if (organizationSlug) {
+        console.log(`🔍 Multi-tenant mode: Using organization slug: ${organizationSlug}`);
+        larkCredentials = await getLarkCredentials(organizationSlug);
+        if (!larkCredentials) {
+            res.status(404).json(failResponse(`Organization '${organizationSlug}' not found or Lark credentials not configured`));
+            return;
+        }
+    } else {
+        console.log(`⚠️  No organization_slug provided, falling back to default config`);
+        // Fallback to default config for backward compatibility
+        const { config } = require('./_utils');
+        larkCredentials = {
+            lark_app_id: config.appId,
+            lark_app_secret: config.appSecret
+        };
+    }
+
     let code = req.query.code || "";
     console.log("接入服务方第② 步: 获取登录预授权码code");
     if (code.length == 0) {
@@ -28,8 +51,8 @@ module.exports = async function handler(req, res) {
         // Request app_access_token
         console.log("接入服务方第③ 步: 根据AppID和App Secret请求应用授权凭证app_access_token");
         const internalRes = await axios.post("https://open.larksuite.com/open-apis/auth/v3/app_access_token/internal", {
-            "app_id": config.appId,
-            "app_secret": config.appSecret
+            "app_id": larkCredentials.lark_app_id,
+            "app_secret": larkCredentials.lark_app_secret
         }, { headers: { "Content-Type": "application/json" } });
 
         if (!internalRes.data) {

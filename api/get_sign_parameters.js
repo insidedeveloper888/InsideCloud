@@ -1,5 +1,41 @@
 const axios = require('axios');
-const { config, handleCors, okResponse, failResponse, calculateSignParam, getJsapiTicket, setJsapiTicket } = require('./_utils');
+const { handleCors, okResponse, failResponse } = require('./_utils');
+const { getLarkCredentials } = require('./supabase_helper');
+const CryptoJS = require('crypto-js');
+
+// Calculate sign parameters for JSAPI (with dynamic appId and noncestr)
+function calculateSignParam(ticketString, url, appId, noncestr) {
+    const timestamp = (new Date()).getTime();
+    const verifyStr = `jsapi_ticket=${ticketString}&noncestr=${noncestr}&timestamp=${timestamp}&url=${url}`;
+    let signature = CryptoJS.SHA1(verifyStr).toString(CryptoJS.enc.Hex);
+    const signParam = {
+        "app_id": appId,
+        "signature": signature,
+        "noncestr": noncestr,
+        "timestamp": timestamp,
+    };
+    return signParam;
+}
+
+// In-memory storage for jsapi_ticket (keyed by organization)
+let jsapiTicketCache = new Map();
+
+function getJsapiTicket(orgSlug) {
+    if (!orgSlug) return null;
+    const cache = jsapiTicketCache.get(orgSlug);
+    if (cache && cache.expires > Date.now()) {
+        return cache.ticket;
+    }
+    return null;
+}
+
+function setJsapiTicket(orgSlug, ticket) {
+    if (!orgSlug) return;
+    jsapiTicketCache.set(orgSlug, {
+        ticket: ticket,
+        expires: Date.now() + (2 * 60 * 60 * 1000) // 2 hours
+    });
+}
 
 module.exports = async function handler(req, res) {
     // Handle CORS
@@ -8,12 +44,35 @@ module.exports = async function handler(req, res) {
     console.log("\n-------------------[接入方服务端鉴权处理 BEGIN]-----------------------------");
     console.log(`接入服务方第① 步: 接收到前端鉴权请求`);
 
+    // Get organization slug from query
+    const organizationSlug = req.query.organization_slug || "";
+    
+    // Get Lark credentials for this organization
+    let larkCredentials = null;
+    if (organizationSlug) {
+        console.log(`🔍 Multi-tenant mode: Using organization slug: ${organizationSlug}`);
+        larkCredentials = await getLarkCredentials(organizationSlug);
+        if (!larkCredentials) {
+            res.status(404).json(failResponse(`Organization '${organizationSlug}' not found or Lark credentials not configured`));
+            return;
+        }
+    } else {
+        console.log(`⚠️  No organization_slug provided, falling back to default config`);
+        // Fallback to default config for backward compatibility
+        const { config } = require('./_utils');
+        larkCredentials = {
+            lark_app_id: config.appId,
+            lark_app_secret: config.appSecret,
+            noncestr: config.noncestr
+        };
+    }
+
     const url = req.query.url || "";
-    const cachedTicket = getJsapiTicket();
+    const cachedTicket = getJsapiTicket(organizationSlug || 'default');
     
     if (cachedTicket) {
         console.log(`接入服务方第② 步: 缓存中获取jsapi_ticket，计算JSAPI鉴权参数，返回`);
-        const signParam = calculateSignParam(cachedTicket, url);
+        const signParam = calculateSignParam(cachedTicket, url, larkCredentials.lark_app_id, larkCredentials.noncestr);
         res.status(200).json(okResponse(signParam));
         console.log("-------------------[接入方服务端鉴权处理 END]-----------------------------\n");
         return;
@@ -24,8 +83,8 @@ module.exports = async function handler(req, res) {
         
         // Request tenant_access_token
         const internalRes = await axios.post("https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal", {
-            "app_id": config.appId,
-            "app_secret": config.appSecret
+            "app_id": larkCredentials.lark_app_id,
+            "app_secret": larkCredentials.lark_app_secret
         }, { headers: { "Content-Type": "application/json" } });
 
         if (!internalRes.data) {
@@ -62,11 +121,11 @@ module.exports = async function handler(req, res) {
         console.log(`接入服务方第⑤ 步: 获得颁发的JSAPI临时授权凭证，更新到缓存`);
         const newTicketString = ticketRes.data.data.ticket || "";
         if (newTicketString.length > 0) {
-            setJsapiTicket(newTicketString);
+            setJsapiTicket(organizationSlug || 'default', newTicketString);
         }
 
         console.log(`接入服务方第⑥ 步: 计算出JSAPI鉴权参数，并返回给前端`);
-        const signParam = calculateSignParam(newTicketString, url);
+        const signParam = calculateSignParam(newTicketString, url, larkCredentials.lark_app_id, larkCredentials.noncestr);
         res.status(200).json(okResponse(signParam));
         console.log("-------------------[接入方服务端鉴权处理 END]-----------------------------\n");
 
