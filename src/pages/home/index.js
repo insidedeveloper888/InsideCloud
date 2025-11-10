@@ -910,6 +910,15 @@ const Home = () => {
       });
 
       if (!jsapiSuccess) {
+        // If JSAPI fails, it might be due to invalid organization
+        // Clear organization and show selector again
+        if (orgSlug) {
+          localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+          setShowOrganizationSelector(true);
+          setIsLoading(false);
+          setAuthError('JSAPI authentication failed. Please select organization again.');
+          return;
+        }
         throw new Error('JSAPI authentication failed');
       }
 
@@ -963,7 +972,23 @@ const Home = () => {
     );
   }
 
+  const handleResetOrganization = () => {
+    // Clear organization from localStorage
+    localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+    // Reset state to show organization selector
+    setShowOrganizationSelector(true);
+    setAuthError(null);
+    setIsLoading(false);
+    setUserInfo(null);
+  };
+
   if (authError) {
+    // Check if error is related to organization (invalid org, credentials not configured, etc.)
+    const isOrgError = authError.includes('Organization') || 
+                       authError.includes('organization') ||
+                       authError.includes('credentials not configured') ||
+                       authError.includes('not found');
+    
     return (
       <div className="error-container" style={{
         display: 'flex',
@@ -977,23 +1002,43 @@ const Home = () => {
         <div style={{ textAlign: 'center', maxWidth: '400px', padding: '20px' }}>
           <div style={{ marginBottom: '20px' }}>❌</div>
           <div style={{ marginBottom: '10px' }}>Authentication Failed</div>
-          <div style={{ fontSize: '14px', opacity: 0.9 }}>
+          <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '20px' }}>
             {authError}
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: '20px',
-              padding: '10px 20px',
-              background: 'rgba(255,255,255,0.2)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '5px',
-              color: 'white',
-              cursor: 'pointer'
-            }}
-          >
-            Retry
-          </button>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {isOrgError && (
+              <button
+                onClick={handleResetOrganization}
+                style={{
+                  padding: '10px 20px',
+                  background: 'rgba(255,255,255,0.3)',
+                  border: '1px solid rgba(255,255,255,0.5)',
+                  borderRadius: '5px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Change Organization
+              </button>
+            )}
+            <button
+              onClick={() => {
+                localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+                window.location.reload();
+              }}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '5px',
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
