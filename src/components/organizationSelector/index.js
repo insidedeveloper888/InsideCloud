@@ -118,9 +118,11 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
   };
 
   const handleSkip = () => {
-    // Allow skipping for backward compatibility (single-tenant mode)
-    localStorage.removeItem(ORGANIZATION_SLUG_KEY);
-    onOrganizationSelected(null, null);
+    // Skip to default organization (org-002)
+    const defaultOrgSlug = 'org-002';
+    localStorage.setItem(ORGANIZATION_SLUG_KEY, defaultOrgSlug);
+    // Directly proceed with org-002 (validation will happen in parent component)
+    onOrganizationSelected(defaultOrgSlug, null);
   };
 
   return (
@@ -198,7 +200,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
               className="btn-secondary"
               onClick={handleSkip}
             >
-              Skip (Single Tenant)
+              Skip (Use org-002)
             </button>
           </div>
         </form>
