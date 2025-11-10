@@ -4,6 +4,7 @@ import Cookies from 'js-cookie';
 import { ORGANIZATION_SLUG_KEY } from '../components/organizationSelector/index.js';
 
 const LJ_TOKEN_KEY = 'lk_token'
+const ORGANIZATION_APP_ID_KEY = 'lark_organization_app_id' // Store org-specific app ID
 
 /// ---------------- JSAPI鉴权 部分 -------------------------
 
@@ -41,6 +42,13 @@ export async function handleJSAPIAccess(complete, organizationSlug = null) {
         complete(false)
         return
     }
+    
+    // Store the app_id from backend response (it's org-specific)
+    if (data.app_id) {
+        localStorage.setItem(ORGANIZATION_APP_ID_KEY, data.app_id);
+        console.log(`✅ Stored organization app_id: ${data.app_id}`);
+    }
+    
     console.log("接入方前端[JSAPI鉴权处理]第③ 步: 通过window.h5sdk.config进行鉴权")
     configJSAPIAccess(data, complete)
 }
@@ -112,9 +120,15 @@ export async function handleUserAuth(complete, organizationSlug = null) {
         //依据App ID调用JSAPI tt.requestAuthCode 请求登录预授权码code
         window.h5sdk.ready(() => {
             console.log("window.h5sdk.ready");
+            
+            // Get organization-specific app ID from localStorage, or fallback to default
+            const orgAppId = localStorage.getItem(ORGANIZATION_APP_ID_KEY) || clientConfig.appId;
+            console.log(`🔍 Using app_id for requestAuthCode: ${orgAppId}`);
+            
             window.tt.requestAuthCode({
-                appId: clientConfig.appId,
+                appId: orgAppId,
                 success: (info) => {
+                    console.log(`✅ requestAuthCode success:`, info);
                     const code = info.code
                     if (code.length <= 0) {
                         console.error('auth code为空')
@@ -124,8 +138,8 @@ export async function handleUserAuth(complete, organizationSlug = null) {
                     }
                 },
                 fail: (error) => {
+                    console.error("❌ window.tt.requestAuthCode failed:", error);
                     complete()
-                    console.error("window.tt.requestAuthCode", error)
                 }
             });
         });
