@@ -7,6 +7,8 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 if (!supabaseUrl || !supabaseServiceRoleKey) {
     console.warn('⚠️  Supabase credentials not found in environment variables. Multi-tenant features will not work.');
     console.warn('   Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env file');
+} else {
+    console.log('ℹ️  Supabase client configured. URL present:', !!supabaseUrl, 'Service role key present:', !!supabaseServiceRoleKey);
 }
 
 // Create Supabase client with service role key (bypasses RLS)

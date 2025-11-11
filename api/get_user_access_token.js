@@ -98,6 +98,7 @@ module.exports = async function handler(req, res) {
 
             try {
                 console.log('ℹ️  [API] Calling syncLarkUser for', newAccessToken.user_id);
+                console.log('ℹ️  [API] organization_id from credentials:', larkCredentials?.organization_id || null);
                 await syncLarkUser({
                     supabaseClient: supabase,
                     accessTokenData: newAccessToken,

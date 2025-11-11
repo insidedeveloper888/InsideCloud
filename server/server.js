@@ -104,6 +104,7 @@ async function getUserAccessToken(ctx) {
 
         try {
             console.log('ℹ️  Calling syncLarkUser for', newAccessToken.user_id)
+            console.log('ℹ️  Session organization_id:', ctx.session.organization_id, 'Credentials organization_id:', larkCredentials.organization_id)
             await syncLarkUser({
                 supabaseClient: supabase,
                 accessTokenData: newAccessToken,

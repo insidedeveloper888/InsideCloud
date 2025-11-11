@@ -13,6 +13,12 @@ const supabase = supabaseUrl && supabaseServiceRoleKey
     })
   : null;
 
+if (!supabase) {
+  console.warn('⚠️  [API] Supabase client not initialized. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+} else {
+  console.log('ℹ️  [API] Supabase client configured. URL present:', !!supabaseUrl, 'Service role key present:', !!supabaseServiceRoleKey);
+}
+
 /**
  * Get Lark credentials for an organization by slug
  */
