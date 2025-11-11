@@ -749,12 +749,6 @@ const Home = () => {
     window.location.reload();
   };
 
-  const handleRefreshData = () => {
-    if (!selectedOrganizationSlug) return;
-    setIsLoading(true);
-    initializeAuth(selectedOrganizationSlug);
-  };
-
   const renderActiveView = () => {
     switch (activeView) {
       case 'account':
