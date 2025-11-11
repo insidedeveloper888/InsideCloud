@@ -15,7 +15,7 @@ const LJ_TOKEN_KEY = 'lk_token'
 //处理免登请求，返回用户的user_access_token
 async function getUserAccessToken(ctx) {
 
-    console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------")
+    console.log("\n-------------------[接入服务端免登处理 BEGIN2]-----------------------------")
     serverUtil.configAccessControl(ctx)
     console.log(`接入服务方第① 步: 接收到前端免登请求`)
     
