@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
 import clientConfig from '../../config/client_config.js';
 import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
@@ -199,7 +199,7 @@ const SupabaseMembers = ({ organizationSlug }) => {
                   </TableCell>
                   <TableCell>{formatDateTime(member.joined_at)}</TableCell>
                 </TableRow>
-              ))}
+          ))}
             </TableBody>
           </Table>
         )}
@@ -323,7 +323,7 @@ const AuditLogView = ({ organizationSlug }) => {
                       </Typography>
                     </TableCell>
                   </TableRow>
-                ))}
+              ))}
               </TableBody>
             </Table>
           )}
@@ -375,7 +375,7 @@ const LoadingState = () => (
       flexDirection: 'column',
       gap: 2,
     }}
-  >
+            >
     <CircularProgress color="inherit" />
     <Typography variant="body1">Authenticating with Lark…</Typography>
   </Box>
@@ -428,7 +428,7 @@ const Home = () => {
       setSelectedOrganizationSlug(savedOrgSlug);
       setShowOrganizationSelector(false);
       fetchOrganizationDetails(savedOrgSlug).finally(() => {
-        initializeAuth(savedOrgSlug);
+      initializeAuth(savedOrgSlug);
       });
     } else {
       setIsLoading(false);
@@ -612,7 +612,7 @@ const Home = () => {
       onLogout={handleResetOrganization}
       onChangeOrganization={handleResetOrganization}
       onRefreshData={handleRefreshData}
-    >
+            >
       {renderActiveView()}
     </ProtectedLayout>
   );
