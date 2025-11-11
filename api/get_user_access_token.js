@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
     // Handle CORS
     if (handleCors(req, res)) return;
 
-    console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------");
+    console.log("\n-------------------[接入服务端免登处理 BEGINNNINGGGG]-----------------------------");
     console.log(`接入服务方第① 步: 接收到前端免登请求`);
 
     // Get organization slug from query
