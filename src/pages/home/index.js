@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import clientConfig from '../../config/client_config.js';
-import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
+import { handleJSAPIAccess, handleUserAuth, handleOAuthCallback, redirectToOAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
 import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
 import {
@@ -603,6 +603,7 @@ const Home = () => {
   const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
   const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false); // Prevent multiple auth attempts
 
   useEffect(() => {
     const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
@@ -679,52 +680,81 @@ const Home = () => {
   };
 
   const initializeAuth = async (orgSlug) => {
+    // Prevent multiple simultaneous authentication attempts
+    if (isAuthenticating) {
+      console.log('⏳ Authentication already in progress, skipping...');
+      return;
+    }
+
+    // Check if already authenticated before starting new auth
+    const existingToken = Cookies.get('lk_token') || localStorage.getItem('lk_token');
+    if (existingToken && userInfo) {
+      console.log('✅ Already authenticated, skipping auth initialization');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    
     try {
       if (orgSlug) {
         setSelectedOrganizationSlug(orgSlug);
       }
 
-      if (typeof window.h5sdk === 'undefined') {
-        const mockUserInfo = {
-          access_token: 'mock_token',
-          avatar_url: 'https://via.placeholder.com/40',
-          en_name: 'Development User',
-          name: '开发用户',
-        };
-        setUserInfo(mockUserInfo);
-        setAuthError(null);
-        setIsLoading(false);
-        return;
-      }
-
-      const jsapiSuccess = await new Promise((resolve) => {
-        handleJSAPIAccess(resolve, orgSlug);
-      });
-      if (!jsapiSuccess) {
-        if (orgSlug) {
-          localStorage.removeItem(ORGANIZATION_SLUG_KEY);
-          setShowOrganizationSelector(true);
-          setIsLoading(false);
-          setAuthError('JSAPI authentication failed. Please select organisation again.');
-          return;
+      // Check if JSAPI is available (production environment inside Lark)
+      const isJSAPIAvailable = typeof window.h5sdk !== 'undefined';
+      
+      if (isJSAPIAvailable) {
+        // Production: Use JSAPI authentication flow
+        console.log('🔐 Using JSAPI authentication flow (production)');
+        
+        const jsapiSuccess = await new Promise((resolve) => {
+          handleJSAPIAccess(resolve, orgSlug);
+        });
+        if (!jsapiSuccess) {
+          if (orgSlug) {
+            localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+            setShowOrganizationSelector(true);
+            setIsLoading(false);
+            setAuthError('JSAPI authentication failed. Please select organisation again.');
+            setIsAuthenticating(false);
+            return;
+          }
+          throw new Error('JSAPI authentication failed');
         }
-        throw new Error('JSAPI authentication failed');
+      } else {
+        // Local development: Skip JSAPI (not needed for OAuth flow)
+        console.log('🔐 JSAPI not available, using OAuth redirect flow (local development)');
       }
 
+      // Handle user authentication (supports both JSAPI and OAuth flows)
       const userData = await new Promise((resolve) => {
         handleUserAuth(resolve, orgSlug);
       });
 
+      // If handleUserAuth triggers OAuth redirect, userData will be null
+      // and the page will redirect, so we don't need to handle it here
       if (userData) {
         setUserInfo(userData);
         setAuthError(null);
+        setIsLoading(false);
+        setIsAuthenticating(false);
+      } else if (!isJSAPIAvailable) {
+        // OAuth redirect is happening, page will reload
+        // Keep loading state - OAuth callback will handle completion
+        console.log('⏳ OAuth redirect initiated, waiting for callback...');
+        // Don't set isLoading to false here - let OAuth callback handle it
+        // Don't clear isAuthenticating - let the redirect handle it
+        return;
       } else {
         setAuthError('No user information returned from authentication.');
+        setIsLoading(false);
+        setIsAuthenticating(false);
       }
     } catch (error) {
       setAuthError(error.message || 'Authentication error');
-    } finally {
       setIsLoading(false);
+      setIsAuthenticating(false);
     }
   };
 

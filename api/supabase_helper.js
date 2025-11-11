@@ -24,23 +24,41 @@ if (!supabase) {
  */
 async function getLarkCredentials(orgSlug) {
   if (!orgSlug || !supabase) {
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
     return null;
   }
 
   try {
+    console.log(`🔍 Fetching Lark credentials for organization slug: ${orgSlug}`);
     const { data, error } = await supabase.rpc('get_lark_credentials', {
       org_slug: orgSlug
     });
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.error('❌ Supabase RPC error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw new Error(`Supabase RPC error: ${error.message || 'Unknown error'}`);
+    }
+
+    if (!data || data.length === 0) {
+      console.warn(`⚠️  No credentials found for organization slug: ${orgSlug}`);
       return null;
     }
 
     const credentials = data[0];
     if (!credentials.lark_app_id || !credentials.lark_app_secret) {
+      console.warn(`⚠️  Incomplete credentials for organization slug: ${orgSlug}`);
       return null;
     }
 
+    console.log(`✅ Lark credentials retrieved for organization: ${orgSlug}`);
     return {
       lark_app_id: credentials.lark_app_id,
       lark_app_secret: credentials.lark_app_secret,
@@ -49,8 +67,9 @@ async function getLarkCredentials(orgSlug) {
       is_active: credentials.is_active
     };
   } catch (error) {
-    console.error('Error fetching Lark credentials:', error);
-    return null;
+    console.error('❌ Error fetching Lark credentials:', error);
+    // Re-throw to let caller handle it
+    throw error;
   }
 }
 

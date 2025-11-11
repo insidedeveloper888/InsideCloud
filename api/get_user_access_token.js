@@ -55,7 +55,74 @@ module.exports = async function handler(req, res) {
 
     let code = req.query.code || "";
     console.log("接入服务方第② 步: 获取登录预授权码code");
+    console.log("🔍 Debug - Code:", code ? code.substring(0, 10) + '...' : 'empty');
+    console.log("🔍 Debug - Headers:", JSON.stringify(req.headers, null, 2));
+    
+    // If no code and no existing auth, check if there's a token in the request
+    // This handles the case where frontend has token in localStorage but cookie wasn't set
     if (code.length == 0) {
+        // Check if there's a token in Authorization header (case-insensitive)
+        const authHeader = req.headers.authorization || req.headers.Authorization;
+        console.log("🔍 Debug - Authorization header:", authHeader ? authHeader.substring(0, 20) + '...' : 'not found');
+        
+        const tokenFromHeader = authHeader && authHeader.startsWith('Bearer ') 
+            ? authHeader.substring(7) 
+            : null;
+        const tokenFromQuery = req.query.token || null;
+        const token = tokenFromHeader || tokenFromQuery;
+        
+        console.log("🔍 Debug - Extracted token:", token ? token.substring(0, 20) + '...' : 'not found');
+        
+        if (token) {
+            console.log("接入服务方第② 步: 检测到token参数，验证token有效性");
+            // Verify token with Lark API to get user info
+            try {
+                // Use the token to get user info from Lark
+                const userInfoRes = await axios.get("https://open.larksuite.com/open-apis/authen/v1/user_info", {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    }
+                });
+                
+                if (userInfoRes.data && userInfoRes.data.code === 0) {
+                    const userInfo = userInfoRes.data.data;
+                    // Create auth object similar to what we get from access_token endpoint
+                    const authData = {
+                        access_token: token,
+                        token_type: "Bearer",
+                        expires_in: 7140,
+                        user_id: userInfo.user_id,
+                        open_id: userInfo.open_id,
+                        union_id: userInfo.union_id,
+                        en_name: userInfo.en_name,
+                        name: userInfo.name,
+                        avatar_url: userInfo.avatar_url
+                    };
+                    
+                    // Set cookie for future requests
+                    setAuthCookie(res, authData);
+                    
+                    try {
+                        await syncLarkUser({
+                            supabaseClient: supabase,
+                            accessTokenData: authData,
+                            organizationId: larkCredentials?.organization_id || null
+                        });
+                    } catch (syncError) {
+                        console.error('❌  [API] Failed to sync Lark user to Supabase:', syncError);
+                    }
+                    
+                    res.status(200).json(okResponse(authData));
+                    console.log("-------------------[接入服务端免登处理 END]-----------------------------\n");
+                    return;
+                }
+            } catch (tokenError) {
+                console.error('❌ Token verification failed:', tokenError.response?.data || tokenError.message);
+                // Fall through to return error
+            }
+        }
+        
         res.status(400).json(failResponse("登录预授权码code is empty, please retry!!!"));
         return;
     }

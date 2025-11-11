@@ -12,6 +12,11 @@ async function getLarkCredentials(orgSlug) {
         return null;
     }
 
+    if (!supabase) {
+        console.error('❌ Supabase client not initialized. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+        return null;
+    }
+
     try {
         console.log(`🔍 Fetching Lark credentials for organization: ${orgSlug}`);
         
@@ -61,6 +66,11 @@ async function validateOrganization(orgSlug) {
         return false;
     }
 
+    if (!supabase) {
+        console.error('❌ Supabase client not initialized. Cannot validate organization.');
+        return false;
+    }
+
     try {
         const { data, error } = await supabase
             .from('organizations')
@@ -87,6 +97,11 @@ async function validateOrganization(orgSlug) {
  */
 async function getOrganizationInfo(orgSlug) {
     if (!orgSlug) {
+        return null;
+    }
+
+    if (!supabase) {
+        console.error('❌ Supabase client not initialized. Cannot fetch organization info.');
         return null;
     }
 

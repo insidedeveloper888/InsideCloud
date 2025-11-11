@@ -90,9 +90,22 @@ module.exports = async function handler(req, res) {
     }
     
     // Get Lark credentials to verify they're configured
-    const larkCredentials = await getLarkCredentials(organizationSlug);
-    if (!larkCredentials) {
-      res.status(404).json(failResponse(`Lark credentials not configured for organization '${organizationSlug}'`));
+    let larkCredentials;
+    try {
+      larkCredentials = await getLarkCredentials(organizationSlug);
+      if (!larkCredentials) {
+        console.warn(`⚠️  No Lark credentials found for organization: ${organizationSlug}`);
+        res.status(404).json(failResponse(`Lark credentials not configured for organization '${organizationSlug}'`));
+        return;
+      }
+    } catch (credError) {
+      console.error('❌ Error fetching Lark credentials:', credError);
+      console.error('Credential error details:', {
+        message: credError.message,
+        stack: credError.stack,
+        organizationSlug
+      });
+      res.status(500).json(failResponse(`Failed to fetch Lark credentials: ${credError.message || 'Unknown error'}`));
       return;
     }
     
@@ -111,8 +124,10 @@ module.exports = async function handler(req, res) {
     res.status(200).json(okResponse(responseData));
     
   } catch (error) {
-    console.error('Error getting organization config:', error);
-    res.status(500).json(failResponse('Internal server error'));
+    console.error('❌ Error getting organization config:', error);
+    console.error('Error stack:', error.stack);
+    const errorMessage = error.message || 'Internal server error';
+    res.status(500).json(failResponse(`Internal server error: ${errorMessage}`));
   }
 };
 
