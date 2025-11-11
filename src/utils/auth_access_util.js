@@ -7,6 +7,11 @@ const LJ_TOKEN_KEY = 'lk_token'
 const ORGANIZATION_APP_ID_KEY = 'lark_organization_app_id' // Store org-specific app ID
 const OAUTH_PROCESSING_KEY = 'oauth_processing' // Flag to prevent redirect loops
 
+// Check if external browser OAuth is allowed
+// Defaults to false (production behavior) - only allow JSAPI
+// Set REACT_APP_ALLOW_EXTERNAL_BROWSER=true in .env for local development
+const ALLOW_EXTERNAL_BROWSER = process.env.REACT_APP_ALLOW_EXTERNAL_BROWSER === 'true';
+
 /// ---------------- JSAPI鉴权 部分 -------------------------
 
 export async function handleJSAPIAccess(complete, organizationSlug = null) {
@@ -190,7 +195,15 @@ export async function handleUserAuth(complete, organizationSlug = null) {
         return;
     }
     
-    // JSAPI not available - use OAuth redirect flow (local development)
+    // JSAPI not available - check if external browser OAuth is allowed
+    if (!ALLOW_EXTERNAL_BROWSER) {
+        console.error("❌ JSAPI不可用，且不允许外部浏览器OAuth流程");
+        console.error("⚠️  请在Lark环境中打开应用，或设置 REACT_APP_ALLOW_EXTERNAL_BROWSER=true 以启用外部浏览器OAuth");
+        complete(null);
+        return;
+    }
+    
+    // Use OAuth redirect flow (local development with flag enabled)
     console.log("接入方前端[免登处理]第① 步: JSAPI不可用，使用OAuth重定向流程 (本地开发)")
     console.log("⚠️  Redirecting to Lark OAuth authorization page...")
     redirectToOAuth(orgSlug);

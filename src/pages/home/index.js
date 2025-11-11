@@ -723,7 +723,15 @@ const Home = () => {
           throw new Error('JSAPI authentication failed');
         }
       } else {
-        // Local development: Skip JSAPI (not needed for OAuth flow)
+        // JSAPI not available - check if external browser OAuth is allowed
+        const allowExternalBrowser = process.env.REACT_APP_ALLOW_EXTERNAL_BROWSER === 'true';
+        if (!allowExternalBrowser) {
+          console.log('🔐 JSAPI not available and external browser OAuth is disabled');
+          setAuthError('This application must be opened within Lark. Please open it from the Lark app.');
+          setIsLoading(false);
+          setIsAuthenticating(false);
+          return;
+        }
         console.log('🔐 JSAPI not available, using OAuth redirect flow (local development)');
       }
 
@@ -740,6 +748,15 @@ const Home = () => {
         setIsLoading(false);
         setIsAuthenticating(false);
       } else if (!isJSAPIAvailable) {
+        // Check if external browser OAuth is allowed
+        const allowExternalBrowser = process.env.REACT_APP_ALLOW_EXTERNAL_BROWSER === 'true';
+        if (!allowExternalBrowser) {
+          // External browser OAuth is disabled and JSAPI not available
+          setAuthError('This application must be opened within Lark. Please open it from the Lark app.');
+          setIsLoading(false);
+          setIsAuthenticating(false);
+          return;
+        }
         // OAuth redirect is happening, page will reload
         // Keep loading state - OAuth callback will handle completion
         console.log('⏳ OAuth redirect initiated, waiting for callback...');
