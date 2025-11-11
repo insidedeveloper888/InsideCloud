@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Cookies from 'js-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LineChart, Line,
@@ -7,10 +8,15 @@ import {
 import {
   Activity, TrendingUp, DollarSign, Target,
   Zap, Award, Briefcase, Heart,
-  ChevronRight, Star, ArrowUp, ArrowDown, Minus, X
+  ChevronRight, Star, ArrowUp, ArrowDown, Minus, X, RefreshCw
 } from 'lucide-react';
 import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
+import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
+import MembersList from '../../components/membersList';
+import DepartmentsList from '../../components/departmentsList';
+import BitableTables from '../../components/bitableTables';
+import { Card, CardContent, Grid, Typography, Chip, Stack, Button, Avatar } from '@mui/material';
 import './index.css';
 
 // Realistic placeholder data
@@ -121,6 +127,14 @@ const departmentData = [
     ]
   }
 ];
+
+const LJ_TOKEN_KEY = 'lk_token';
+const departmentColors = {
+  healthy: 'from-emerald-400 via-green-500 to-teal-500',
+  'at-risk': 'from-amber-400 via-orange-500 to-red-500',
+  critical: 'from-red-500 via-rose-500 to-purple-500',
+  improving: 'from-blue-400 via-indigo-500 to-purple-500'
+};
 
 const announcements = [
   {
@@ -822,27 +836,193 @@ const Footer = () => {
 };
 
 // Main Dashboard Component
-const InternalIntelligenceHub = ({ userInfo }) => {
-  return (
-    <div className="min-h-screen bg-dark-bg relative overflow-hidden">
-      {/* Animated background particles */}
-      <div className="fixed inset-0 z-0">
-        <div className="particles"></div>
-      </div>
+const DashboardView = ({ userInfo }) => {
+  const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
+  const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
+  const [activeView, setActiveView] = useState('overview'); // 'overview', 'departments', 'members', 'roadmap'
 
-      {/* Main content */}
-      <div className="relative z-10">
-        <Header userInfo={userInfo} />
-        <CompanyOverview />
-        <Announcements />
-        <DepartmentPerformance />
-        <EmployeeSpotlight />
-        <CompanyRoadmap />
-        <Footer />
-      </div>
-    </div>
+  const renderActiveView = () => {
+    switch (activeView) {
+      case 'overview':
+        return <CompanyOverview />;
+      case 'departments':
+        return <DepartmentPerformance />;
+      case 'announcements':
+        return <Announcements />;
+      case 'spotlight':
+        return <EmployeeSpotlight />;
+      case 'roadmap':
+        return <CompanyRoadmap />;
+      default:
+        return <CompanyOverview />;
+    }
+  };
+
+  const handleLogout = () => {
+    Cookies.remove(LJ_TOKEN_KEY);
+    window.location.reload();
+  };
+
+  const handleRefreshData = () => {
+    // Implement data refresh logic if needed
+    console.log('Refreshing data...');
+  };
+
+  const handleResetOrganization = () => {
+     // Clear organization from localStorage
+     localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+     // Reset state to show organization selector
+     setShowOrganizationSelector(true);
+     setAuthError(null);
+     setIsLoading(false);
+     setUserInfo(null);
+    setActiveView('dashboard');
+    setSelectedOrganizationSlug(null);
+    setSelectedOrganizationName(null);
+   };
+
+  return (
+    <ProtectedLayout
+      user={userInfo}
+      organizationName={selectedOrganizationName}
+      organizationSlug={selectedOrganizationSlug || undefined}
+      activeView={activeView}
+      onNavigate={setActiveView}
+      onLogout={handleLogout}
+      onChangeOrganization={handleResetOrganization}
+      onRefreshData={handleRefreshData}
+    >
+      {renderActiveView()}
+    </ProtectedLayout>
   );
 };
+
+const AccountOverview = ({ userInfo, organizationSlug, organizationName }) => (
+  <Stack spacing={3} sx={{ mt: 2 }}>
+    <Typography variant="h4" fontWeight={600} color="text.primary">
+      Account Overview
+    </Typography>
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={4}>
+        <Card elevation={2}>
+          <CardContent>
+            <Stack spacing={2} alignItems="center">
+              <Avatar
+                src={userInfo?.avatar_url || undefined}
+                alt={userInfo?.en_name || userInfo?.name || 'User Avatar'}
+                sx={{ width: 96, height: 96, fontSize: 32 }}
+              >
+                {(userInfo?.en_name || userInfo?.name || 'U').charAt(0).toUpperCase()}
+              </Avatar>
+              <Stack spacing={0.5} alignItems="center">
+                <Typography variant="h6">
+                  {userInfo?.en_name || userInfo?.name || 'Authenticated User'}
+                </Typography>
+                {userInfo?.name && userInfo?.en_name && userInfo?.en_name !== userInfo?.name && (
+                  <Typography variant="body2" color="text.secondary">
+                    {userInfo.name}
+                  </Typography>
+                )}
+                <Chip
+                  label={organizationSlug ? `Org: ${organizationSlug}` : 'Single Tenant'}
+                  color="primary"
+                  size="small"
+                  variant="outlined"
+                />
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} md={8}>
+        <Card elevation={2}>
+          <CardContent>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+              Contact Information
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Mobile
+                </Typography>
+                <Typography variant="body1">{userInfo?.mobile || 'Not provided'}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Email
+                </Typography>
+                <Typography variant="body1">{userInfo?.email || 'Not provided'}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Tenant Key
+                </Typography>
+                <Typography variant="body1">{userInfo?.tenant_key || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Organization Name
+                </Typography>
+                <Typography variant="body1">{organizationName || 'Not specified'}</Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  </Stack>
+);
+
+const AuditLogPlaceholder = () => (
+  <Card elevation={2} sx={{ mt: 2 }}>
+    <CardContent>
+      <Typography variant="h5" fontWeight={600} gutterBottom>
+        Audit Log
+      </Typography>
+      <Typography variant="body1" color="text.secondary" paragraph>
+        Audit log integration is planned. Once Supabase audit events are exposed
+        through the backend, entries will appear here with filtering and export
+        controls.
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        In the meantime, ensure Supabase has audit policies enabled for the
+        modules you plan to expose in the new interface.
+      </Typography>
+    </CardContent>
+  </Card>
+);
+
+const OrganizationOverview = ({ organizationSlug, organizationName, onChangeOrganization }) => (
+  <Stack spacing={3} sx={{ mt: 2 }}>
+    <Card elevation={2}>
+      <CardContent>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+          <div>
+            <Typography variant="h5" fontWeight={600} gutterBottom>
+              Organization Overview
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              You are currently authenticated against
+              {" "}
+              <strong>{organizationName || organizationSlug || 'the default tenant'}</strong>.
+            </Typography>
+            {organizationSlug && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Slug: {organizationSlug}
+              </Typography>
+            )}
+          </div>
+          {onChangeOrganization && (
+            <Button variant="outlined" onClick={onChangeOrganization} startIcon={<RefreshCw size={16} />}>
+              Change Organization
+            </Button>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+    <BitableTables />
+  </Stack>
+);
 
 // Main Home component that handles authentication
 const Home = () => {
@@ -850,11 +1030,16 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [showOrganizationSelector, setShowOrganizationSelector] = useState(true);
+  const [activeView, setActiveView] = useState('dashboard');
+  const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
+  const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
 
   useEffect(() => {
-    // Check if organization is already selected
-    const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
-    if (savedOrgSlug) {
+     // Check if organization is already selected
+     const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
+     if (savedOrgSlug) {
+      setSelectedOrganizationSlug(savedOrgSlug);
+      setSelectedOrganizationName(null);
       setShowOrganizationSelector(false);
       initializeAuth(savedOrgSlug);
     } else {
@@ -863,25 +1048,33 @@ const Home = () => {
   }, []);
 
   const handleOrganizationSelected = (slug, orgInfo) => {
-    if (slug) {
+     if (slug) {
+      setSelectedOrganizationSlug(slug);
+      setSelectedOrganizationName(orgInfo?.organization_name || null);
       setShowOrganizationSelector(false);
       setIsLoading(true);
       initializeAuth(slug);
     } else {
       // Skip organization selection (single-tenant mode)
+      setSelectedOrganizationSlug(null);
+      setSelectedOrganizationName(null);
       setShowOrganizationSelector(false);
       setIsLoading(true);
       initializeAuth(null);
     }
-  };
+   };
 
   const initializeAuth = async (orgSlug) => {
-    try {
-      console.log('🚀 Starting authentication process...');
-      console.log('🔍 Checking if Lark SDK is available...');
+     try {
+       console.log('🚀 Starting authentication process...');
+       console.log('🔍 Checking if Lark SDK is available...');
 
-      // Check if Lark SDK is available
-      if (typeof window.h5sdk === 'undefined') {
+      if (orgSlug) {
+        setSelectedOrganizationSlug(orgSlug);
+      }
+ 
+       // Check if Lark SDK is available
+       if (typeof window.h5sdk === 'undefined') {
         console.warn('⚠️ Lark SDK not available, running in development mode');
         // In development mode, create mock user data
         const mockUserInfo = {
@@ -972,16 +1165,6 @@ const Home = () => {
     );
   }
 
-  const handleResetOrganization = () => {
-    // Clear organization from localStorage
-    localStorage.removeItem(ORGANIZATION_SLUG_KEY);
-    // Reset state to show organization selector
-    setShowOrganizationSelector(true);
-    setAuthError(null);
-    setIsLoading(false);
-    setUserInfo(null);
-  };
-
   if (authError) {
     // Check if error is related to organization (invalid org, credentials not configured, etc.)
     const isOrgError = authError.includes('Organization') || 
@@ -1044,7 +1227,7 @@ const Home = () => {
     );
   }
 
-  return <InternalIntelligenceHub userInfo={userInfo} />;
+  return <DashboardView userInfo={userInfo} />;
 };
 
 export default Home;

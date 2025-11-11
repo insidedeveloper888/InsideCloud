@@ -5,6 +5,10 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@emotion/react": "^11.13.1",
+    "@emotion/styled": "^11.13.0",
+    "@mui/icons-material": "^5.15.20",
+    "@mui/material": "^5.15.20",
     "autoprefixer": "^10.4.21",
     "axios": "^1.2.3",
     "cookie": "^0.5.0",

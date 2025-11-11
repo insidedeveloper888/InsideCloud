@@ -88,7 +88,7 @@
 ## Supabase Verification Notes
 - `get_lark_credentials('cloud')` and `get_lark_credentials('inside')` return active credentials (app ID + secret + nonce) and associated `organization_id`.
 - `organizations` table has two active entries; ensure new UI allows switching org context via slug.
-- `lark_users` remains empty until real logins occur; sync job now runs on both Koa and Vercel auth handlers (verified via test RPC call).
+- `lark_users` now receives records on every successful Lark login; sync job runs on both Koa and Vercel auth handlers (manually verified in staging).
 - `organization_members` currently has 1 record—seed additional records for UI demos or adapt components to handle empty states.
 - No outstanding migrations detected; ensure future migrations use `supabase/migrations` pipeline.
 
