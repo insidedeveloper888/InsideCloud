@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
+import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
 import MembersList from '../../components/membersList';
 import DepartmentsList from '../../components/departmentsList';
 import BitableTables from '../../components/bitableTables';
@@ -1031,6 +1032,25 @@ const Home = () => {
     setSelectedOrganizationName(null);
   };
 
+  const handleLogout = () => {
+    Cookies.remove(LJ_TOKEN_KEY);
+    localStorage.removeItem(LJ_TOKEN_KEY);
+    localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+    setUserInfo(null);
+    setActiveView('dashboard');
+    setSelectedOrganizationSlug(null);
+    setSelectedOrganizationName(null);
+    setShowOrganizationSelector(true);
+    setAuthError(null);
+    window.location.reload();
+  };
+
+  const handleRefreshData = () => {
+    setIsLoading(true);
+    const slugToUse = selectedOrganizationSlug || null;
+    initializeAuth(slugToUse);
+  };
+
   const initializeAuth = async (orgSlug) => {
      try {
        console.log('🚀 Starting authentication process...');
@@ -1227,7 +1247,20 @@ const Home = () => {
     );
   }
 
-  return renderActiveView();
+  return (
+    <ProtectedLayout
+      user={userInfo}
+      organizationName={selectedOrganizationName}
+      organizationSlug={selectedOrganizationSlug || undefined}
+      activeView={activeView}
+      onNavigate={setActiveView}
+      onLogout={handleLogout}
+      onChangeOrganization={handleResetOrganization}
+      onRefreshData={handleRefreshData}
+    >
+      {renderActiveView()}
+    </ProtectedLayout>
+  );
 };
 
 export default Home;
