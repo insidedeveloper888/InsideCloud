@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { handleCors, okResponse, failResponse, setAuthCookie, getAuthFromCookie } = require('./_utils');
-const { getLarkCredentials } = require('./supabase_helper');
+const { getLarkCredentials, supabase } = require('./supabase_helper');
+const { syncLarkUser } = require('../lib/larkUserSync');
 
 module.exports = async function handler(req, res) {
     // Handle CORS
@@ -94,6 +95,16 @@ module.exports = async function handler(req, res) {
         if (newAccessToken) {
             // Set authentication cookie
             setAuthCookie(res, newAccessToken);
+
+            try {
+                await syncLarkUser({
+                    supabaseClient: supabase,
+                    accessTokenData: newAccessToken,
+                    organizationId: larkCredentials?.organization_id || null
+                });
+            } catch (syncError) {
+                console.error('❌ Failed to sync Lark user to Supabase:', syncError);
+            }
         }
 
         res.status(200).json(okResponse(newAccessToken));

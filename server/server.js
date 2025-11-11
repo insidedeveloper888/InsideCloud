@@ -6,6 +6,8 @@ const session = require('koa-session');
 const serverConfig = require('./server_config')
 const serverUtil = require('./server_util')
 const { getLarkCredentials, validateOrganization, getOrganizationInfo } = require('./organization_helper')
+const { supabase } = require('./supabase_client')
+const { syncLarkUser } = require('../lib/larkUserSync')
 
 const LJ_JSTICKET_KEY = 'lk_jsticket'
 const LJ_TOKEN_KEY = 'lk_token'
@@ -99,6 +101,16 @@ async function getUserAccessToken(ctx) {
     if (newAccessToken) {
         ctx.session.userinfo = newAccessToken
         serverUtil.setCookie(ctx, LJ_TOKEN_KEY, newAccessToken.access_token || '')
+
+        try {
+            await syncLarkUser({
+                supabaseClient: supabase,
+                accessTokenData: newAccessToken,
+                organizationId: ctx.session.organization_id || larkCredentials.organization_id || null
+            })
+        } catch (syncError) {
+            console.error('❌ Failed to sync Lark user to Supabase:', syncError)
+        }
     } else {
         serverUtil.setCookie(ctx, LJ_TOKEN_KEY, '')
     }
