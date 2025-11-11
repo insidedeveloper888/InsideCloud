@@ -837,63 +837,24 @@ const Footer = () => {
 
 // Main Dashboard Component
 const DashboardView = ({ userInfo }) => {
-  const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
-  const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
-  const [activeView, setActiveView] = useState('overview'); // 'overview', 'departments', 'members', 'roadmap'
-
-  const renderActiveView = () => {
-    switch (activeView) {
-      case 'overview':
-        return <CompanyOverview />;
-      case 'departments':
-        return <DepartmentPerformance />;
-      case 'announcements':
-        return <Announcements />;
-      case 'spotlight':
-        return <EmployeeSpotlight />;
-      case 'roadmap':
-        return <CompanyRoadmap />;
-      default:
-        return <CompanyOverview />;
-    }
-  };
-
-  const handleLogout = () => {
-    Cookies.remove(LJ_TOKEN_KEY);
-    window.location.reload();
-  };
-
-  const handleRefreshData = () => {
-    // Implement data refresh logic if needed
-    console.log('Refreshing data...');
-  };
-
-  const handleResetOrganization = () => {
-     // Clear organization from localStorage
-     localStorage.removeItem(ORGANIZATION_SLUG_KEY);
-     // Reset state to show organization selector
-     setShowOrganizationSelector(true);
-     setAuthError(null);
-     setIsLoading(false);
-     setUserInfo(null);
-    setActiveView('dashboard');
-    setSelectedOrganizationSlug(null);
-    setSelectedOrganizationName(null);
-   };
-
   return (
-    <ProtectedLayout
-      user={userInfo}
-      organizationName={selectedOrganizationName}
-      organizationSlug={selectedOrganizationSlug || undefined}
-      activeView={activeView}
-      onNavigate={setActiveView}
-      onLogout={handleLogout}
-      onChangeOrganization={handleResetOrganization}
-      onRefreshData={handleRefreshData}
-    >
-      {renderActiveView()}
-    </ProtectedLayout>
+    <div className="min-h-screen bg-dark-bg relative overflow-hidden">
+      {/* Animated background particles */}
+      <div className="fixed inset-0 z-0">
+        <div className="particles"></div>
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10">
+        <Header userInfo={userInfo} />
+        <CompanyOverview />
+        <Announcements />
+        <DepartmentPerformance />
+        <EmployeeSpotlight />
+        <CompanyRoadmap />
+        <Footer />
+      </div>
+    </div>
   );
 };
 
@@ -1064,6 +1025,19 @@ const Home = () => {
     }
    };
 
+  const handleResetOrganization = () => {
+    Cookies.remove(LJ_TOKEN_KEY);
+    localStorage.removeItem(LJ_TOKEN_KEY);
+    localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+    setShowOrganizationSelector(true);
+    setAuthError(null);
+    setIsLoading(false);
+    setUserInfo(null);
+    setActiveView('dashboard');
+    setSelectedOrganizationSlug(null);
+    setSelectedOrganizationName(null);
+  };
+
   const initializeAuth = async (orgSlug) => {
      try {
        console.log('🚀 Starting authentication process...');
@@ -1138,6 +1112,39 @@ const Home = () => {
       setIsLoading(false);
     }
   };
+
+  const renderActiveView = () => {
+     switch (activeView) {
+       case 'account':
+         return (
+           <AccountOverview
+             userInfo={userInfo}
+             organizationSlug={selectedOrganizationSlug}
+             organizationName={selectedOrganizationName}
+           />
+         );
+       case 'users':
+         return (
+           <Stack spacing={3} sx={{ mt: 2 }}>
+             <MembersList />
+             <DepartmentsList />
+           </Stack>
+         );
+       case 'audit_log':
+         return <AuditLogPlaceholder />;
+       case 'organization':
+         return (
+           <OrganizationOverview
+             organizationSlug={selectedOrganizationSlug}
+             organizationName={selectedOrganizationName}
+             onChangeOrganization={handleResetOrganization}
+           />
+         );
+       case 'dashboard':
+       default:
+        return <DashboardView userInfo={userInfo} />;
+     }
+   };
 
   if (showOrganizationSelector) {
     return <OrganizationSelector onOrganizationSelected={handleOrganizationSelected} />;
@@ -1227,7 +1234,7 @@ const Home = () => {
     );
   }
 
-  return <DashboardView userInfo={userInfo} />;
+  return renderActiveView();
 };
 
 export default Home;
