@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import clientConfig from '../../config/client_config.js';
-import { handleJSAPIAccess, handleUserAuth, handleOAuthCallback, redirectToOAuth } from '../../utils/auth_access_util.js';
+import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
 import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
 import {
