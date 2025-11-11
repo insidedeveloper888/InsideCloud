@@ -97,13 +97,15 @@ module.exports = async function handler(req, res) {
             setAuthCookie(res, newAccessToken);
 
             try {
+                console.log('ℹ️  [API] Calling syncLarkUser for', newAccessToken.user_id);
                 await syncLarkUser({
                     supabaseClient: supabase,
                     accessTokenData: newAccessToken,
                     organizationId: larkCredentials?.organization_id || null
                 });
+                console.log('✅  [API] syncLarkUser complete');
             } catch (syncError) {
-                console.error('❌ Failed to sync Lark user to Supabase:', syncError);
+                console.error('❌  [API] Failed to sync Lark user to Supabase:', syncError);
             }
         }
 

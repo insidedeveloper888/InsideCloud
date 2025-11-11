@@ -103,13 +103,15 @@ async function getUserAccessToken(ctx) {
         serverUtil.setCookie(ctx, LJ_TOKEN_KEY, newAccessToken.access_token || '')
 
         try {
+            console.log('ℹ️  Calling syncLarkUser for', newAccessToken.user_id)
             await syncLarkUser({
                 supabaseClient: supabase,
                 accessTokenData: newAccessToken,
                 organizationId: ctx.session.organization_id || larkCredentials.organization_id || null
             })
+            console.log('✅  syncLarkUser complete')
         } catch (syncError) {
-            console.error('❌ Failed to sync Lark user to Supabase:', syncError)
+            console.error('❌  Failed to sync Lark user to Supabase:', syncError)
         }
     } else {
         serverUtil.setCookie(ctx, LJ_TOKEN_KEY, '')
