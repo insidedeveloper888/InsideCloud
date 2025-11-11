@@ -11,32 +11,14 @@ import {
   Avatar,
   Typography,
   Divider,
-  Button,
   Stack,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import {
-  LayoutDashboard,
-  Users,
-  Settings,
-  FileText,
-  Building2,
-  User,
-  LogOut,
-  RefreshCw,
-} from "lucide-react";
+import { User } from "lucide-react";
 
-const drawerWidthExpanded = 248;
-const drawerWidthCollapsed = 76;
-
-const defaultNavItems = [
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "General" },
-  { key: "account", label: "Account", icon: Settings, section: "General" },
-  { key: "users", label: "Users", icon: Users, section: "Users" },
-  { key: "audit_log", label: "Audit Log", icon: FileText, section: "System" },
-  { key: "organization", label: "Organization", icon: Building2, section: "System" },
-];
+const drawerWidthExpanded = 240;
+const drawerWidthCollapsed = 72;
 
 function ProtectedLayout({
   user,
@@ -44,10 +26,7 @@ function ProtectedLayout({
   organizationSlug,
   activeView,
   onNavigate,
-  navItems = defaultNavItems,
-  onLogout,
-  onChangeOrganization,
-  onRefreshData,
+  navItems = [],
   children,
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -85,44 +64,44 @@ function ProtectedLayout({
               }),
             borderRight: "1px solid",
             borderColor: "divider",
+            display: "flex",
+            flexDirection: "column",
           },
         }}
         open
       >
-        <Box sx={{ display: "flex", alignItems: "center", px: 2, py: 2, gap: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "space-between",
+            px: 1,
+            py: 1.5,
+          }}
+        >
           <IconButton size="small" onClick={() => setCollapsed((prev) => !prev)}>
             {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </IconButton>
-          {!collapsed && (
-            <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <Typography variant="subtitle2" fontWeight={600}>
-                Inside Advisory
-              </Typography>
-              {organizationName && (
-                <Typography variant="caption" color="text.secondary">
-                  {organizationName}
-                </Typography>
-              )}
-            </Box>
-          )}
         </Box>
         <Divider />
-        <Box sx={{ px: 2.5, py: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <Box sx={{ px: collapsed ? 1 : 2.5, pt: 3, pb: 2, textAlign: "center" }}>
           <Box
             component="img"
             src="/inside-advisory/logo.png"
             alt="Inside Advisory"
-            sx={{ width: collapsed ? 32 : 120, transition: 'width 0.2s ease' }}
+            sx={{ width: collapsed ? 36 : 120, height: "auto", mb: collapsed ? 1 : 1.5 }}
           />
-          <Divider flexItem sx={{ borderColor: 'divider' }} />
-          <Avatar
-            sx={{ width: 42, height: 42 }}
-            src={user?.avatar_url || user?.avatarUrl || undefined}
-          >
-            <User size={20} />
-          </Avatar>
           {!collapsed && (
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack spacing={1} alignItems="center">
+              <Typography variant="subtitle2" fontWeight={600}>
+                Inside Advisory
+              </Typography>
+              <Avatar
+                sx={{ width: 48, height: 48 }}
+                src={user?.avatar_url || user?.avatarUrl || undefined}
+              >
+                <User size={20} />
+              </Avatar>
               <Typography variant="subtitle2" noWrap>
                 {user?.en_name || user?.name || "User"}
               </Typography>
@@ -131,18 +110,18 @@ function ProtectedLayout({
                   {organizationSlug}
                 </Typography>
               )}
-            </Box>
+            </Stack>
           )}
         </Box>
         <Divider />
-        <Box sx={{ flex: 1, overflowY: "auto" }}>
+        <Box sx={{ flex: 1, overflowY: "auto", px: collapsed ? 0 : 1.5, py: 1 }}>
           {Object.entries(groupedNav).map(([section, items]) => (
-            <Box key={section}>
+            <Box key={section} sx={{ mb: collapsed ? 0.5 : 1.5 }}>
               {!collapsed && (
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ px: 2, py: 1.5, display: "block" }}
+                  sx={{ px: 1, pb: 0.75, display: "block" }}
                 >
                   {section}
                 </Typography>
@@ -158,11 +137,11 @@ function ProtectedLayout({
                       onClick={() => handleNavigate(item.key)}
                       sx={{
                         borderRadius: collapsed ? "0" : 2,
-                        mx: collapsed ? 0 : 1,
-                        my: 0.5,
+                        mx: collapsed ? 0 : 0.5,
+                        my: 0.25,
                       }}
                     >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
+                      <ListItemIcon sx={{ minWidth: collapsed ? 32 : 36 }}>
                         <Icon size={18} />
                       </ListItemIcon>
                       {!collapsed && <ListItemText primary={item.label} />}
@@ -174,43 +153,11 @@ function ProtectedLayout({
           ))}
         </Box>
         <Divider />
-        <Box sx={{ p: collapsed ? 1.5 : 2.5, display: "flex", flexDirection: "column", gap: 1.5, pb: collapsed ? 2 : 3 }}>
+        <Box sx={{ px: collapsed ? 1 : 2, py: collapsed ? 1.5 : 2.5 }}>
           {!collapsed && (
-            <Stack spacing={1}>
-              {onChangeOrganization && (
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  startIcon={<RefreshCw size={16} />}
-                  onClick={onChangeOrganization}
-                >
-                  Change Organization
-                </Button>
-              )}
-              {onRefreshData && (
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  startIcon={<RefreshCw size={16} />}
-                  onClick={onRefreshData}
-                >
-                  Refresh Data
-                </Button>
-              )}
-              {onLogout && (
-                <Button fullWidth
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  startIcon={<LogOut size={16} />}
-                  onClick={onLogout}
-                >
-                  Logout
-                </Button>
-              )}
-            </Stack>
+            <Typography variant="caption" color="text.secondary" align="center">
+              © 2025 Inside Advisory. All rights reserved.
+            </Typography>
           )}
         </Box>
       </Drawer>
@@ -226,7 +173,7 @@ function ProtectedLayout({
           sx={{
             px: { xs: 2, md: 4 },
             py: { xs: 3, md: 4 },
-            maxWidth: "1600px",
+            maxWidth: "1200px",
             margin: "0 auto",
           }}
         >

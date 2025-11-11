@@ -12,6 +12,14 @@ const { syncLarkUser } = require('../lib/larkUserSync')
 const LJ_JSTICKET_KEY = 'lk_jsticket'
 const LJ_TOKEN_KEY = 'lk_token'
 
+const slugify = (value) =>
+    (value || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '')
+        .substring(0, 60)
+
 //处理免登请求，返回用户的user_access_token
 async function getUserAccessToken(ctx) {
 
@@ -756,7 +764,8 @@ async function getOrganizationConfig(ctx) {
         organization_name: orgInfo.name,
         organization_id: orgInfo.id,
         lark_app_id: larkCredentials.lark_app_id, // Safe to return app_id
-        is_active: orgInfo.is_active
+        is_active: orgInfo.is_active,
+        is_admin: !!ctx.session.is_admin
     })
     
     console.log("-------------------[获取组织配置 END]-----------------------------\n")
@@ -855,6 +864,92 @@ async function getAuditLogs(ctx) {
     console.log("-------------------[获取审计日志 END]-----------------------------\n")
 }
 
+async function getOrganizationsAdmin(ctx) {
+    console.log("\n-------------------[获取全部组织 BEGIN]-----------------------------")
+    serverUtil.configAccessControl(ctx)
+
+    if (!ctx.session.is_admin) {
+        ctx.body = serverUtil.failResponse('权限不足，仅管理员可访问')
+        return
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('organizations')
+            .select('id, name, slug, is_active, created_at')
+            .order('created_at', { ascending: true })
+
+        if (error) {
+            console.error('❌ Failed to fetch organizations:', error)
+            ctx.body = serverUtil.failResponse('获取组织失败')
+            return
+        }
+
+        ctx.body = serverUtil.okResponse(data || [])
+        console.log(`成功返回 ${data?.length || 0} 个组织`)
+    } catch (error) {
+        console.error('❌ Exception fetching organizations:', error)
+        ctx.body = serverUtil.failResponse('服务器内部错误')
+    }
+
+    console.log("-------------------[获取全部组织 END]-----------------------------\n")
+}
+
+async function createOrganizationAdmin(ctx) {
+    console.log("\n-------------------[创建组织 BEGIN]-----------------------------")
+    serverUtil.configAccessControl(ctx)
+
+    if (!ctx.session.is_admin) {
+        ctx.body = serverUtil.failResponse('权限不足，仅管理员可访问')
+        return
+    }
+
+    const name = (ctx.query.name || '').trim()
+    let customSlug = (ctx.query.slug || '').trim()
+
+    if (!name) {
+        ctx.body = serverUtil.failResponse('组织名称不能为空')
+        return
+    }
+
+    if (!customSlug) {
+        customSlug = slugify(name)
+    } else {
+        customSlug = slugify(customSlug)
+    }
+
+    if (!customSlug) {
+        ctx.body = serverUtil.failResponse('无法生成有效的组织标识')
+        return
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('organizations')
+            .insert({
+                name,
+                slug: customSlug,
+                is_active: true,
+            })
+            .select('id, name, slug, is_active, created_at')
+            .single()
+
+        if (error) {
+            console.error('❌ Failed to create organization:', error)
+            ctx.body = serverUtil.failResponse(error.message || '创建组织失败')
+            return
+        }
+
+        ctx.body = serverUtil.okResponse(data)
+        console.log(`成功创建组织 ${data.name}`)
+    } catch (error) {
+        console.error('❌ Exception creating organization:', error)
+        ctx.body = serverUtil.failResponse('服务器内部错误')
+    }
+
+    console.log("-------------------[创建组织 END]-----------------------------\n")
+}
+
 //注册服务端路由和处理
 router.get(serverConfig.config.getUserAccessTokenPath, getUserAccessToken)
 router.get(serverConfig.config.getSignParametersPath, getSignParameters)
@@ -865,6 +960,8 @@ router.get(serverConfig.config.getDepartmentUsersPath, getDepartmentUsers)
 router.get(serverConfig.config.getBitableTablesPath, getBitableTables)
 router.get('/api/get_audit_logs', getAuditLogs)
 router.get('/api/get_supabase_members', getSupabaseMembers)
+router.get('/api/admin/organizations', getOrganizationsAdmin)
+router.post('/api/admin/organizations', createOrganizationAdmin)
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());
 app.listen(port, () => {

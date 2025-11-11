@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import clientConfig from '../../config/client_config.js';
 import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
-import BitableTables from '../../components/bitableTables';
 import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
 import {
   Box,
@@ -22,8 +21,20 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TextField,
 } from '@mui/material';
-import { Users, Shield, Layers, FileText, Building2, RefreshCw, HardDrive, Settings } from 'lucide-react';
+import {
+  Users,
+  Shield,
+  Layers,
+  FileText,
+  Building2,
+  RefreshCw,
+  HardDrive,
+  Settings,
+  LayoutDashboard,
+  UserCircle2,
+} from 'lucide-react';
 import './index.css';
 
 const resolveApiOrigin = () =>
@@ -36,6 +47,14 @@ const formatDateTime = (value) =>
 
 const titleizeSlug = (slug) =>
   slug ? slug.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) : '';
+
+const slugify = (value) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+    .substring(0, 60);
 
 const dashboardWidgets = [
   { key: 'people', label: 'People', icon: Users },
@@ -199,7 +218,7 @@ const SupabaseMembers = ({ organizationSlug }) => {
                   </TableCell>
                   <TableCell>{formatDateTime(member.joined_at)}</TableCell>
                 </TableRow>
-          ))}
+              ))}
             </TableBody>
           </Table>
         )}
@@ -323,7 +342,7 @@ const AuditLogView = ({ organizationSlug }) => {
                       </Typography>
                     </TableCell>
                   </TableRow>
-              ))}
+                ))}
               </TableBody>
             </Table>
           )}
@@ -333,35 +352,197 @@ const AuditLogView = ({ organizationSlug }) => {
   );
 };
 
-const OrganizationView = ({ organizationName, organizationSlug, onChangeOrganization }) => (
+const AccountView = ({ userInfo, organizationName, organizationSlug, onChangeOrganization, onLogout }) => (
   <Stack spacing={3} sx={{ mt: 2 }}>
-    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={2}>
-      <Box>
-        <Typography variant="h4" fontWeight={600}>
-          Organisation
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {organizationName || titleizeSlug(organizationSlug) || 'Inside Advisory'}
-        </Typography>
-      </Box>
-      <Button variant="contained" startIcon={<Building2 size={16} />} onClick={onChangeOrganization}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="flex-end">
+      <Button variant="outlined" onClick={onChangeOrganization}>
         Change Organisation
+      </Button>
+      <Button variant="outlined" color="error" onClick={onLogout}>
+        Log Out
       </Button>
     </Stack>
     <Card sx={{ borderRadius: 4 }}>
       <CardContent>
-        <Typography variant="h6" fontWeight={600} gutterBottom>
-          Connected Bitable Workspaces
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Manage the tables and automations linked to your Inside Advisory workspace. Use the actions below to refresh
-          or reconfigure integrations.
-        </Typography>
-        <BitableTables />
+        <Stack spacing={2} alignItems="center">
+          <Avatar src={userInfo?.avatar_url || undefined} sx={{ width: 96, height: 96, fontSize: 32 }}>
+            {(userInfo?.en_name || 'U').charAt(0)}
+          </Avatar>
+          <Typography variant="h6">{userInfo?.en_name || 'Authenticated User'}</Typography>
+          <Chip label="Admin" color="primary" variant="outlined" />
+          <Typography variant="body2" color="text.secondary">
+            {organizationName || titleizeSlug(organizationSlug) || 'Inside Advisory'}
+          </Typography>
+        </Stack>
       </CardContent>
     </Card>
   </Stack>
 );
+
+const OrganizationView = ({ isAdmin }) => {
+  const [organizations, setOrganizations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const fetchOrganizations = useCallback(async () => {
+    if (!isAdmin) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const base = resolveApiOrigin();
+      const response = await fetch(`${base}/api/admin/organizations`, {
+        credentials: 'include',
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch organisations (${response.status})`);
+      }
+      const json = await response.json();
+      if (json.code !== 0) {
+        throw new Error(json.msg || 'Failed to fetch organisations');
+      }
+      setOrganizations(json.data || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [fetchOrganizations]);
+
+  const handleCreate = async (event) => {
+    event.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const base = resolveApiOrigin();
+      const params = new URLSearchParams({ name: name.trim() });
+      if (slug.trim()) {
+        params.append('slug', slugify(slug));
+      }
+      const response = await fetch(`${base}/api/admin/organizations?${params.toString()}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to create organisation (${response.status})`);
+      }
+      const json = await response.json();
+      if (json.code !== 0) {
+        throw new Error(json.msg || 'Failed to create organisation');
+      }
+      setName('');
+      setSlug('');
+      fetchOrganizations();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isAdmin) {
+    return (
+      <Alert severity="warning" sx={{ mt: 2 }}>
+        Organisation administration is restricted to system administrators.
+      </Alert>
+    );
+  }
+
+  return (
+    <Stack spacing={3} sx={{ mt: 2 }}>
+      <Typography variant="h4" fontWeight={600}>
+        Organisations
+      </Typography>
+      <Card sx={{ borderRadius: 4 }}>
+        <CardContent>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Create New Organisation
+          </Typography>
+          <Stack
+            component="form"
+            spacing={1.5}
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'flex-end' }}
+            onSubmit={handleCreate}
+          >
+            <TextField
+              label="Organisation name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Custom slug (optional)"
+              value={slug}
+              onChange={(event) => setSlug(event.target.value)}
+              fullWidth
+            />
+            <Button type="submit" variant="contained" disabled={saving}>
+              {saving ? 'Saving…' : 'Add'}
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+      <Card sx={{ borderRadius: 4 }}>
+        <CardContent>
+          {loading ? (
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }} spacing={2}>
+              <CircularProgress />
+              <Typography variant="body2" color="text.secondary">
+                Loading organisations…
+              </Typography>
+            </Stack>
+          ) : error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : organizations.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No organisations found yet. Use the form above to add one.
+            </Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Slug</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Created</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {organizations.map((org) => (
+                  <TableRow key={org.id} hover>
+                    <TableCell>{org.name}</TableCell>
+                    <TableCell>
+                      <Chip label={org.slug} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={org.is_active ? 'Active' : 'Inactive'}
+                        size="small"
+                        color={org.is_active ? 'success' : 'default'}
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{formatDateTime(org.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+};
 
 const LoadingState = () => (
   <Box
@@ -375,7 +556,7 @@ const LoadingState = () => (
       flexDirection: 'column',
       gap: 2,
     }}
-            >
+  >
     <CircularProgress color="inherit" />
     <Typography variant="body1">Authenticating with Lark…</Typography>
   </Box>
@@ -421,6 +602,7 @@ const Home = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
   const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
@@ -428,13 +610,35 @@ const Home = () => {
       setSelectedOrganizationSlug(savedOrgSlug);
       setShowOrganizationSelector(false);
       fetchOrganizationDetails(savedOrgSlug).finally(() => {
-      initializeAuth(savedOrgSlug);
+        initializeAuth(savedOrgSlug);
       });
     } else {
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const allowed = ['dashboard', 'account'];
+    if (!isAdmin && !allowed.includes(activeView)) {
+      setActiveView('dashboard');
+    }
+  }, [isAdmin, activeView]);
+
+  const navItems = useMemo(() => {
+    const base = [
+      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
+      { key: 'account', label: 'Account', icon: UserCircle2, section: 'General' },
+    ];
+    if (isAdmin) {
+      base.push(
+        { key: 'users', label: 'Users', icon: Users, section: 'Team' },
+        { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
+        { key: 'organization', label: 'Organization', icon: Building2, section: 'System' }
+      );
+    }
+    return base;
+  }, [isAdmin]);
 
   const fetchOrganizationDetails = async (slug) => {
     try {
@@ -446,9 +650,13 @@ const Home = () => {
       const json = await response.json();
       if (json.code === 0) {
         setSelectedOrganizationName(json.data.organization_name || null);
+        setIsAdmin(Boolean(json.data?.is_admin));
+      } else {
+        setIsAdmin(false);
       }
     } catch (error) {
       console.warn('Unable to fetch organisation details', error);
+      setIsAdmin(false);
     }
   };
 
@@ -458,12 +666,14 @@ const Home = () => {
       setSelectedOrganizationName(orgInfo?.organization_name || null);
       setShowOrganizationSelector(false);
       setIsLoading(true);
+      fetchOrganizationDetails(slug);
       initializeAuth(slug);
     } else {
       setSelectedOrganizationSlug(null);
       setSelectedOrganizationName(null);
       setShowOrganizationSelector(false);
       setIsLoading(true);
+      setIsAdmin(false);
       initializeAuth(null);
     }
   };
@@ -529,6 +739,14 @@ const Home = () => {
     setActiveView('dashboard');
     setSelectedOrganizationSlug(null);
     setSelectedOrganizationName(null);
+    setIsAdmin(false);
+  };
+
+  const handleLogout = () => {
+    Cookies.remove('lk_token');
+    localStorage.removeItem('lk_token');
+    localStorage.removeItem(ORGANIZATION_SLUG_KEY);
+    window.location.reload();
   };
 
   const handleRefreshData = () => {
@@ -541,38 +759,20 @@ const Home = () => {
     switch (activeView) {
       case 'account':
         return (
-          <Stack spacing={3} sx={{ mt: 2 }}>
-            <Typography variant="h4" fontWeight={600}>
-              Account
-            </Typography>
-            <Card sx={{ borderRadius: 4 }}>
-              <CardContent>
-                <Stack spacing={2} alignItems="center">
-                  <Avatar src={userInfo?.avatar_url || undefined} sx={{ width: 96, height: 96, fontSize: 32 }}>
-                    {(userInfo?.en_name || 'U').charAt(0)}
-                  </Avatar>
-                  <Typography variant="h6">{userInfo?.en_name || 'Authenticated User'}</Typography>
-                  <Chip label="Admin" color="primary" variant="outlined" />
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedOrganizationName || titleizeSlug(selectedOrganizationSlug) || 'Inside Advisory'}
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Stack>
+          <AccountView
+            userInfo={userInfo}
+            organizationName={selectedOrganizationName}
+            organizationSlug={selectedOrganizationSlug}
+            onChangeOrganization={handleResetOrganization}
+            onLogout={handleLogout}
+          />
         );
       case 'users':
         return <UsersView organizationSlug={selectedOrganizationSlug} />;
       case 'audit_log':
         return <AuditLogView organizationSlug={selectedOrganizationSlug} />;
       case 'organization':
-        return (
-          <OrganizationView
-            organizationName={selectedOrganizationName}
-            organizationSlug={selectedOrganizationSlug}
-            onChangeOrganization={handleResetOrganization}
-          />
-        );
+        return <OrganizationView isAdmin={isAdmin} />;
       case 'dashboard':
       default:
         return <DashboardContent />;
@@ -609,10 +809,8 @@ const Home = () => {
       organizationSlug={selectedOrganizationSlug || undefined}
       activeView={activeView}
       onNavigate={setActiveView}
-      onLogout={handleResetOrganization}
-      onChangeOrganization={handleResetOrganization}
-      onRefreshData={handleRefreshData}
-            >
+      navItems={navItems}
+    >
       {renderActiveView()}
     </ProtectedLayout>
   );
