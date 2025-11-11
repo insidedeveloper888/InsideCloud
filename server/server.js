@@ -47,6 +47,18 @@ async function getUserAccessToken(ctx) {
     const lkToken = ctx.cookies.get(LJ_TOKEN_KEY) || ''
     if (accessToken && accessToken.access_token && lkToken.length > 0 && accessToken.access_token == lkToken) {
         console.log("接入服务方第② 步: 从Session中获取user_access_token信息，用户已登录")
+
+        try {
+            console.log('ℹ️  Session auth found, ensuring Supabase sync for', accessToken.user_id)
+            await syncLarkUser({
+                supabaseClient: supabase,
+                accessTokenData: accessToken,
+                organizationId: ctx.session.organization_id || larkCredentials.organization_id || null
+            })
+        } catch (syncError) {
+            console.error('❌  Failed to sync existing session user to Supabase:', syncError)
+        }
+
         ctx.body = serverUtil.okResponse(accessToken)
         console.log("-------------------[接入服务端免登处理 END]-----------------------------\n")
         return

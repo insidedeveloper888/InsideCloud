@@ -10,15 +10,6 @@ module.exports = async function handler(req, res) {
     console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------");
     console.log(`接入服务方第① 步: 接收到前端免登请求`);
 
-    // Check if user is already authenticated
-    const existingAuth = getAuthFromCookie(req);
-    if (existingAuth && existingAuth.access_token) {
-        console.log("接入服务方第② 步: 从Cookie中获取user_access_token信息，用户已登录");
-        res.status(200).json(okResponse(existingAuth));
-        console.log("-------------------[接入服务端免登处理 END]-----------------------------\n");
-        return;
-    }
-
     // Get organization slug from query
     const organizationSlug = req.query.organization_slug || "";
     
@@ -39,6 +30,27 @@ module.exports = async function handler(req, res) {
             lark_app_id: config.appId,
             lark_app_secret: config.appSecret
         };
+    }
+
+    // Check if user is already authenticated (cookie present)
+    const existingAuth = getAuthFromCookie(req);
+    if (existingAuth && existingAuth.access_token) {
+        console.log("接入服务方第② 步: 从Cookie中获取user_access_token信息，用户已登录");
+
+        try {
+            console.log('ℹ️  [API] Existing auth found, ensuring Supabase sync for', existingAuth.user_id);
+            await syncLarkUser({
+                supabaseClient: supabase,
+                accessTokenData: existingAuth,
+                organizationId: larkCredentials?.organization_id || null
+            });
+        } catch (syncError) {
+            console.error('❌  [API] Failed to sync existing Lark user to Supabase:', syncError);
+        }
+
+        res.status(200).json(okResponse(existingAuth));
+        console.log("-------------------[接入服务端免登处理 END]-----------------------------\n");
+        return;
     }
 
     let code = req.query.code || "";
