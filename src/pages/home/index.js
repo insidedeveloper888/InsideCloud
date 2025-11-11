@@ -25,17 +25,15 @@ import {
 } from '@mui/material';
 import {
   Users,
-  Shield,
-  Layers,
   FileText,
   Building2,
   RefreshCw,
-  HardDrive,
-  Settings,
   LayoutDashboard,
   UserCircle2,
+  Map,
 } from 'lucide-react';
 import './index.css';
+import StrategicMapView from '../../components/StrategicMap/index.jsx';
 
 const resolveApiOrigin = () =>
   clientConfig.apiOrigin && clientConfig.apiOrigin.length > 0
@@ -56,53 +54,48 @@ const slugify = (value) =>
     .replace(/(^-|-$)+/g, '')
     .substring(0, 60);
 
-const dashboardWidgets = [
-  { key: 'people', label: 'People', icon: Users },
-  { key: 'security', label: 'Security', icon: Shield },
-  { key: 'systems', label: 'Systems', icon: Layers },
-  { key: 'reports', label: 'Reports', icon: FileText },
-  { key: 'infrastructure', label: 'Infrastructure', icon: HardDrive },
-  { key: 'settings', label: 'Settings', icon: Settings },
-];
-
-const DashboardContent = () => (
-  <Stack spacing={3} sx={{ mt: 2 }}>
-    <Card sx={{ borderRadius: 4 }}>
-      <CardContent sx={{ py: 6, textAlign: 'center' }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          Welcome to Inside Advisory
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 520, mx: 'auto' }}>
-          Your personalised dashboard will live here. Pin widgets to launch the services your team uses most.
-        </Typography>
-      </CardContent>
-    </Card>
-    <Typography variant="subtitle1" fontWeight={600}>
-      Quick Launch (coming soon)
-    </Typography>
-    <Grid container spacing={2}>
-      {dashboardWidgets.map((widget) => {
-        const Icon = widget.icon;
-        return (
-          <Grid item xs={12} sm={6} md={4} key={widget.key}>
-            <Card sx={{ borderRadius: 4, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 5 }}>
-              <Stack spacing={1.5} alignItems="center">
-                <Avatar sx={{ width: 56, height: 56, bgcolor: 'secondary.light', color: 'secondary.dark' }}>
-                  <Icon size={24} />
-                </Avatar>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  {widget.label}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 220 }}>
-                  Widget placeholder. Click functionality will be added later.
-                </Typography>
-              </Stack>
-            </Card>
-          </Grid>
-        );
-      })}
+const DashboardContent = ({ onNavigate }) => (
+  <Box>
+    <Grid container spacing={3}>
+      <Grid item xs={12} sm={6} md={4}>
+        <Card
+          sx={{
+            borderRadius: 3,
+            height: '100%',
+            minHeight: 200,
+            transition: 'all 0.3s ease',
+            cursor: 'pointer',
+            '&:hover': {
+              transform: 'translateY(-8px)',
+              boxShadow: 6,
+            },
+          }}
+          onClick={() => onNavigate && onNavigate('strategic_map')}
+        >
+          <CardContent sx={{ p: 4, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+            <Avatar
+              sx={{
+                width: 64,
+                height: 64,
+                bgcolor: 'primary.main',
+                color: 'white',
+                mx: 'auto',
+                mb: 2,
+              }}
+            >
+              <Map size={32} />
+            </Avatar>
+            <Typography variant="h5" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
+              战略地图
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', mt: 1 }}>
+              Strategic Map
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
     </Grid>
-  </Stack>
+  </Box>
 );
 
 const SupabaseMembers = ({ organizationSlug }) => {
@@ -145,82 +138,92 @@ const SupabaseMembers = ({ organizationSlug }) => {
   }, [fetchMembers]);
 
   return (
-    <Card sx={{ borderRadius: 4 }}>
-      <CardContent>
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} sx={{ mb: 2 }} spacing={2}>
+    <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 3 }} spacing={2}>
           <Box>
-            <Typography variant="h5" fontWeight={600}>
-              Organisation Members
+            <Typography variant="h6" fontWeight={600}>
+              Team Members
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Showing members from Supabase for this organisation.
+              Manage your organisation's team
             </Typography>
           </Box>
-          <Button variant="outlined" startIcon={<RefreshCw size={16} />} onClick={fetchMembers}>
+          <Button variant="contained" startIcon={<RefreshCw size={18} />} onClick={fetchMembers} size="small">
             Refresh
           </Button>
         </Stack>
 
         {loading ? (
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }} spacing={2}>
+          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }} spacing={2}>
             <CircularProgress />
             <Typography variant="body2" color="text.secondary">
-              Loading members…
+              Loading team members…
             </Typography>
           </Stack>
         ) : error ? (
-          <Alert severity="error">{error}</Alert>
+          <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>
         ) : members.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No members found in Supabase for this organisation.
-          </Typography>
+          <Box sx={{ textAlign: 'center', py: 6 }}>
+            <Typography variant="body1" color="text.secondary">
+              No members found for this organisation.
+            </Typography>
+          </Box>
         ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell width="40%">Member</TableCell>
-                <TableCell width="25%">Role</TableCell>
-                <TableCell width="20%">Status</TableCell>
-                <TableCell width="15%">Joined</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {members.map((member) => (
-                <TableRow key={member.id} hover>
-                  <TableCell>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Avatar src={member.avatar_url || undefined}>{(member.name || 'U').charAt(0)}</Avatar>
-                      <Box>
-                        <Typography variant="subtitle2">{member.name || 'Unknown User'}</Typography>
-                        {member.email && (
-                          <Typography variant="caption" color="text.secondary">
-                            {member.email}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={(member.role_code || 'member').toUpperCase()}
-                      size="small"
-                      variant="outlined"
-                      color={member.role_code === 'admin' ? 'primary' : 'default'}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={member.status || 'unknown'}
-                      size="small"
-                      variant="outlined"
-                      color={member.status === 'active' ? 'success' : 'default'}
-                    />
-                  </TableCell>
-                  <TableCell>{formatDateTime(member.joined_at)}</TableCell>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Member</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Joined</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {members.map((member) => (
+                  <TableRow key={member.id} hover sx={{ '&:last-child td': { border: 0 } }}>
+                    <TableCell>
+                      <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar src={member.avatar_url || undefined} sx={{ width: 40, height: 40 }}>
+                          {(member.name || 'U').charAt(0)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {member.name || 'Unknown User'}
+                          </Typography>
+                          {member.email && (
+                            <Typography variant="caption" color="text.secondary">
+                              {member.email}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={(member.role_code || 'member').toUpperCase()}
+                        size="small"
+                        color={member.role_code === 'admin' ? 'primary' : 'default'}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={member.status || 'unknown'}
+                        size="small"
+                        color={member.status === 'active' ? 'success' : 'default'}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatDateTime(member.joined_at)}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         )}
       </CardContent>
     </Card>
@@ -228,12 +231,17 @@ const SupabaseMembers = ({ organizationSlug }) => {
 };
 
 const UsersView = ({ organizationSlug }) => (
-  <Stack spacing={3} sx={{ mt: 2 }}>
-    <Typography variant="h4" fontWeight={600}>
-      People
-    </Typography>
+  <Box>
+    <Box sx={{ mb: 3 }}>
+      <Typography variant="h4" fontWeight={700}>
+        People
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        View and manage your team members
+      </Typography>
+    </Box>
     <SupabaseMembers organizationSlug={organizationSlug} />
-  </Stack>
+  </Box>
 );
 
 const AuditLogView = ({ organizationSlug }) => {
@@ -352,7 +360,7 @@ const AuditLogView = ({ organizationSlug }) => {
   );
 };
 
-const AccountView = ({ userInfo, organizationName, organizationSlug, onChangeOrganization, onLogout }) => (
+const AccountView = ({ userInfo, organizationName, organizationSlug, onChangeOrganization, onLogout, isAdmin }) => (
   <Stack spacing={3} sx={{ mt: 2 }}>
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="flex-end">
       <Button variant="outlined" onClick={onChangeOrganization}>
@@ -369,7 +377,9 @@ const AccountView = ({ userInfo, organizationName, organizationSlug, onChangeOrg
             {(userInfo?.en_name || 'U').charAt(0)}
           </Avatar>
           <Typography variant="h6">{userInfo?.en_name || 'Authenticated User'}</Typography>
-          <Chip label="Admin" color="primary" variant="outlined" />
+          {isAdmin && (
+            <Chip label="Admin" color="primary" variant="outlined" />
+          )}
           <Typography variant="body2" color="text.secondary">
             {organizationName || titleizeSlug(organizationSlug) || 'Inside Advisory'}
           </Typography>
@@ -620,44 +630,57 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    const allowed = ['dashboard', 'account'];
-    if (!isAdmin && !allowed.includes(activeView)) {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
 
   const navItems = useMemo(() => {
-    const base = [
+    // Normal users only see Dashboard
+    if (!isAdmin) {
+      return [
+        { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
+      ];
+    }
+    // Admin users see all tabs
+    return [
       { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
       { key: 'account', label: 'Account', icon: UserCircle2, section: 'General' },
+      { key: 'users', label: 'Users', icon: Users, section: 'Team' },
+      { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
+      { key: 'organization', label: 'Organization', icon: Building2, section: 'System' },
     ];
-    if (isAdmin) {
-      base.push(
-        { key: 'users', label: 'Users', icon: Users, section: 'Team' },
-        { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
-        { key: 'organization', label: 'Organization', icon: Building2, section: 'System' }
-      );
-    }
-    return base;
   }, [isAdmin]);
 
   const fetchOrganizationDetails = async (slug) => {
     try {
       const base = resolveApiOrigin();
-      const response = await fetch(`${base}/api/get_organization_config?organization_slug=${slug}`, {
+      // Add cache-busting parameter to force fresh data
+      const cacheBuster = `_t=${Date.now()}`;
+      const response = await fetch(`${base}/api/get_organization_config?organization_slug=${slug}&${cacheBuster}`, {
         credentials: 'include',
-        headers: { 'ngrok-skip-browser-warning': 'true' },
+        headers: { 
+          'ngrok-skip-browser-warning': 'true',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
       });
       const json = await response.json();
+      console.log('🔍 Frontend: Received org config:', { is_admin: json.data?.is_admin, role_from_api: json.data?.is_admin });
       if (json.code === 0) {
         setSelectedOrganizationName(json.data.organization_name || null);
-        setIsAdmin(Boolean(json.data?.is_admin));
+        // ALWAYS use the value from API, never cache
+        const apiIsAdmin = Boolean(json.data?.is_admin);
+        setIsAdmin(apiIsAdmin);
+        console.log(`📤 Frontend: Set isAdmin=${apiIsAdmin} (from API response)`);
       } else {
         setIsAdmin(false);
+        console.log('⚠️ Frontend: API returned error, setting isAdmin=false');
       }
     } catch (error) {
       console.warn('Unable to fetch organisation details', error);
       setIsAdmin(false);
+      console.log('⚠️ Frontend: Fetch failed, setting isAdmin=false');
     }
   };
 
@@ -798,6 +821,14 @@ const Home = () => {
 
   const renderActiveView = () => {
     switch (activeView) {
+      case 'strategic_map':
+        return (
+          <StrategicMapView
+            organizationSlug={selectedOrganizationSlug}
+            userName={userInfo?.name || userInfo?.en_name}
+            organizationName={selectedOrganizationName}
+          />
+        );
       case 'account':
         return (
           <AccountView
@@ -806,6 +837,7 @@ const Home = () => {
             organizationSlug={selectedOrganizationSlug}
             onChangeOrganization={handleResetOrganization}
             onLogout={handleLogout}
+            isAdmin={isAdmin}
           />
         );
       case 'users':
@@ -816,7 +848,7 @@ const Home = () => {
         return <OrganizationView isAdmin={isAdmin} />;
       case 'dashboard':
       default:
-        return <DashboardContent />;
+        return <DashboardContent onNavigate={setActiveView} />;
     }
   };
 

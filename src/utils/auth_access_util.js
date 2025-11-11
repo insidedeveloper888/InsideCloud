@@ -104,7 +104,7 @@ function configJSAPIAccess(data, complete) {
 //处理用户免登逻辑
 export async function handleUserAuth(complete, organizationSlug = null) {
 
-    console.log("\n----------[接入方网页免登处理 BEGIN11111]----------")
+    console.log("\n----------[接入方网页免登处理 BEGIN]----------")
     
     // Get organization slug from parameter or localStorage
     const orgSlug = organizationSlug || localStorage.getItem(ORGANIZATION_SLUG_KEY) || null;

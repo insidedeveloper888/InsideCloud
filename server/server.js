@@ -6,6 +6,7 @@ const Router = require('koa-router')
 const axios = require('axios')
 const CryptoJS = require('crypto-js')
 const session = require('koa-session');
+const bodyParser = require('koa-bodyparser');
 const serverConfig = require('./server_config')
 const serverUtil = require('./server_util')
 const { getLarkCredentials, validateOrganization, getOrganizationInfo } = require('./organization_helper')
@@ -26,7 +27,7 @@ const slugify = (value) =>
 //处理免登请求，返回用户的user_access_token
 async function getUserAccessToken(ctx) {
 
-    console.log("\n-------------------[接入服务端免登处理 BEGIN2]-----------------------------")
+    console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------")
     serverUtil.configAccessControl(ctx)
     console.log(`接入服务方第① 步: 接收到前端免登请求`)
     
@@ -200,7 +201,68 @@ async function getUserAccessToken(ctx) {
                 organizationId: ctx.session.organization_id || larkCredentials.organization_id || null
             })
 
-            ctx.session.is_admin = true
+            // ALWAYS query fresh from Supabase - force clear session cache
+            // Set to false first to clear any cached value
+            ctx.session.is_admin = false
+            
+            try {
+                const larkUserId = newAccessToken.user_id
+                if (larkUserId && ctx.session.organization_id) {
+                    console.log(`🔍 Session: Checking role for lark_user_id=${larkUserId}, org_id=${ctx.session.organization_id}`)
+                    
+                    // Query: Use RPC function to find auth user by lark_user_id, then link to individuals and organization_members
+                    const { data: authUserId, error: rpcError } = await supabase
+                        .rpc('get_auth_user_by_lark', {
+                            p_lark_user_id: larkUserId,
+                            p_email: null
+                        })
+                    
+                    if (!rpcError && authUserId) {
+                        console.log(`✅ Session: Found auth user via RPC: id=${authUserId}`)
+                        
+                        // Get individual by user_id
+                        const { data: individual, error: indError } = await supabase
+                            .from('individuals')
+                            .select('id')
+                            .eq('user_id', authUserId)
+                            .maybeSingle()
+                        
+                        if (individual && individual.id) {
+                            console.log(`✅ Session: Found individual: id=${individual.id}`)
+                            
+                            // Get organization member role
+                            const { data: orgMember, error: memberError } = await supabase
+                                .from('organization_members')
+                                .select('role_code')
+                                .eq('individual_id', individual.id)
+                                .eq('organization_id', ctx.session.organization_id)
+                                .maybeSingle()
+                            
+                            if (orgMember) {
+                                ctx.session.is_admin = orgMember.role_code === 'admin' || orgMember.role_code === 'owner'
+                                console.log(`✅ Session role RESULT: lark_user_id=${larkUserId}, role_code=${orgMember.role_code}, isAdmin=${ctx.session.is_admin}`)
+                            } else {
+                                ctx.session.is_admin = false
+                                console.log(`⚠️ Session: No org member found for individual_id=${individual.id}, org_id=${ctx.session.organization_id}:`, memberError)
+                            }
+                        } else {
+                            ctx.session.is_admin = false
+                            console.log(`⚠️ Session: No individual found for auth_user.id=${authUserId}:`, indError)
+                        }
+                    } else {
+                        ctx.session.is_admin = false
+                        console.log(`⚠️ Session: Auth user not found via RPC for lark_user_id=${larkUserId}:`, rpcError)
+                    }
+                } else {
+                    ctx.session.is_admin = false
+                    console.log(`⚠️ Session: Missing larkUserId or organization_id`)
+                }
+            } catch (roleError) {
+                console.error('❌ Session: Failed to check user role:', roleError)
+                ctx.session.is_admin = false
+            }
+            
+            console.log(`📤 Session: Final is_admin=${ctx.session.is_admin} (fresh from DB)`)
         } catch (syncError) {
             console.error('❌  Failed to sync Lark user to Supabase:', syncError)
         }
@@ -794,6 +856,16 @@ const koaSessionConfig = {
 };
 app.use(session(koaSessionConfig, app));
 
+// Add body parser middleware to parse JSON request bodies
+app.use(bodyParser({
+  enableTypes: ['json'],
+  jsonLimit: '10mb',
+  strict: true,
+  onerror: (err, ctx) => {
+    console.error('❌ Body parser error:', err);
+    ctx.throw(422, 'Body parse error');
+  }
+}));
 
 //处理获取组织配置请求，验证组织是否存在
 async function getOrganizationConfig(ctx) {
@@ -828,6 +900,77 @@ async function getOrganizationConfig(ctx) {
         return
     }
     
+    // ALWAYS query fresh from Supabase - ignore session cache completely
+    // EXPLICITLY set to false - never trust session or any cached value
+    let isAdmin = false
+    
+    // CRITICAL: Never use session.is_admin - always query fresh
+    const sessionWasAdmin = ctx.session.is_admin
+    ctx.session.is_admin = false // Clear it immediately
+    
+    try {
+        const accessToken = ctx.session.userinfo
+        if (accessToken && accessToken.user_id && orgInfo.id) {
+            const larkUserId = accessToken.user_id
+            
+            console.log(`🔍 [getOrganizationConfig] Checking role for lark_user_id=${larkUserId}, org_id=${orgInfo.id}`)
+            console.log(`🔍 [getOrganizationConfig] Session had is_admin=${sessionWasAdmin} (ignoring, querying fresh)`)
+            
+            // Query: Use RPC function to find auth user by lark_user_id, then link to individuals and organization_members
+            const { data: authUserId, error: rpcError } = await supabase
+                .rpc('get_auth_user_by_lark', {
+                    p_lark_user_id: larkUserId,
+                    p_email: null
+                })
+            
+            if (!rpcError && authUserId) {
+                console.log(`✅ [getOrganizationConfig] Found auth user via RPC: id=${authUserId}`)
+                
+                // Get individual by user_id
+                const { data: individual, error: indError } = await supabase
+                    .from('individuals')
+                    .select('id')
+                    .eq('user_id', authUserId)
+                    .maybeSingle()
+                
+                if (individual && individual.id) {
+                    console.log(`✅ [getOrganizationConfig] Found individual: id=${individual.id}`)
+                    
+                    // Get organization member role
+                    const { data: orgMember, error: memberError } = await supabase
+                        .from('organization_members')
+                        .select('role_code')
+                        .eq('individual_id', individual.id)
+                        .eq('organization_id', orgInfo.id)
+                        .maybeSingle()
+                    
+                    if (orgMember) {
+                        isAdmin = orgMember.role_code === 'admin' || orgMember.role_code === 'owner'
+                        console.log(`✅ [getOrganizationConfig] Role check RESULT: lark_user_id=${larkUserId}, role_code=${orgMember.role_code}, isAdmin=${isAdmin}`)
+                    } else {
+                        console.log(`⚠️ [getOrganizationConfig] No org member found for individual_id=${individual.id}, org_id=${orgInfo.id}:`, memberError)
+                        isAdmin = false
+                    }
+                } else {
+                    console.log(`⚠️ [getOrganizationConfig] No individual found for auth_user.id=${authUserId}:`, indError)
+                    isAdmin = false
+                }
+            } else {
+                console.log(`⚠️ [getOrganizationConfig] Auth user not found via RPC for lark_user_id=${larkUserId}:`, rpcError)
+                isAdmin = false
+            }
+        } else {
+            console.log(`⚠️ [getOrganizationConfig] Missing required data:`, { hasToken: !!accessToken, hasUserId: !!(accessToken?.user_id), orgId: orgInfo.id })
+            isAdmin = false
+        }
+    } catch (roleError) {
+        console.error('❌ [getOrganizationConfig] Failed to check user role:', roleError)
+        isAdmin = false
+    }
+    
+    // CRITICAL: Always return fresh value, never use session cache
+    console.log(`📤 [getOrganizationConfig] FINAL RESULT: is_admin=${isAdmin} (fresh from DB, session was ${sessionWasAdmin})`)
+    
     // Return organization config (without secrets)
     ctx.body = serverUtil.okResponse({
         organization_slug: orgInfo.slug,
@@ -835,7 +978,7 @@ async function getOrganizationConfig(ctx) {
         organization_id: orgInfo.id,
         lark_app_id: larkCredentials.lark_app_id, // Safe to return app_id
         is_active: orgInfo.is_active,
-        is_admin: !!ctx.session.is_admin
+        is_admin: isAdmin
     })
     
     console.log("-------------------[获取组织配置 END]-----------------------------\n")
@@ -1032,6 +1175,59 @@ router.get('/api/get_audit_logs', getAuditLogs)
 router.get('/api/get_supabase_members', getSupabaseMembers)
 router.get('/api/admin/organizations', getOrganizationsAdmin)
 router.post('/api/admin/organizations', createOrganizationAdmin)
+
+// Strategic Map API routes
+router.get('/api/strategic_map', async (ctx) => {
+    const strategicMapHandler = require('../api/strategic_map')
+    await strategicMapHandler({ 
+        method: ctx.method, 
+        query: ctx.query, 
+        body: ctx.request.body,
+        headers: ctx.headers 
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: () => {},
+    })
+})
+
+router.post('/api/strategic_map', async (ctx) => {
+    const strategicMapHandler = require('../api/strategic_map')
+    
+    // Body is now automatically parsed by koa-bodyparser middleware
+    console.log('🔍 Koa POST /api/strategic_map');
+    console.log('  - Method:', ctx.method);
+    console.log('  - Query:', ctx.query);
+    console.log('  - Body type:', typeof ctx.request.body);
+    console.log('  - Body:', JSON.stringify(ctx.request.body, null, 2));
+    console.log('  - Body keys:', ctx.request.body ? Object.keys(ctx.request.body) : 'null/undefined');
+    console.log('  - organization_slug in body:', ctx.request.body?.organization_slug);
+    
+    const reqBody = ctx.request.body || {};
+    
+    await strategicMapHandler({ 
+        method: ctx.method, 
+        query: ctx.query, 
+        body: reqBody,
+        headers: ctx.headers 
+    }, {
+        status: (code) => {
+            console.log('📤 Setting status:', code);
+            return {
+                json: (data) => {
+                    console.log('📤 Sending JSON response:', JSON.stringify(data, null, 2));
+                    ctx.status = code;
+                    ctx.body = data;
+                }
+            };
+        },
+        json: (data) => {
+            console.log('📤 Sending JSON response (direct):', JSON.stringify(data, null, 2));
+            ctx.body = data;
+        },
+        setHeader: () => {},
+    })
+})
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());
 app.listen(port, () => {

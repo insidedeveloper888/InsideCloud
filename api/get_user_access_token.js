@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
     // Handle CORS
     if (handleCors(req, res)) return;
 
-    console.log("\n-------------------[接入服务端免登处理 BEGIN1]-----------------------------");
+    console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------");
     console.log(`接入服务方第① 步: 接收到前端免登请求`);
 
     // Get organization slug from query
@@ -62,8 +62,10 @@ module.exports = async function handler(req, res) {
     // This handles the case where frontend has token in localStorage but cookie wasn't set
     if (code.length == 0) {
         // Check if there's a token in Authorization header (case-insensitive)
-        const authHeader = req.headers.authorization || req.headers.Authorization;
+        // Vercel serverless functions use lowercase headers
+        const authHeader = req.headers.authorization || req.headers.Authorization || req.headers['authorization'];
         console.log("🔍 Debug - Authorization header:", authHeader ? authHeader.substring(0, 20) + '...' : 'not found');
+        console.log("🔍 Debug - All headers keys:", Object.keys(req.headers).filter(k => k.toLowerCase().includes('auth')));
         
         const tokenFromHeader = authHeader && authHeader.startsWith('Bearer ') 
             ? authHeader.substring(7) 
@@ -116,14 +118,27 @@ module.exports = async function handler(req, res) {
                     res.status(200).json(okResponse(authData));
                     console.log("-------------------[接入服务端免登处理 END]-----------------------------\n");
                     return;
+                } else {
+                    console.error('❌ Lark API returned error:', userInfoRes.data);
+                    res.status(401).json(failResponse(`Token verification failed: ${userInfoRes.data?.msg || 'Invalid token'}`));
+                    return;
                 }
             } catch (tokenError) {
                 console.error('❌ Token verification failed:', tokenError.response?.data || tokenError.message);
-                // Fall through to return error
+                res.status(401).json(failResponse(`Token verification failed: ${tokenError.response?.data?.msg || tokenError.message || 'Invalid or expired token'}`));
+                return;
             }
         }
         
-        res.status(400).json(failResponse("登录预授权码code is empty, please retry!!!"));
+        // No code and no valid token - provide helpful error message
+        console.error('❌ No authorization code or valid token provided');
+        console.error('📋 Debug info:', {
+            hasCode: code.length > 0,
+            hasAuthHeader: !!authHeader,
+            hasToken: !!token,
+            cookiePresent: !!req.headers.cookie
+        });
+        res.status(400).json(failResponse("登录预授权码code为空。请确保：1) 在Lark环境中打开应用（JSAPI模式），或 2) 使用OAuth重定向流程获取授权码，或 3) 提供有效的访问令牌。"));
         return;
     }
 
