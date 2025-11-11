@@ -107,7 +107,14 @@ function ProtectedLayout({
           )}
         </Box>
         <Divider />
-        <Box sx={{ px: 2, py: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Box sx={{ px: 2.5, py: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <Box
+            component="img"
+            src="/inside-advisory/logo.png"
+            alt="Inside Advisory"
+            sx={{ width: collapsed ? 32 : 120, transition: 'width 0.2s ease' }}
+          />
+          <Divider flexItem sx={{ borderColor: 'divider' }} />
           <Avatar
             sx={{ width: 42, height: 42 }}
             src={user?.avatar_url || user?.avatarUrl || undefined}
@@ -167,11 +174,12 @@ function ProtectedLayout({
           ))}
         </Box>
         <Divider />
-        <Box sx={{ p: collapsed ? 1 : 2, display: "flex", flexDirection: "column", gap: 1 }}>
+        <Box sx={{ p: collapsed ? 1.5 : 2.5, display: "flex", flexDirection: "column", gap: 1.5, pb: collapsed ? 2 : 3 }}>
           {!collapsed && (
             <Stack spacing={1}>
               {onChangeOrganization && (
                 <Button
+                  fullWidth
                   variant="outlined"
                   size="small"
                   startIcon={<RefreshCw size={16} />}
@@ -182,6 +190,7 @@ function ProtectedLayout({
               )}
               {onRefreshData && (
                 <Button
+                  fullWidth
                   variant="outlined"
                   size="small"
                   startIcon={<RefreshCw size={16} />}
@@ -191,7 +200,7 @@ function ProtectedLayout({
                 </Button>
               )}
               {onLogout && (
-                <Button
+                <Button fullWidth
                   variant="contained"
                   color="primary"
                   size="small"

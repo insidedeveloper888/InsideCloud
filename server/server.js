@@ -116,13 +116,13 @@ async function getUserAccessToken(ctx) {
 
         try {
             console.log('ℹ️  Calling syncLarkUser for', newAccessToken.user_id)
-            console.log('ℹ️  Session organization_id:', ctx.session.organization_id, 'Credentials organization_id:', larkCredentials.organization_id)
             await syncLarkUser({
                 supabaseClient: supabase,
                 accessTokenData: newAccessToken,
                 organizationId: ctx.session.organization_id || larkCredentials.organization_id || null
             })
-            console.log('✅  syncLarkUser complete')
+
+            ctx.session.is_admin = true
         } catch (syncError) {
             console.error('❌  Failed to sync Lark user to Supabase:', syncError)
         }
@@ -762,6 +762,58 @@ async function getOrganizationConfig(ctx) {
     console.log("-------------------[获取组织配置 END]-----------------------------\n")
 }
 
+async function getSupabaseMembers(ctx) {
+    console.log("\n-------------------[获取组织成员 (Supabase) BEGIN]-----------------------------")
+    serverUtil.configAccessControl(ctx)
+
+    const accessToken = ctx.session.userinfo
+    if (!accessToken || !accessToken.access_token) {
+        ctx.body = serverUtil.failResponse("用户未登录，请先登录")
+        return
+    }
+
+    const organizationId = ctx.session.organization_id
+    if (!organizationId) {
+        ctx.body = serverUtil.failResponse("未检测到组织信息，请重新登录以选择组织")
+        return
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('organization_members')
+            .select('id, role_code, status, joined_at, individuals:individual_id (display_name, primary_email, profile)')
+            .eq('organization_id', organizationId)
+            .order('joined_at', { ascending: true })
+
+        if (error) {
+            console.error('❌ Failed to fetch organization members:', error)
+            ctx.body = serverUtil.failResponse('获取组织成员失败')
+            return
+        }
+
+        const members = (data || []).map((member) => {
+            const profile = member.individuals?.profile || {}
+            return {
+                id: member.id,
+                role_code: member.role_code,
+                status: member.status,
+                joined_at: member.joined_at,
+                name: member.individuals?.display_name || 'Unknown User',
+                email: member.individuals?.primary_email || null,
+                avatar_url: profile?.avatar_url || null,
+            }
+        })
+
+        ctx.body = serverUtil.okResponse(members)
+        console.log(`成功返回 ${members.length} 个组织成员`)
+    } catch (error) {
+        console.error('❌ Exception fetching organization members:', error)
+        ctx.body = serverUtil.failResponse('服务器内部错误')
+    }
+
+    console.log("-------------------[获取组织成员 (Supabase) END]-----------------------------\n")
+}
+
 // Fetch audit log entries for the authenticated organisation
 async function getAuditLogs(ctx) {
     console.log("\n-------------------[获取审计日志 BEGIN]-----------------------------")
@@ -812,6 +864,7 @@ router.get(serverConfig.config.getDepartmentsPath, getDepartments)
 router.get(serverConfig.config.getDepartmentUsersPath, getDepartmentUsers)
 router.get(serverConfig.config.getBitableTablesPath, getBitableTables)
 router.get('/api/get_audit_logs', getAuditLogs)
+router.get('/api/get_supabase_members', getSupabaseMembers)
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());
 app.listen(port, () => {
