@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
-import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
 import MembersList from '../../components/membersList';
 import DepartmentsList from '../../components/departmentsList';
 import BitableTables from '../../components/bitableTables';
@@ -129,12 +128,6 @@ const departmentData = [
 ];
 
 const LJ_TOKEN_KEY = 'lk_token';
-const departmentColors = {
-  healthy: 'from-emerald-400 via-green-500 to-teal-500',
-  'at-risk': 'from-amber-400 via-orange-500 to-red-500',
-  critical: 'from-red-500 via-rose-500 to-purple-500',
-  improving: 'from-blue-400 via-indigo-500 to-purple-500'
-};
 
 const announcements = [
   {
