@@ -762,6 +762,47 @@ async function getOrganizationConfig(ctx) {
     console.log("-------------------[获取组织配置 END]-----------------------------\n")
 }
 
+// Fetch audit log entries for the authenticated organisation
+async function getAuditLogs(ctx) {
+    console.log("\n-------------------[获取审计日志 BEGIN]-----------------------------")
+    serverUtil.configAccessControl(ctx)
+
+    const accessToken = ctx.session.userinfo
+    if (!accessToken || !accessToken.access_token) {
+        ctx.body = serverUtil.failResponse("用户未登录，请先登录")
+        return
+    }
+
+    const organizationId = ctx.session.organization_id
+    if (!organizationId) {
+        ctx.body = serverUtil.failResponse("未检测到组织信息，请重新登录以选择组织")
+        return
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('audit_events')
+            .select('id,event_type,payload,occurred_at,ip,user_agent')
+            .eq('organization_id', organizationId)
+            .order('occurred_at', { ascending: false })
+            .limit(50)
+
+        if (error) {
+            console.error('❌ Failed to fetch audit logs:', error)
+            ctx.body = serverUtil.failResponse('获取审计日志失败')
+            return
+        }
+
+        ctx.body = serverUtil.okResponse(data || [])
+        console.log(`成功返回 ${data?.length || 0} 条审计记录`)
+    } catch (error) {
+        console.error('❌ Exception fetching audit logs:', error)
+        ctx.body = serverUtil.failResponse('服务器内部错误')
+    }
+
+    console.log("-------------------[获取审计日志 END]-----------------------------\n")
+}
+
 //注册服务端路由和处理
 router.get(serverConfig.config.getUserAccessTokenPath, getUserAccessToken)
 router.get(serverConfig.config.getSignParametersPath, getSignParameters)
@@ -770,6 +811,7 @@ router.get(serverConfig.config.getOrganizationMembersPath, getOrganizationMember
 router.get(serverConfig.config.getDepartmentsPath, getDepartments)
 router.get(serverConfig.config.getDepartmentUsersPath, getDepartmentUsers)
 router.get(serverConfig.config.getBitableTablesPath, getBitableTables)
+router.get('/api/get_audit_logs', getAuditLogs)
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());
 app.listen(port, () => {

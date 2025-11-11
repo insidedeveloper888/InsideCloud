@@ -89,7 +89,9 @@
 - `get_lark_credentials('cloud')` and `get_lark_credentials('inside')` return active credentials (app ID + secret + nonce) and associated `organization_id`.
 - `organizations` table has two active entries; ensure new UI allows switching org context via slug.
 - `lark_users` now receives records on every successful Lark login; sync job runs on both Koa and Vercel auth handlers (manually verified in staging).
-- `organization_members` currently has 1 record—seed additional records for UI demos or adapt components to handle empty states.
+- Added `/api/get_audit_logs` (Koa + serverless) backed by Supabase `audit_events` for tenant-scoped activity logs.
+- Updated dashboard shell to the BOMS-style layout with hero imagery and MUI cards; navigation now mirrors the template structure inside `ProtectedLayout`.
+- Current admin membership stored in `organization_members` using `role_code = 'admin'` for the active login so protected actions are available during UI testing.
 - No outstanding migrations detected; ensure future migrations use `supabase/migrations` pipeline.
 
 ## Open Questions / Follow-ups
