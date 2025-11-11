@@ -78,8 +78,8 @@ function ProtectedLayout({
           "& .MuiDrawer-paper": {
             width: collapsed ? drawerWidthCollapsed : drawerWidthExpanded,
             boxSizing: "border-box",
-            transition: (theme) 
-              => theme.transitions.create("width", {
+            transition: (theme) =>
+              theme.transitions.create("width", {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.shortest,
               }),
