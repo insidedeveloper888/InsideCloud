@@ -41,7 +41,10 @@ async function getIndividualIdFromCookie(req) {
   console.log('🔍 Cookie header:', cookieHeader.substring(0, 100) + '...');
   console.log('🔍 Parsed cookies:', Object.keys(cookies));
   
-  const lkToken = cookies.lk_token || cookies['lk_token'];
+  // Prefer Authorization header (Bearer <lk_token>) when available (WebView often lacks cookies)
+  const authHeader = req.headers.authorization || req.headers.Authorization || req.headers['authorization'];
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  const lkToken = bearerToken || cookies.lk_token || cookies['lk_token'];
 
   if (!lkToken) {
     console.warn('⚠️ No lk_token cookie found');

@@ -299,9 +299,14 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     }
 
     try {
+      const lkToken = localStorage.getItem('lk_token');
+      const headers = { 'ngrok-skip-browser-warning': 'true' };
+      if (lkToken) {
+        headers['Authorization'] = `Bearer ${lkToken}`;
+      }
       const response = await fetch(`${base}/api/strategic_map?${params.toString()}`, {
         credentials: 'include',
-        headers: { 'ngrok-skip-browser-warning': 'true' },
+        headers,
       });
       const json = await response.json();
 
@@ -1046,13 +1051,18 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       console.log('💾 Request body string:', requestBody);
       console.log('💾 Request body length:', requestBody.length);
 
+      const lkToken = localStorage.getItem('lk_token');
+      const headers = {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      };
+      if (lkToken) {
+        headers['Authorization'] = `Bearer ${lkToken}`;
+      }
       const response = await fetch(`${base}/api/strategic_map`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
+        headers,
         body: requestBody,
       });
 
