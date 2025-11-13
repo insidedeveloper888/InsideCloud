@@ -759,12 +759,10 @@ const Home = () => {
       }
 
       // Handle user authentication (supports both JSAPI and OAuth flows)
-      const userData = await new Promise((resolve) => {
+      let userData = await new Promise((resolve) => {
         handleUserAuth(resolve, orgSlug);
       });
 
-      // If handleUserAuth triggers OAuth redirect, userData will be null
-      // and the page will redirect, so we don't need to handle it here
       if (userData) {
         setUserInfo(userData);
         setAuthError(null);
@@ -787,9 +785,32 @@ const Home = () => {
         // Don't clear isAuthenticating - let the redirect handle it
         return;
       } else {
-        setAuthError('No user information returned from authentication.');
-        setIsLoading(false);
-        setIsAuthenticating(false);
+        // JSAPI available but no user data – force a clean retry once
+        Cookies.remove('lk_token');
+        localStorage.removeItem('lk_token');
+        // Re-run JSAPI config to ensure app_id is fresh for this org
+        const jsapiSuccessRetry = await new Promise((resolve) => {
+          handleJSAPIAccess(resolve, orgSlug);
+        });
+        if (jsapiSuccessRetry) {
+          userData = await new Promise((resolve) => {
+            handleUserAuth(resolve, orgSlug);
+          });
+          if (userData) {
+            setUserInfo(userData);
+            setAuthError(null);
+            setIsLoading(false);
+            setIsAuthenticating(false);
+          } else {
+            setAuthError('No user information returned from authentication.');
+            setIsLoading(false);
+            setIsAuthenticating(false);
+          }
+        } else {
+          setAuthError('JSAPI authentication failed. Please select organisation again.');
+          setIsLoading(false);
+          setIsAuthenticating(false);
+        }
       }
     } catch (error) {
       setAuthError(error.message || 'Authentication error');

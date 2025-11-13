@@ -248,7 +248,7 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
     ).then(function (response) {  // ignore_security_alert
         if (!response.data) {
             console.error(`${clientConfig.getUserAccessTokenPath} response is null`)
-            complete()
+            complete(null)
             return
         }
         
@@ -284,7 +284,7 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
                 Cookies.remove(LJ_TOKEN_KEY)
                 complete(null)
             } else {
-                complete()
+                complete(null)
             }
             console.log("----------[接入网页方免登处理 END]----------\n")
         }
@@ -306,7 +306,7 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
             // Return null to trigger re-authentication
             complete(null)
         } else {
-            complete()
+            complete(null)
         }
         console.log("----------[接入网页方免登处理 END]----------\n")
     })
@@ -418,6 +418,5 @@ export function handleOAuthCallback() {
     
     return { code, organizationSlug: orgSlug };
 }
-
 
 
