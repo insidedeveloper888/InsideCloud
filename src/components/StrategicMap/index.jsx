@@ -83,6 +83,8 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const editInputRef = useRef(null);
   const editTextareaRef = useRef(null); // Direct ref to the actual textarea/input element
   const saveTimeoutRef = useRef(null);
+  const isComposingRef = useRef(false);
+  const cellItemsCacheRef = useRef({});
 
   // Tab management for Monthly/Weekly/Daily views
   const [activeTab, setActiveTab] = useState('yearly'); // 'yearly' | 'monthly' | 'weekly' | 'daily'
@@ -383,6 +385,59 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     }
   }, [organizationSlug, scope]);
 
+  const fetchSingleTimeframeData = useCallback(async (timeframeType, timeframeValue) => {
+    if (!organizationSlug) return {};
+    const base = resolveApiOrigin();
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      scope,
+      timeframe: timeframeType,
+      timeframe_value: timeframeValue,
+    });
+    try {
+      const lkToken = localStorage.getItem('lk_token');
+      const headers = { 'ngrok-skip-browser-warning': 'true' };
+      if (lkToken) headers['Authorization'] = `Bearer ${lkToken}`;
+      const response = await fetch(`${base}/api/strategic_map?${params.toString()}`, {
+        credentials: 'include',
+        headers,
+      });
+      const json = await response.json();
+      if (json.code !== 0 || !json.data) return {};
+      const itemsMap = {};
+      let columnIndex = 0;
+      if (timeframeType === 'monthly') {
+        const months = getMonths();
+        columnIndex = months.findIndex(m => m.value.substring(0, 7) === timeframeValue.substring(0, 7));
+        if (columnIndex < 0) return {};
+      } else if (timeframeType === 'weekly') {
+        const weeks = getWeeks();
+        columnIndex = weeks.findIndex(w => w.value === timeframeValue);
+        if (columnIndex < 0) return {};
+      } else if (timeframeType === 'daily') {
+        const days = getDays();
+        columnIndex = days.findIndex(d => d.value === timeframeValue);
+        if (columnIndex < 0) return {};
+      }
+      json.data.forEach((item) => {
+        const key = `${timeframeType}_${item.row_index}_${columnIndex}`;
+        if (!itemsMap[key]) itemsMap[key] = [];
+        itemsMap[key].push(item);
+      });
+      setItems(prev => {
+        const newItems = { ...prev };
+        Object.keys(itemsMap).forEach(key => {
+          newItems[key] = itemsMap[key];
+        });
+        return newItems;
+      });
+      return itemsMap;
+    } catch (err) {
+      console.error('Error fetching single timeframe data:', err);
+      return {};
+    }
+  }, [organizationSlug, scope, getMonths, getWeeks, getDays]);
+
   // Load yearly data (always loaded on mount)
   const fetchYearlyData = useCallback(async (clearFirst = false, silent = false) => {
     if (!organizationSlug) {
@@ -631,7 +686,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       return;
     }
 
-    const timeframesToRefresh = ['yearly', 'monthly', 'weekly', 'daily'];
+    const timeframesToRefresh = [changedTimeframe];
 
     for (const timeframeKey of timeframesToRefresh) {
       try {
@@ -649,18 +704,26 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const getCellItems = useCallback((timeframe, rowIndex, columnIndex) => {
     const key = `${timeframe}_${rowIndex}_${columnIndex}`;
     const cellItems = items[key];
-    let arr = Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
+    const baseArr = Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
+    let filterYear = null;
     if (timeframe === 'yearly') {
       const years = getYears();
-      const targetYear = years[columnIndex]?.year;
-      if (targetYear) {
-        arr = arr.filter(i => {
-          if (!i || !i.timeframe_value) return false;
-          const y = parseInt(String(i.timeframe_value).substring(0, 4), 10);
-          return y === targetYear;
-        });
-      }
+      filterYear = years[columnIndex]?.year || null;
     }
+    const cacheKey = filterYear != null ? `${key}_${filterYear}` : key;
+    const cacheEntry = cellItemsCacheRef.current[cacheKey];
+    if (cacheEntry && cacheEntry.src === cellItems) {
+      return cacheEntry.val;
+    }
+    let arr = baseArr;
+    if (filterYear != null) {
+      arr = baseArr.filter(i => {
+        if (!i || !i.timeframe_value) return false;
+        const y = parseInt(String(i.timeframe_value).substring(0, 4), 10);
+        return y === filterYear;
+      });
+    }
+    cellItemsCacheRef.current[cacheKey] = { src: cellItems, val: arr };
     return arr;
   }, [items, getYears]);
 
@@ -818,6 +881,8 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
                   ref={editTextareaRef}
                   defaultValue={editValue || ''}
                   onKeyDown={(e) => onCellKeyDown(e, timeframe, rowIndex, columnIndex)}
+                  onCompositionStart={() => { isComposingRef.current = true; }}
+                  onCompositionEnd={() => { isComposingRef.current = false; }}
                   autoFocus
                   style={{
                     flex: 1,
@@ -927,6 +992,8 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
               defaultValue={editValue || ''}
               // onChange={(e) => onEditValueChange(e.target.value)}
               onKeyDown={(e) => onCellKeyDown(e, timeframe, rowIndex, columnIndex)}
+              onCompositionStart={() => { isComposingRef.current = true; }}
+              onCompositionEnd={() => { isComposingRef.current = false; }}
               autoFocus
               style={{
                 width: '100%',
@@ -1118,12 +1185,14 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
 
           return newItems;
         });
+        if (timeframe === 'yearly') {
+          const yearStr = String(payload.timeframe_value).substring(0, 4);
+          const decValue = `${yearStr}-12-01`;
+          fetchSingleTimeframeData('monthly', decValue);
+        }
       }
 
       console.log('✅ Save successful');
-      refreshCascadeTimeframes(timeframe).catch(err => {
-        console.error(`Failed to refresh cascaded timeframes after ${timeframe} save:`, err);
-      });
       return savedItemResult;
     } catch (err) {
       console.error('❌ Save error:', err);
@@ -1212,9 +1281,6 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
         throw new Error(json.msg || 'Failed to delete item');
       }
 
-      refreshCascadeTimeframes(timeframe).catch(err => {
-        console.error(`Failed to refresh cascaded timeframes after ${timeframe} delete:`, err);
-      });
     } catch (err) {
       console.error('❌ Delete error:', err);
       setError(err.message || 'Failed to delete item. Please try again.');
@@ -1222,6 +1288,9 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   }, [organizationSlug, refreshCascadeTimeframes]);
 
   const handleCellBlur = useCallback((timeframe, rowIndex, columnIndex) => {
+    if (isComposingRef.current) {
+      return;
+    }
     const key = `${timeframe}_${rowIndex}_${columnIndex}`;
 
     // Handle inline item editing blur - only if this is the cell being edited
@@ -1285,10 +1354,10 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       setEditingItemIndex(null);
       setEditingItemKey(null);
     }
-  }, [editingItemKey, editTextareaRef, editValue, getCellItems, saveItem, callDeleteItem, editingCell]);
+  }, [editingItemKey, editTextareaRef, editValue, getCellItems, saveItem, callDeleteItem, editingCell, isComposingRef]);
 
   const handleCellKeyDown = useCallback((e, timeframe, rowIndex, columnIndex) => {
-    const composing = (e.nativeEvent && e.nativeEvent.isComposing) || e.keyCode === 229;
+    const composing = isComposingRef.current || (e.nativeEvent && e.nativeEvent.isComposing) || e.keyCode === 229;
     if (composing) {
       return;
     }
@@ -1438,7 +1507,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       setEditingItemIndex(null);
       setEditingItemKey(null);
     }
-  }, [editingItemKey, editTextareaRef, editValue, getCellItems, saveItem, callDeleteItem, handleCellBlur]);
+  }, [editingItemKey, editTextareaRef, editValue, getCellItems, saveItem, callDeleteItem, handleCellBlur, isComposingRef]);
 
   const handleStatusClick = useCallback((timeframe, rowIndex, columnIndex, itemId, itemIndex, e) => {
     e.stopPropagation();
@@ -2528,4 +2597,3 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
 };
 
 export default StrategicMapView;
-

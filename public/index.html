@@ -8,11 +8,24 @@
   <meta name="description" content="web app with auth" />
   <title>Inside Advisory</title>
 </head>
-<script src="https://unpkg.com/vconsole/dist/vconsole.min.js"></script>
 <!-- 引入 JSSDK -->
 <script type="text/javascript" src="https://lf1-cdn-tos.bytegoofy.com/goofy/lark/op/h5-js-sdk-1.5.23.js"></script>
 <script>
-  var vConsole = new window.VConsole(); 
+  (function() {
+    var enable = false;
+    try {
+      var ls = window.localStorage && window.localStorage.getItem('enable_vconsole');
+      if (ls === 'true') enable = true;
+      var qs = window.location.search || '';
+      if (qs.indexOf('debug=true') !== -1) enable = true;
+    } catch (e) {}
+    if (enable) {
+      var s = document.createElement('script');
+      s.src = 'https://unpkg.com/vconsole/dist/vconsole.min.js';
+      s.onload = function() { new window.VConsole(); };
+      document.head.appendChild(s);
+    }
+  })();
 </script>
 
 <body>
