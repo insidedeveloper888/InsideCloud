@@ -158,7 +158,17 @@ export async function handleUserAuth(complete, organizationSlug = null) {
     let lj_tokenString = Cookies.get(LJ_TOKEN_KEY) || localStorage.getItem(LJ_TOKEN_KEY) || ""
     if (lj_tokenString.length > 0) {
         console.log("接入方前端[免登处理]第① 步: 用户已登录，请求后端验证...")
-        requestUserAccessToken("", complete, orgSlug)
+        // Use a wrapper to handle token invalidity and retry authentication
+        requestUserAccessToken("", (userData) => {
+            if (userData === null) {
+                // Token was invalid, cleared - retry authentication without token
+                console.log("🔄 Token已清除，重新开始认证流程...")
+                // Recursively call handleUserAuth to start fresh authentication
+                handleUserAuth(complete, orgSlug)
+            } else {
+                complete(userData)
+            }
+        }, orgSlug)
         return
     }
     
@@ -241,6 +251,23 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
             complete()
             return
         }
+        
+        // Check if response indicates token invalidity (code -2) or code is empty error (code -1) when we sent a token
+        const responseCode = response.data.code;
+        const sentToken = !code || code.length === 0; // We sent a token if code was empty
+        
+        if (responseCode === -2 || (responseCode === -1 && sentToken && response.data.msg && response.data.msg.includes('code is empty'))) {
+            console.warn("⚠️ Token验证失败或无效，清除旧token并重新认证")
+            console.warn("⚠️ Response code:", responseCode, "Message:", response.data.msg);
+            // Clear invalid token from localStorage and cookies
+            localStorage.removeItem(LJ_TOKEN_KEY)
+            Cookies.remove(LJ_TOKEN_KEY)
+            // Return null to trigger re-authentication
+            complete(null)
+            console.log("----------[接入网页方免登处理 END]----------\n")
+            return
+        }
+        
         const data = response.data.data
         if (data) {
             console.log("接入方前端[免登处理]第③ 步: 获取user_access_token信息")
@@ -250,13 +277,37 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
         } else {
             console.error("接入方前端[免登处理]第③ 步: 未获取user_access_token信息")
             console.error("Response:", response.data);
-            complete()
+            // If we sent a token but got an error, clear it and retry
+            if (sentToken && responseCode === -1) {
+                console.warn("⚠️ 检测到token验证失败，清除token并重试")
+                localStorage.removeItem(LJ_TOKEN_KEY)
+                Cookies.remove(LJ_TOKEN_KEY)
+                complete(null)
+            } else {
+                complete()
+            }
             console.log("----------[接入网页方免登处理 END]----------\n")
         }
     }).catch(function (error) {
         console.log(`${clientConfig.getUserAccessTokenPath} error:`, error)
         console.error("Error details:", error.response?.data || error.message);
-        complete()
+        
+        // Check if error response indicates token invalidity (code -2 or -1 with code is empty message)
+        const errorCode = error.response?.data?.code;
+        const errorMsg = error.response?.data?.msg || '';
+        const sentToken = !code || code.length === 0; // We sent a token if code was empty
+        
+        if (errorCode === -2 || (errorCode === -1 && sentToken && errorMsg.includes('code is empty'))) {
+            console.warn("⚠️ Token验证失败，清除旧token并重新认证")
+            console.warn("⚠️ Error code:", errorCode, "Message:", errorMsg);
+            // Clear invalid token from localStorage and cookies
+            localStorage.removeItem(LJ_TOKEN_KEY)
+            Cookies.remove(LJ_TOKEN_KEY)
+            // Return null to trigger re-authentication
+            complete(null)
+        } else {
+            complete()
+        }
         console.log("----------[接入网页方免登处理 END]----------\n")
     })
 }

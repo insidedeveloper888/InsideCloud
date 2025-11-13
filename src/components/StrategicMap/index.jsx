@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import {
   Box,
   Typography,
@@ -17,9 +17,38 @@ import {
   Paper,
   Chip,
   Stack,
+  Tabs,
+  Tab,
+  useMediaQuery,
+  useTheme,
+  Card,
+  CardContent,
+  CardHeader,
+  Collapse,
+  IconButton,
+  Fab,
+  LinearProgress,
+  Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, getYear, startOfMonth, eachWeekOfInterval, eachDayOfInterval } from 'date-fns';
+import {
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  DollarSign,
+  Users,
+  Settings,
+  Award,
+  BookOpen,
+} from 'lucide-react';
+import { format, getYear, startOfMonth, eachWeekOfInterval, eachDayOfInterval, parseISO, addDays, getISOWeek, getISOWeekYear, getMonth, startOfISOWeek } from 'date-fns';
 
 const resolveApiOrigin = () => {
   const clientConfig = require('../../config/client_config.js').default;
@@ -30,27 +59,31 @@ const resolveApiOrigin = () => {
 
 // Strategic categories (rows) - Map to row_index 0-5
 const CATEGORIES = [
-  { id: 0, label: '阶段成就', en: 'Phase Achievements' },
-  { id: 1, label: '财务盈利', en: 'Financial Profitability' },
-  { id: 2, label: '客户市场', en: 'Customer Market' },
-  { id: 3, label: '内部系统', en: 'Internal Systems' },
-  { id: 4, label: '人才资本', en: 'Human Capital' },
-  { id: 5, label: '学习成长', en: 'Learning & Growth' },
+  { id: 0, label: '阶段成就', description: '重要里程碑与成就' },
+  { id: 1, label: '财务盈利', description: '收入、利润与财务目标' },
+  { id: 2, label: '客户市场', description: '客户关系与市场拓展' },
+  { id: 3, label: '内部系统', description: '流程优化与系统建设' },
+  { id: 4, label: '人才资本', description: '团队建设与人才发展' },
+  { id: 5, label: '学习成长', description: '知识积累与能力提升' },
 ];
 
 // Status cycling: neutral → done → fail → neutral
 const STATUS_CYCLE = ['neutral', 'done', 'fail'];
 
 const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
+  // Responsive breakpoints
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // < 600px
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md')); // 600-960px
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md')); // >= 960px
+
   const [scope, setScope] = useState('company');
-  const [yearRange, setYearRange] = useState(() => {
-    const currentYear = getYear(new Date());
-    return Math.floor(currentYear / 5) * 5;
-  });
   const [focusYear, setFocusYear] = useState(() => {
     return getYear(new Date()); // Default to current year
   });
-  
+  const [yearSpan, setYearSpan] = useState(5); // Number of years to display (default 5)
+  const [yearStartOffset, setYearStartOffset] = useState(0); // Offset from focusYear to start displaying
+
   const [items, setItems] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,31 +91,97 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [editingItemIndex, setEditingItemIndex] = useState(null); // Track which item we're editing
+  const [editingItemKey, setEditingItemKey] = useState(null); // Track which cell+item we're editing (format: "timeframe_rowIndex_columnIndex_itemIndex")
   const editInputRef = useRef(null);
+  const editTextareaRef = useRef(null); // Direct ref to the actual textarea/input element
   const saveTimeoutRef = useRef(null);
-  
-  // Progressive loading states (tracked but not currently used for conditional logic)
-  // eslint-disable-next-line no-unused-vars
-  const [loadedTimeframes, setLoadedTimeframes] = useState({
+
+  // Tab management for Monthly/Weekly/Daily views
+  const [activeTab, setActiveTab] = useState('yearly'); // 'yearly' | 'monthly' | 'weekly' | 'daily'
+  const [loadedTabs, setLoadedTabs] = useState({
     yearly: false,
     monthly: false,
     weekly: false,
     daily: false,
   });
+  const [tabLoading, setTabLoading] = useState({
+    monthly: false,
+    weekly: false,
+    daily: false,
+  });
+
+  // Mobile-specific states
+  const [expandedCategories, setExpandedCategories] = useState(
+    CATEGORIES.reduce((acc, cat) => ({ ...acc, [cat.id]: true }), {})
+  );
+  const [showFab, setShowFab] = useState(false);
+  const [showScrollTopButton, setShowScrollTopButton] = useState(false);
+
+  const scrollContainerRef = useRef(null);
+  const monthlySectionRef = useRef(null);
+  const weeklySectionRef = useRef(null);
+  const dailySectionRef = useRef(null);
 
   // Debug logging
   useEffect(() => {
     console.log('🔍 StrategicMapView props:', { organizationSlug, userName, organizationName });
-  }, [organizationSlug, userName, organizationName]);
+    console.log('📱 Device type:', { isMobile, isTablet, isDesktop });
+  }, [organizationSlug, userName, organizationName, isMobile, isTablet, isDesktop]);
 
-  // Generate years (5 years)
-  const getYears = useCallback(() => {
-    return Array.from({ length: 5 }, (_, i) => ({
-      index: i,
-      year: yearRange + i,
-      value: `${yearRange + i}-01-01`,
+
+  useEffect(() => {
+    if (editTextareaRef.current && (editingCell || editingItemKey !== null)) {
+      const timer = setTimeout(() => {
+        const inputElement = editTextareaRef.current;
+        if (inputElement && document.activeElement !== inputElement) {
+          // Only focus if not already focused (to avoid interfering with active typing)
+          inputElement.focus();
+          // Set cursor to end when starting to edit
+          const length = inputElement.value.length;
+          inputElement.setSelectionRange(length, length);
+        }
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [editingCell, editingItemKey]); // Only run when editing state changes, not on every keystroke
+
+  // Calculate completion statistics for a category
+  const getCategoryStats = useCallback((categoryId, timeframe = 'yearly') => {
+    const categoryItems = Object.entries(items)
+      .filter(([key]) => key.startsWith(`${timeframe}_${categoryId}_`))
+      .flatMap(([, itemsArray]) => itemsArray);
+
+    const total = categoryItems.length;
+    const completed = categoryItems.filter(item => item.status === 'done').length;
+    const failed = categoryItems.filter(item => item.status === 'fail').length;
+    const inProgress = categoryItems.filter(item => item.status === 'neutral').length;
+
+    return {
+      total,
+      completed,
+      failed,
+      inProgress,
+      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0
+    };
+  }, [items]);
+
+  // Toggle category expansion (for mobile)
+  const toggleCategory = useCallback((categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
     }));
-  }, [yearRange]);
+  }, []);
+
+  // Generate years dynamically based on focusYear and yearSpan
+  const getYears = useCallback(() => {
+    const startYear = focusYear + yearStartOffset;
+    return Array.from({ length: yearSpan }, (_, i) => ({
+      index: i,
+      year: startYear + i,
+      value: `${startYear + i}-01-01`,
+    }));
+  }, [focusYear, yearSpan, yearStartOffset]);
 
   // Generate months (12 months)
   const getMonths = useCallback(() => {
@@ -100,16 +199,48 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   // Generate weeks (52 weeks)
   const getWeeks = useCallback(() => {
     const year = focusYear;
-    const startDate = startOfMonth(new Date(year, 0, 1));
-    const endDate = new Date(year, 12, 1);
+    const startDate = startOfISOWeek(new Date(year, 0, 4));
+    const endDate = startOfISOWeek(new Date(year + 1, 0, 4));
     const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
-    
-    return weeks.slice(0, 52).map((week, i) => ({
+
+    return weeks.map((week, i) => ({
       index: i,
       label: `W${String(i + 1).padStart(2, '0')}`,
       value: format(week, 'yyyy-MM-dd'),
     }));
   }, [focusYear]);
+
+  const weeksByMonth = useMemo(() => {
+    const monthsForYear = getMonths();
+    const weeksForYear = getWeeks();
+
+    return monthsForYear.map((month, monthIdx) => {
+      const monthWeeks = weeksForYear
+        .map(week => {
+          const weekStart = parseISO(week.value);
+          const anchorDate = addDays(weekStart, 3); // Thursday rule
+
+          if (getYear(anchorDate) !== focusYear || getMonth(anchorDate) !== monthIdx) {
+            return null;
+          }
+
+          const isoWeekNumber = getISOWeek(weekStart);
+
+          return {
+            ...week,
+            isoWeekNumber,
+            isoWeekLabel: String(isoWeekNumber).padStart(2, '0'),
+            weekStart,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        month,
+        weeks: monthWeeks,
+      };
+    });
+  }, [getMonths, getWeeks, focusYear]);
 
   // Generate days (365 days)
   const getDays = useCallback(() => {
@@ -117,7 +248,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     const startDate = new Date(year, 0, 1);
     const endDate = new Date(year, 11, 31);
     const days = eachDayOfInterval({ start: startDate, end: endDate });
-    
+
     return days.map((day, i) => ({
       index: i,
       label: format(day, 'MMM dd'),
@@ -126,203 +257,730 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     }));
   }, [focusYear]);
 
-  // Fetch specific timeframe data
-  const fetchTimeframeData = useCallback(async (timeframeType, columns, startIndex) => {
+  const daysByWeek = useMemo(() => {
+    const allDays = getDays();
+    const map = new Map();
+
+    allDays.forEach((day) => {
+      const dateObj = parseISO(day.value);
+      const isoWeekNumber = getISOWeek(dateObj);
+      const dayOfWeek = ((dateObj.getDay() + 6) % 7) + 1; // Monday=1 ... Sunday=7
+
+      const localMonth = dateObj.getMonth();
+      const yearMonthKey = `${getISOWeekYear(dateObj)}-${String(localMonth + 1).padStart(2, '0')}`;
+      const weekKey = `${getISOWeekYear(dateObj)}-${String(isoWeekNumber).padStart(2, '0')}`;
+
+      const dayEntry = {
+        ...day,
+        date: dateObj,
+        isoWeekNumber,
+        dayOfWeek,
+        lastDayOfMonth: new Date(dateObj.getFullYear(), localMonth + 1, 0),
+        yearMonthKey,
+      };
+
+      if (!map.has(weekKey)) {
+        map.set(weekKey, []);
+      }
+      map.get(weekKey).push(dayEntry);
+    });
+
+    map.forEach((values) => {
+      values.sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    });
+
+    return map;
+  }, [getDays, focusYear]);
+
+  // Fetch batch data for a timeframe (optimized - single API call)
+  const fetchBatchTimeframeData = useCallback(async (timeframeType, focusYearValue, yearStart, yearEnd) => {
     if (!organizationSlug) return {};
-    
+
     const base = resolveApiOrigin();
-    const promises = columns.map(col => {
-      const params = new URLSearchParams({
-        organization_slug: organizationSlug,
-        scope,
-        timeframe: timeframeType,
-        timeframe_value: col.value,
-      });
-      return fetch(`${base}/api/strategic_map?${params.toString()}`, {
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      scope,
+      timeframe: timeframeType,
+    });
+
+    // Use year_range for yearly (send start year), focus_year for others
+    if (timeframeType === 'yearly') {
+      params.append('year_range', yearStart); // Start year of the range
+      params.append('year_span', yearEnd - yearStart + 1); // Number of years
+    } else {
+      params.append('focus_year', focusYearValue);
+    }
+
+    try {
+      const response = await fetch(`${base}/api/strategic_map?${params.toString()}`, {
         credentials: 'include',
         headers: { 'ngrok-skip-browser-warning': 'true' },
-      }).then(res => res.json());
-    });
+      });
+      const json = await response.json();
 
-    const results = await Promise.all(promises);
-    const itemsMap = {};
-    
-    results.forEach((json, colIndex) => {
-      if (json.code === 0 && json.data) {
-        json.data.forEach((item) => {
-          // Support multiple items per cell - use array
-          const key = `${timeframeType}_${item.row_index}_${colIndex}`;
-          if (!itemsMap[key]) {
-            itemsMap[key] = [];
-          }
-          itemsMap[key].push(item);
-        });
+      if (json.code !== 0 || !json.data) {
+        console.log(`⚠️ No data returned for ${timeframeType} (focusYear: ${focusYearValue})`, json);
+        return {};
       }
-    });
-    
-    return itemsMap;
+
+      console.log(`📥 Fetched ${json.data.length} items for ${timeframeType} (focusYear: ${focusYearValue})`);
+      if (timeframeType === 'monthly') {
+        // Log December items specifically
+        const decemberItems = json.data.filter(item => {
+          if (item.timeframe_value) {
+            const month = parseInt(item.timeframe_value.substring(5, 7), 10);
+            return month === 12;
+          }
+          return false;
+        });
+        console.log(`📅 December items found: ${decemberItems.length}`, decemberItems);
+      }
+
+      // Process items and organize by actual year/date, not column_index
+      // This ensures items appear in the correct column even when the view changes
+      const itemsMap = {};
+
+      // For yearly items, build a year-to-columnIndex map based on the fetched range
+      let yearToColumnMap = null;
+      if (timeframeType === 'yearly') {
+        yearToColumnMap = {};
+        for (let i = 0; i <= yearEnd - yearStart; i++) {
+          const year = yearStart + i;
+          yearToColumnMap[year] = i;
+        }
+      }
+
+      json.data.forEach((item) => {
+        let columnIndex = item.column_index !== undefined ? item.column_index : 0;
+
+        // For yearly items, map by actual year from timeframe_value instead of column_index
+        if (timeframeType === 'yearly' && item.timeframe_value && yearToColumnMap) {
+          // Extract year from timeframe_value (format: "YYYY-01-01")
+          const yearFromValue = parseInt(item.timeframe_value.substring(0, 4), 10);
+          // Find the column index that corresponds to this year in the fetched range
+          if (yearToColumnMap[yearFromValue] !== undefined) {
+            columnIndex = yearToColumnMap[yearFromValue];
+          } else {
+            // Year not in fetched range, skip this item
+            return;
+          }
+        }
+
+        // For monthly items, verify the year matches focusYear (filter out items from other years)
+        if (timeframeType === 'monthly' && item.timeframe_value) {
+          // Extract year from timeframe_value (format: "YYYY-MM-DD")
+          const yearFromValue = parseInt(item.timeframe_value.substring(0, 4), 10);
+          // Only include items that match the focusYear
+          if (yearFromValue !== focusYearValue) {
+            console.log(`⚠️ Skipping monthly item from year ${yearFromValue} (focusYear is ${focusYearValue})`, item);
+            return; // Skip items from other years
+          }
+        }
+
+        const key = `${timeframeType}_${item.row_index}_${columnIndex}`;
+        if (!itemsMap[key]) {
+          itemsMap[key] = [];
+        }
+        itemsMap[key].push(item);
+      });
+
+      return itemsMap;
+    } catch (err) {
+      console.error('Error fetching batch data:', err);
+      return {};
+    }
   }, [organizationSlug, scope]);
 
-  const fetchItems = useCallback(async (loadAll = false, clearFirst = false) => {
+  // Load yearly data (always loaded on mount)
+  const fetchYearlyData = useCallback(async (clearFirst = false, silent = false) => {
     if (!organizationSlug) {
       console.error('❌ Cannot fetch: organizationSlug is missing');
       setError('Organization slug is missing. Please refresh the page.');
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    
-    // Clear items first if scope changed
-    if (clearFirst) {
-      setItems({});
-      setLoadedTimeframes({ yearly: false, monthly: false, weekly: false, daily: false });
+    if (!silent) {
+      setLoading(true);
     }
-    
+    setError(null);
+
+    // Always clear items when yearRange changes to prevent showing wrong year's data
+    if (clearFirst) {
+      console.log('🧹 Clearing all items due to year range change');
+      setItems({});
+      setLoadedTabs({ yearly: false, monthly: false, weekly: false, daily: false });
+    }
+
     try {
-      // Always fetch yearly data first (fast, only 5 requests)
-      // Note: fetchTimeframeData uses resolveApiOrigin() internally
+      // Fetch all yearly data in one batch call for the current year range
       const years = getYears();
-      const yearlyItems = await fetchTimeframeData('yearly', years, 0);
-      
+      const yearStart = years[0]?.year || focusYear;
+      const yearEnd = years[years.length - 1]?.year || focusYear;
+      const yearlyItems = await fetchBatchTimeframeData('yearly', focusYear, yearStart, yearEnd);
+
       setItems(prev => {
-        const newItems = { ...prev };
-        // Merge new items with existing, handling arrays properly
-        Object.keys(yearlyItems).forEach(key => {
-          if (clearFirst) {
+        // If clearFirst, start with empty object, otherwise merge
+        const newItems = clearFirst ? {} : { ...prev };
+
+        // Only add items that match the current yearRange
+        // Filter out old items that don't belong to current yearRange
+        if (clearFirst) {
+          // When clearing, only add new items
+          Object.keys(yearlyItems).forEach(key => {
             newItems[key] = yearlyItems[key];
-          } else {
-            const existing = newItems[key];
-            const incoming = yearlyItems[key];
-            if (Array.isArray(existing) && Array.isArray(incoming)) {
-              newItems[key] = [...existing, ...incoming];
-            } else if (Array.isArray(existing)) {
-              newItems[key] = [...existing, incoming];
-            } else if (Array.isArray(incoming)) {
-              newItems[key] = [existing, ...incoming].filter(Boolean);
-            } else {
-              newItems[key] = incoming || existing;
+          });
+        } else {
+          // When merging, replace yearly items but keep other timeframes
+          Object.keys(prev).forEach(key => {
+            if (!key.startsWith('yearly_')) {
+              newItems[key] = prev[key];
             }
-          }
-        });
+          });
+          Object.keys(yearlyItems).forEach(key => {
+            newItems[key] = yearlyItems[key];
+          });
+        }
+
         return newItems;
       });
-      setLoadedTimeframes(prev => ({ ...prev, yearly: true }));
-      setLoading(false); // Show yearly table immediately
-      
-      // If loadAll is true or user wants to see all, load the rest progressively
-      if (loadAll) {
-        // Load monthly (12 requests)
-        const months = getMonths();
-        const monthlyItems = await fetchTimeframeData('monthly', months, 5);
-        setItems(prev => {
-          const newItems = { ...prev };
-          Object.keys(monthlyItems).forEach(key => {
-            const existing = newItems[key];
-            const incoming = monthlyItems[key];
-            newItems[key] = Array.isArray(existing) && Array.isArray(incoming) 
-              ? [...existing, ...incoming]
-              : Array.isArray(existing) 
-                ? [...existing, incoming].filter(Boolean)
-                : Array.isArray(incoming)
-                  ? [existing, ...incoming].filter(Boolean)
-                  : incoming || existing;
-          });
-          return newItems;
-        });
-        setLoadedTimeframes(prev => ({ ...prev, monthly: true }));
-        
-        // Load weekly (52 requests) - batch in chunks
-        const weeks = getWeeks();
-        const weeklyChunks = [];
-        for (let i = 0; i < weeks.length; i += 13) {
-          weeklyChunks.push(weeks.slice(i, i + 13));
-        }
-        for (const chunk of weeklyChunks) {
-          const weeklyItems = await fetchTimeframeData('weekly', chunk, 17);
-          setItems(prev => {
-            const newItems = { ...prev };
-            Object.keys(weeklyItems).forEach(key => {
-              const existing = newItems[key];
-              const incoming = weeklyItems[key];
-              newItems[key] = Array.isArray(existing) && Array.isArray(incoming) 
-                ? [...existing, ...incoming]
-                : Array.isArray(existing) 
-                  ? [...existing, incoming].filter(Boolean)
-                  : Array.isArray(incoming)
-                    ? [existing, ...incoming].filter(Boolean)
-                    : incoming || existing;
-            });
-            return newItems;
-          });
-        }
-        setLoadedTimeframes(prev => ({ ...prev, weekly: true }));
-        
-        // Load daily (365 requests) - only load current year for performance
-        const days = getDays();
-        const currentYearDays = days.filter(day => {
-          const date = new Date(day.value);
-          return date.getFullYear() === focusYear;
-        });
-        
-        // Load daily data in batches of 30 days
-        for (let i = 0; i < currentYearDays.length; i += 30) {
-          const batch = currentYearDays.slice(i, i + 30);
-          const dailyItems = await fetchTimeframeData('daily', batch, 69);
-          setItems(prev => {
-            const newItems = { ...prev };
-            Object.keys(dailyItems).forEach(key => {
-              const existing = newItems[key];
-              const incoming = dailyItems[key];
-              newItems[key] = Array.isArray(existing) && Array.isArray(incoming) 
-                ? [...existing, ...incoming]
-                : Array.isArray(existing) 
-                  ? [...existing, incoming].filter(Boolean)
-                  : Array.isArray(incoming)
-                    ? [existing, ...incoming].filter(Boolean)
-                    : incoming || existing;
-            });
-            return newItems;
-          });
-        }
-        setLoadedTimeframes(prev => ({ ...prev, daily: true }));
+
+      setLoadedTabs(prev => ({ ...prev, yearly: true }));
+      if (!silent) {
+        setLoading(false);
       }
     } catch (err) {
-      console.error('❌ Fetch error:', err);
+      console.error('❌ Fetch yearly error:', err);
       setError(err.message);
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  }, [organizationSlug, getYears, getMonths, getWeeks, getDays, fetchTimeframeData, focusYear]); // scope is used via fetchTimeframeData, yearRange and focusYear are used via getYears/getMonths/getWeeks/getDays
+  }, [organizationSlug, focusYear, yearSpan, yearStartOffset, getYears, fetchBatchTimeframeData]);
 
-  useEffect(() => {
-    setFocusYear(yearRange);
-  }, [yearRange]);
+  // Load tab data on demand
+  const loadTabData = useCallback(async (tabName, forceReload = false) => {
+    if (!organizationSlug) {
+      return;
+    }
+    if (tabLoading[tabName]) {
+      return;
+    }
+    if (!forceReload && loadedTabs[tabName]) {
+      return;
+    }
 
-  // Track previous scope to detect changes
+    setTabLoading(prev => ({ ...prev, [tabName]: true }));
+    setError(null);
+
+    try {
+      let timeframeItems = {};
+
+      if (tabName === 'monthly') {
+        timeframeItems = await fetchBatchTimeframeData('monthly', focusYear, focusYear, focusYear);
+      } else if (tabName === 'weekly') {
+        timeframeItems = await fetchBatchTimeframeData('weekly', focusYear, focusYear, focusYear);
+      } else if (tabName === 'daily') {
+        timeframeItems = await fetchBatchTimeframeData('daily', focusYear, focusYear, focusYear);
+      }
+
+      setItems(prev => {
+        const newItems = { ...prev };
+
+        // Remove old items for this timeframe before adding new ones
+        Object.keys(prev).forEach(key => {
+          if (key.startsWith(`${tabName}_`)) {
+            delete newItems[key];
+          }
+        });
+
+        // Add new items for current yearRange/focusYear
+        Object.keys(timeframeItems).forEach(key => {
+          newItems[key] = timeframeItems[key];
+        });
+
+        return newItems;
+      });
+
+      setLoadedTabs(prev => ({ ...prev, [tabName]: true }));
+    } catch (err) {
+      console.error(`❌ Fetch ${tabName} error:`, err);
+      setError(`Failed to load ${tabName} data: ${err.message}`);
+    } finally {
+      setTabLoading(prev => ({ ...prev, [tabName]: false }));
+    }
+  }, [organizationSlug, focusYear, loadedTabs, tabLoading, fetchBatchTimeframeData]);
+
+  const reloadTimeframe = useCallback((timeframeKey, { silent = true } = {}) => {
+    if (!organizationSlug) {
+      return;
+    }
+
+    if (timeframeKey === 'yearly') {
+      fetchYearlyData(false, silent);
+      return;
+    }
+
+    if (tabLoading[timeframeKey]) {
+      return;
+    }
+
+    setTabLoading(prev => ({ ...prev, [timeframeKey]: true }));
+
+    setItems(prev => {
+      const newItems = { ...prev };
+      Object.keys(prev).forEach(key => {
+        if (key.startsWith(`${timeframeKey}_`)) {
+          delete newItems[key];
+        }
+      });
+      return newItems;
+    });
+
+    setLoadedTabs(prev => ({ ...prev, [timeframeKey]: false }));
+    loadTabData(timeframeKey, true);
+  }, [organizationSlug, fetchYearlyData, loadTabData, tabLoading]);
+
+  // Track previous scope/focusYear/yearSpan/yearStartOffset to detect changes
   const prevScopeRef = useRef(scope);
-  const prevYearRangeRef = useRef(yearRange);
+  const prevFocusYearRef = useRef(focusYear);
+  const prevYearSpanRef = useRef(yearSpan);
+  const prevYearStartOffsetRef = useRef(yearStartOffset);
   const isInitialMount = useRef(true);
-  
+  const prevFocusYearForReloadRef = useRef(focusYear);
+
+  // Load yearly data on mount or when scope/year range changes
   useEffect(() => {
     if (!organizationSlug) {
       setLoading(false);
       return;
     }
-    
-    // If scope or yearRange changed, clear and reload
+
     const scopeChanged = prevScopeRef.current !== scope;
-    const yearRangeChanged = prevYearRangeRef.current !== yearRange;
+    const focusYearChanged = prevFocusYearRef.current !== focusYear;
+    const yearSpanChanged = prevYearSpanRef.current !== yearSpan;
+    const yearStartOffsetChanged = prevYearStartOffsetRef.current !== yearStartOffset;
+
     prevScopeRef.current = scope;
-    prevYearRangeRef.current = yearRange;
-    
-    // On initial mount or when scope/yearRange changes, load all data
-    // Clear first if scope or yearRange changed to prevent mixing data
-    if (isInitialMount.current || scopeChanged || yearRangeChanged) {
+    prevFocusYearRef.current = focusYear;
+    prevYearSpanRef.current = yearSpan;
+    prevYearStartOffsetRef.current = yearStartOffset;
+
+    if (isInitialMount.current || scopeChanged || focusYearChanged || yearSpanChanged || yearStartOffsetChanged) {
       isInitialMount.current = false;
-      fetchItems(true, scopeChanged || yearRangeChanged); // Load all data, clear if scope/yearRange changed
+      if (focusYearChanged || yearSpanChanged || yearStartOffsetChanged) {
+        setLoadedTabs(prev => ({
+          ...prev,
+          monthly: false,
+          weekly: false,
+          daily: false
+        }));
+        setItems(prev => {
+          const newItems = { ...prev };
+          Object.keys(prev).forEach(key => {
+            if (key.startsWith('monthly_') || key.startsWith('weekly_') || key.startsWith('daily_')) {
+              delete newItems[key];
+            }
+          });
+          return newItems;
+        });
+        // Defer non-yearly reloads to tab-activation and focusYear-change handlers to avoid races
+      }
+      reloadTimeframe('yearly', { silent: false });
     }
-  }, [organizationSlug, fetchItems, scope, yearRange]);
+  }, [organizationSlug, reloadTimeframe, scope, focusYear, yearSpan, yearStartOffset]);
+
+  // Reload tab data when focusYear changes (if tab is active)
+  useEffect(() => {
+    if (!organizationSlug || isInitialMount.current) return;
+
+    const changed = prevFocusYearForReloadRef.current !== focusYear;
+    prevFocusYearForReloadRef.current = focusYear;
+
+    if (!changed) return;
+
+    console.log('🔄 Focus year changed, reloading active tab:', activeTab);
+    if (activeTab !== 'yearly') {
+      reloadTimeframe(activeTab);
+    }
+  }, [focusYear, activeTab, organizationSlug, reloadTimeframe]);
+
+  // Load tab data when tab is activated
+  useEffect(() => {
+    if (activeTab !== 'yearly' && !loadedTabs[activeTab] && !tabLoading[activeTab]) {
+      reloadTimeframe(activeTab);
+    }
+  }, [activeTab, loadedTabs, tabLoading, reloadTimeframe]);
+
+  useEffect(() => {
+    if (activeTab === 'weekly' && !loadedTabs.monthly && !tabLoading.monthly) {
+      loadTabData('monthly');
+    }
+  }, [activeTab, loadedTabs.monthly, tabLoading.monthly, loadTabData]);
+
+  useEffect(() => {
+    if (activeTab === 'daily' && !loadedTabs.weekly && !tabLoading.weekly) {
+      loadTabData('weekly');
+    }
+    if (activeTab === 'daily' && !loadedTabs.monthly && !tabLoading.monthly) {
+      loadTabData('monthly');
+    }
+  }, [activeTab, loadedTabs.weekly, loadedTabs.monthly, tabLoading.weekly, tabLoading.monthly, loadTabData]);
+
+  const refreshCascadeTimeframes = useCallback(async (changedTimeframe) => {
+    if (!organizationSlug) {
+      return;
+    }
+
+    const timeframesToRefresh = ['yearly', 'monthly', 'weekly', 'daily'];
+
+    for (const timeframeKey of timeframesToRefresh) {
+      try {
+        if (timeframeKey === 'yearly') {
+          await fetchYearlyData(false, true);
+        } else {
+          await loadTabData(timeframeKey, true);
+        }
+      } catch (err) {
+        console.error(`Failed to refresh ${timeframeKey} data after ${changedTimeframe} update:`, err);
+      }
+    }
+  }, [organizationSlug, fetchYearlyData, loadTabData]);
+
+  const getCellItems = useCallback((timeframe, rowIndex, columnIndex) => {
+    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
+    const cellItems = items[key];
+    return Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
+  }, [items]);
+
+  // Memoized Cell Component to prevent unnecessary re-renders
+  const StrategicMapCell = memo(({ 
+    timeframe,
+    rowIndex,
+    columnIndex,
+    cellItems,
+    isEditing,
+    editValue,
+    editingItemIndex,
+    editingItemKey,
+    isSmall,
+    hasRightBorder = true,
+    hasLeftBorder = false,
+    onCellClick,
+    onItemClick,
+    onCellBlur,
+    onCellKeyDown,
+    onStatusClick,
+    onDeleteItem,
+    onEditValueChange,
+    editInputRef
+  }) => {
+    const getStatusIcon = useCallback((status, itemId, itemIndex) => {
+      const iconSize = 18; // Increased from 14 to 18
+
+      let icon;
+      if (status === 'done') {
+        // Green check icon
+        icon = (
+          <svg width={iconSize} height={iconSize} viewBox="0 0 20 20" fill="none">
+            <path
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              fill="#4caf50"
+            />
+          </svg>
+        );
+      } else if (status === 'fail') {
+        // Red cross icon
+        icon = (
+          <svg width={iconSize} height={iconSize} viewBox="0 0 20 20" fill="none">
+            <path
+              fillRule="evenodd"
+              clipRule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              fill="#f44336"
+            />
+          </svg>
+        );
+      } else {
+        // Neutral - gray circle (not completed)
+        icon = (
+          <svg width={iconSize} height={iconSize} viewBox="0 0 20 20" fill="none">
+            <circle
+              cx="10"
+              cy="10"
+              r="8"
+              stroke="#9e9e9e"
+              strokeWidth="1.5"
+              fill="none"
+            />
+          </svg>
+        );
+      }
+
+      return (
+        <Box
+          onClick={(e) => onStatusClick(timeframe, rowIndex, columnIndex, itemId, itemIndex, e)}
+          onMouseDown={(e) => e.stopPropagation()}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: iconSize + 8,
+            height: iconSize + 8,
+            cursor: 'pointer',
+            flexShrink: 0,
+            borderRadius: '4px',
+            '&:hover': {
+              backgroundColor: '#f5f5f5',
+              transform: 'scale(1.1)',
+            },
+            transition: 'all 0.2s',
+          }}
+        >
+          {icon}
+        </Box>
+      );
+    }, [timeframe, rowIndex, columnIndex, onStatusClick]);
+
+    const getLockIcon = useCallback(() => {
+      const iconSize = 18;
+      return (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: iconSize + 8,
+            height: iconSize + 8,
+            flexShrink: 0,
+            borderRadius: '4px',
+          }}
+        >
+          <svg width={iconSize} height={iconSize} viewBox="0 0 20 20" fill="none">
+            <path d="M10 3a4 4 0 00-4 4v2H5a2 2 0 00-2 2v4a2 2 0 002 2h10a2 2 0 002-2v-4a2 2 0 00-2-2h-1V7a4 4 0 00-4-4zm-2 6V7a2 2 0 114 0v2H8z" fill="#9e9e9e"/>
+          </svg>
+        </Box>
+      );
+    }, []);
+
+    return (
+      <TableCell
+        onClick={!isEditing ? onCellClick : undefined}
+        sx={{
+          minWidth: isSmall ? 60 : 120,
+          maxWidth: isSmall ? 60 : 120,
+          minHeight: 60,
+          px: isSmall ? 0.5 : 1,
+          py: 1,
+          cursor: isEditing ? 'default' : 'pointer',
+          verticalAlign: 'top',
+          position: 'relative',
+          fontSize: '0.875rem',
+          borderBottom: '1px solid #e8e8e8',
+          borderRight: hasRightBorder ? '1px solid #e0e0e0' : 'none',
+          borderLeft: hasLeftBorder ? '1px solid #e0e0e0' : 'none',
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {/* Always show existing checklist items */}
+          {cellItems.length > 0 && (
+            cellItems.map((item, idx) => (
+              <Box
+                key={item.id || idx}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 0.5,
+                  minHeight: 16,
+                  position: 'relative',
+                  '&:hover .delete-button': {
+                    opacity: 1,
+                  },
+                }}
+              >
+                {getStatusIcon(item.status || 'neutral', item.id, item.item_index)}
+                {item.is_auto_generated ? getLockIcon() : null}
+                {editingItemKey === `${timeframe}_${rowIndex}_${columnIndex}_${item.item_index !== undefined ? item.item_index : idx}` ? (
+                  // Inline editing - use native input for single-line text
+                <input
+                  type="text"
+                  ref={editTextareaRef}
+                  defaultValue={editValue || ''}
+                  onKeyDown={(e) => onCellKeyDown(e, timeframe, rowIndex, columnIndex)}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    fontSize: isSmall ? '0.8125rem' : '0.9375rem',
+                    fontFamily: 'inherit',
+                    border: '1px solid rgba(0, 0, 0, 0.23)',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    lineHeight: 1.4,
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1976d2';
+                    e.target.style.borderWidth = '2px';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(0, 0, 0, 0.23)';
+                    e.target.style.borderWidth = '1px';
+                    onCellBlur(timeframe, rowIndex, columnIndex);
+                  }}
+                />
+                ) : (
+                  <Typography
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      const itemIndex = item.item_index !== undefined ? item.item_index : idx;
+                      if (!item.is_auto_generated) {
+                        onItemClick(timeframe, rowIndex, columnIndex, item.id, itemIndex, item.cell_value);
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                    variant="body2"
+                    sx={{
+                      fontSize: isSmall ? '0.8125rem' : '0.9375rem', // Increased from 0.6/0.65rem
+                      lineHeight: 1.4,
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      cursor: item.is_auto_generated ? 'not-allowed' : 'pointer',
+                      borderRadius: '4px',
+                      px: 0.5,
+                      py: 0.5,
+                      transition: 'all 0.2s',
+                      pointerEvents: 'auto',
+                      userSelect: 'none',
+                      '&:hover': {
+                        backgroundColor: '#f5f5f5',
+                      },
+                    }}
+                  >
+                    {item.cell_value || ''}
+                  </Typography>
+                )}
+                {/* Delete button - shows on hover */}
+                <Box
+                  className="delete-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (item.id && !item.id.toString().startsWith('temp-')) {
+                      onDeleteItem(timeframe, rowIndex, columnIndex, item.id);
+                    }
+                  }}
+                  sx={{
+                    opacity: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    minWidth: 24,
+                    minHeight: 24,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    borderRadius: '4px',
+                    transition: 'opacity 0.2s',
+                    '&:hover': {
+                      backgroundColor: '#f5f5f5',
+                      opacity: 1,
+                    },
+                  }}
+                >
+                  <svg width={18} height={18} viewBox="0 0 20 20" fill="none">
+                    <path
+                      fillRule="evenodd"
+                      clipRule="evenodd"
+                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      fill="#9e9e9e"
+                    />
+                  </svg>
+                </Box>
+              </Box>
+            ))
+          )}
+
+          {/* Input field - only show when adding new items (not when editing existing items inline) */}
+          {isEditing && editingItemIndex === null ? (
+            <input
+              type="text"
+              ref={editTextareaRef}
+              defaultValue={editValue || ''}
+              // onChange={(e) => onEditValueChange(e.target.value)}
+              onKeyDown={(e) => onCellKeyDown(e, timeframe, rowIndex, columnIndex)}
+              autoFocus
+              style={{
+                width: '100%',
+                fontSize: '0.9375rem',
+                fontFamily: 'inherit',
+                border: '1px solid rgba(0, 0, 0, 0.23)',
+                borderRadius: '4px',
+                padding: '6px 6px',
+                marginTop: '4px',
+                lineHeight: 1.4,
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#1976d2';
+                e.target.style.borderWidth = '2px';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'rgba(0, 0, 0, 0.23)';
+                e.target.style.borderWidth = '1px';
+                onCellBlur(timeframe, rowIndex, columnIndex);
+              }}
+            />
+          ) : (
+            <Box
+              onClick={onCellClick}
+              sx={{
+                minHeight: 32,
+                fontSize: '0.875rem',
+                color: 'text.secondary',
+                cursor: 'pointer',
+                px: 0.75,
+                py: 0.5,
+                borderRadius: 0.5,
+                '&:hover': {
+                  backgroundColor: '#f5f5f5',
+                },
+              }}
+            />
+          )}
+        </Box>
+      </TableCell>
+    );
+  }, (prevProps, nextProps) => {
+    // Custom comparison function for React.memo
+    // Only re-render if these props change
+    if (prevProps.isEditing !== nextProps.isEditing) return false;
+    if (prevProps.editValue !== nextProps.editValue) return false;
+    if (prevProps.editingItemIndex !== nextProps.editingItemIndex) return false;
+    if (prevProps.editingItemKey !== nextProps.editingItemKey) return false;
+    if (prevProps.isSmall !== nextProps.isSmall) return false;
+
+    // Deep compare cellItems array
+    if (prevProps.cellItems.length !== nextProps.cellItems.length) return false;
+    for (let i = 0; i < prevProps.cellItems.length; i++) {
+      const prev = prevProps.cellItems[i];
+      const next = nextProps.cellItems[i];
+      if (prev.id !== next.id || prev.cell_value !== next.cell_value || prev.status !== next.status) {
+        return false;
+      }
+    }
+
+    return true; // Props are equal, skip re-render
+  });
 
   const saveItem = useCallback(async (timeframe, rowIndex, columnIndex, updates) => {
     // Validate organizationSlug before proceeding
@@ -342,7 +1000,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     try {
       const base = resolveApiOrigin();
       let timeframeValue = '';
-      
+
       if (timeframe === 'yearly') {
         const years = getYears();
         timeframeValue = years[columnIndex]?.value || '';
@@ -410,29 +1068,49 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       }
 
       const key = `${timeframe}_${rowIndex}_${columnIndex}`;
-      
+      let savedItemResult = null;
+
       // Update items state - merge the saved item with existing items
       if (json.data) {
         const savedItem = json.data;
+        savedItemResult = savedItem;
         setItems((prev) => {
           const newItems = { ...prev };
-          const existingItems = getCellItems(timeframe, rowIndex, columnIndex);
-          
+          // Get existing items from prev state, not closure
+          const cellItems = prev[key];
+          const existingItems = Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
+
           if (savedItem.id && existingItems.some(i => i.id === savedItem.id)) {
             // Update existing item
-            newItems[key] = existingItems.map(item => 
+            newItems[key] = existingItems.map(item =>
               item.id === savedItem.id ? savedItem : item
             );
           } else {
-            // Add new item
-            newItems[key] = [...existingItems, savedItem];
+            // Add new item (or replace temp item if exists)
+            const tempItemIndex = existingItems.findIndex(item =>
+              item.id && item.id.toString().startsWith('temp-') &&
+              item.item_index === savedItem.item_index
+            );
+            if (tempItemIndex >= 0) {
+              // Replace temp item
+              const updatedItems = [...existingItems];
+              updatedItems[tempItemIndex] = savedItem;
+              newItems[key] = updatedItems;
+            } else {
+              // Add new item
+              newItems[key] = [...existingItems, savedItem];
+            }
           }
-          
+
           return newItems;
         });
       }
-      
+
       console.log('✅ Save successful');
+      refreshCascadeTimeframes(timeframe).catch(err => {
+        console.error(`Failed to refresh cascaded timeframes after ${timeframe} save:`, err);
+      });
+      return savedItemResult;
     } catch (err) {
       console.error('❌ Save error:', err);
       console.error('Error details:', {
@@ -447,7 +1125,12 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     } finally {
       setSaving(false);
     }
-  }, [organizationSlug, scope, getYears, getMonths, getWeeks, getDays, getCellItems]);
+  }, [organizationSlug, scope, getYears, getMonths, getWeeks, getDays, refreshCascadeTimeframes]);
+
+  // Simple onChange handler - native textarea handles cursor positioning automatically
+  const handleEditValueChange = useCallback((newValue) => {
+    setEditValue(newValue);
+  }, []);
 
   const handleCellClick = (timeframe, rowIndex, columnIndex) => {
     if (!organizationSlug) {
@@ -455,259 +1138,617 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       return;
     }
     const key = `${timeframe}_${rowIndex}_${columnIndex}`;
-    const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
-    // When clicking, edit the first item if exists, or create new
-    const firstItem = cellItems[0];
+    // Always start with empty input for adding new items (checklist behavior)
     setEditingCell(key);
-    setEditValue(firstItem?.cell_value || '');
-    setEditingItemIndex(firstItem?.item_index !== undefined ? firstItem.item_index : null);
-    setTimeout(() => {
-      if (editInputRef.current) {
-        editInputRef.current.focus();
-        editInputRef.current.select();
-      }
-    }, 0);
+    setEditValue('');
+    setEditingItemIndex(null); // Always create new item when clicking cell
+    setEditingItemKey(null); // Clear editing item key when adding new item
   };
 
-  const handleCellBlur = (timeframe, rowIndex, columnIndex) => {
-    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
-    if (editingCell === key) {
-      const newValue = editValue.trim();
-      const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
-      
-      // Only save if value changed
-      if (newValue) {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        
-        // If editingItemIndex is set, we're updating an existing item
-        // Otherwise, we're creating a new item with the next available index
-        const maxItemIndex = cellItems.length > 0 
-          ? Math.max(...cellItems.map(i => i.item_index || 0))
-          : -1;
-        const itemIndex = editingItemIndex !== null ? editingItemIndex : maxItemIndex + 1;
-        
-        const editingItem = editingItemIndex !== null 
-          ? cellItems.find(i => i.item_index === editingItemIndex)
-          : null;
-        
-        saveTimeoutRef.current = setTimeout(() => {
-          saveItem(timeframe, rowIndex, columnIndex, { 
-            cell_value: newValue,
-            item_id: editingItem?.id,
-            item_index: itemIndex
-          });
-        }, 500);
-      }
-
-      setEditingCell(null);
-      setEditValue('');
-      setEditingItemIndex(null);
-    }
-  };
-
-  const handleCellKeyDown = async (e, timeframe, rowIndex, columnIndex) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      // If Enter is pressed, save current item and prepare for next item
-      const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
-      const newValue = editValue.trim();
-      
-      if (newValue) {
-        // If editingItemIndex is set, we're updating an existing item
-        // Otherwise, we're creating a new item with the next available index
-        let currentItemIndex;
-        let editingItem = null;
-        
-        if (editingItemIndex !== null) {
-          // Updating existing item
-          editingItem = cellItems.find(i => i.item_index === editingItemIndex);
-          currentItemIndex = editingItemIndex;
-        } else {
-          // Creating new item - find next available index
-          const maxItemIndex = cellItems.length > 0 
-            ? Math.max(...cellItems.map(i => (i.item_index || 0)))
-            : -1;
-          currentItemIndex = maxItemIndex + 1;
-        }
-        
-        // Save current item (wait for it to complete)
-        try {
-          await saveItem(timeframe, rowIndex, columnIndex, { 
-            cell_value: newValue,
-            item_id: editingItem?.id,
-            item_index: currentItemIndex
-          });
-          
-          // After save completes, prepare for next item
-          setEditValue('');
-          setEditingItemIndex(null); // Next item will be new
-          // Keep edit mode active so user can type the next goal
-          setTimeout(() => {
-            if (editInputRef.current) {
-              editInputRef.current.focus();
-            }
-          }, 100);
-        } catch (err) {
-          console.error('Failed to save item:', err);
-          // Don't clear on error, let user retry
-        }
-      } else {
-        // Empty value - just clear and prepare for next
-        setEditValue('');
-        setEditingItemIndex(null);
-      }
-    } else if (e.key === 'Enter' && e.shiftKey) {
-      // Shift+Enter = save and exit
-      e.preventDefault();
-      handleCellBlur(timeframe, rowIndex, columnIndex);
-    } else if (e.key === 'Escape') {
-      setEditingCell(null);
-      setEditValue('');
-      setEditingItemIndex(null);
-    }
-  };
-
-  const getCellItems = useCallback((timeframe, rowIndex, columnIndex) => {
-    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
-    const cellItems = items[key];
-    return Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
-  }, [items]);
-
-  const handleStatusClick = useCallback((timeframe, rowIndex, columnIndex, itemId, itemIndex, e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
+  const handleItemClick = useCallback((timeframe, rowIndex, columnIndex, itemId, itemIndex, currentValue) => {
     if (!organizationSlug) {
       setError('Organization slug is missing. Please refresh the page.');
       return;
     }
-    
+    // Edit existing item inline - track both the cell and item index
+    setEditValue(currentValue || '');
+    setEditingItemIndex(itemIndex);
+    setEditingItemKey(`${timeframe}_${rowIndex}_${columnIndex}_${itemIndex}`);
+  }, [organizationSlug]);
+
+  const handleCellBlur = (timeframe, rowIndex, columnIndex) => {
+    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
+
+    // Handle inline item editing blur - only if this is the cell being edited
+    if (editingItemKey && editingItemKey.startsWith(`${timeframe}_${rowIndex}_${columnIndex}_`)) {
+      const domValue = editTextareaRef.current ? editTextareaRef.current.value : editValue;
+      const newValue = (domValue || '').trim();
+      const itemIndexMatch = editingItemKey.match(/_(\d+)$/);
+      const itemIndex = itemIndexMatch ? parseInt(itemIndexMatch[1], 10) : null;
+
+      if (newValue && itemIndex !== null) {
+        const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
+        const existingItem = cellItems.find(i => i.item_index === itemIndex);
+
+        if (existingItem && newValue !== existingItem.cell_value) {
+          // Save the yearly item
+          saveItem(timeframe, rowIndex, columnIndex, {
+            cell_value: newValue,
+            item_id: existingItem.id,
+            item_index: itemIndex
+          });
+        }
+      } else if (itemIndex !== null) {
+        // Empty value when editing - delete the item
+        const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
+        const existingItem = cellItems.find(i => i.item_index === itemIndex);
+        if (existingItem && existingItem.id && !existingItem.id.toString().startsWith('temp-')) {
+          handleDeleteItem(timeframe, rowIndex, columnIndex, existingItem.id);
+        }
+      }
+
+      // Exit inline edit mode
+      setEditValue('');
+      setEditingItemIndex(null);
+      setEditingItemKey(null);
+      return;
+    }
+
+    // Handle cell input blur (for adding new items)
+    if (editingCell === key) {
+      const domValue = editTextareaRef.current ? editTextareaRef.current.value : editValue;
+      const newValue = (domValue || '').trim();
+
+      // Creating new item (checklist behavior)
+      if (newValue) {
+        const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
+        const maxItemIndex = cellItems.length > 0
+          ? Math.max(...cellItems.map(i => i.item_index || 0))
+          : -1;
+        const nextItemIndex = maxItemIndex + 1;
+
+        saveItem(timeframe, rowIndex, columnIndex, {
+          cell_value: newValue,
+          item_id: null, // New item
+          item_index: nextItemIndex
+        });
+      }
+
+      // Exit edit mode on blur
+      setEditingCell(null);
+      setEditValue('');
+      setEditingItemIndex(null);
+      setEditingItemKey(null);
+    }
+  };
+
+  const handleCellKeyDown = (e, timeframe, rowIndex, columnIndex) => {
+    const composing = (e.nativeEvent && e.nativeEvent.isComposing) || e.keyCode === 229;
+    if (composing) {
+      return;
+    }
+    // Handle inline item editing - only if this is the cell being edited
+    if (editingItemKey && editingItemKey.startsWith(`${timeframe}_${rowIndex}_${columnIndex}_`)) {
+      const itemIndexMatch = editingItemKey.match(/_(\d+)$/);
+      const itemIndex = itemIndexMatch ? parseInt(itemIndexMatch[1], 10) : null;
+
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const domValue = editTextareaRef.current ? editTextareaRef.current.value : editValue;
+        const newValue = (domValue || '').trim();
+
+        if (newValue && itemIndex !== null) {
+          const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
+          const existingItem = cellItems.find(i => i.item_index === itemIndex);
+
+          if (existingItem && newValue !== existingItem.cell_value) {
+            // Value changed - update it
+            saveItem(timeframe, rowIndex, columnIndex, {
+              cell_value: newValue,
+              item_id: existingItem.id,
+              item_index: itemIndex
+            });
+          }
+          // Exit edit mode
+          setEditValue('');
+          setEditingItemIndex(null);
+          setEditingItemKey(null);
+        } else if (itemIndex !== null) {
+          // Empty value - delete the item
+          const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
+          const existingItem = cellItems.find(i => i.item_index === itemIndex);
+          if (existingItem && existingItem.id && !existingItem.id.toString().startsWith('temp-')) {
+            handleDeleteItem(timeframe, rowIndex, columnIndex, existingItem.id);
+          }
+          setEditValue('');
+          setEditingItemIndex(null);
+          setEditingItemKey(null);
+        }
+        return;
+      } else if (e.key === 'Escape') {
+        // Cancel editing
+        e.preventDefault();
+        setEditValue('');
+        setEditingItemIndex(null);
+        setEditingItemKey(null);
+        return;
+      }
+      // For other keys, let the input handle them
+      return;
+    }
+
+    // Handle cell input (for adding new items)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const domValue = editTextareaRef.current ? editTextareaRef.current.value : editValue;
+      const newValue = (domValue || '').trim();
+
+      if (newValue) {
+        // Creating new item (checklist behavior)
+        const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
+        const maxItemIndex = cellItems.length > 0
+          ? Math.max(...cellItems.map(i => (i.item_index || 0)))
+          : -1;
+        const nextItemIndex = maxItemIndex + 1;
+
+        // Optimistically update UI immediately (don't wait for save)
+        const key = `${timeframe}_${rowIndex}_${columnIndex}`;
+        const tempId = `temp-${Date.now()}-${nextItemIndex}`;
+        const optimisticItem = {
+          id: tempId,
+          cell_value: newValue,
+          status: 'neutral',
+          item_index: nextItemIndex,
+          row_index: rowIndex,
+          column_index: columnIndex,
+          timeframe,
+        };
+
+        // Add to items immediately for instant feedback
+        setItems(prev => {
+          const newItems = { ...prev };
+          const existingItems = prev[key] || [];
+          newItems[key] = [...existingItems, optimisticItem];
+          return newItems;
+        });
+
+        // Clear input immediately for next item
+        setEditValue('');
+        if (editTextareaRef.current) {
+          editTextareaRef.current.value = '';
+        }
+        setEditingItemIndex(null);
+        setEditingItemKey(null);
+
+        // Save in background (don't wait)
+        saveItem(timeframe, rowIndex, columnIndex, {
+          cell_value: newValue,
+          item_id: null, // New item
+          item_index: nextItemIndex
+        }).then((savedItem) => {
+          // Replace optimistic item with real saved item
+          if (savedItem) {
+            setItems(prev => {
+              const newItems = { ...prev };
+              const existingItems = prev[key] || [];
+              // Replace temp item with real item
+              const updatedItems = existingItems.map(item =>
+                item.id === tempId ? savedItem : item
+              );
+              newItems[key] = updatedItems;
+              return newItems;
+            });
+          }
+        }).catch(err => {
+          console.error('Failed to save item:', err);
+          // Remove optimistic item on error
+          setItems(prev => {
+            const newItems = { ...prev };
+            const existingItems = prev[key] || [];
+            newItems[key] = existingItems.filter(item => item.id !== tempId);
+            return newItems;
+          });
+        });
+
+        // Keep focus on input for next item
+        setTimeout(() => {
+          if (editTextareaRef.current) {
+            editTextareaRef.current.focus();
+          }
+        }, 10);
+      } else {
+        // Empty value - just clear
+        setEditValue('');
+        setEditingItemIndex(null);
+        setEditingItemKey(null);
+      }
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      // Shift+Enter = save current item and exit edit mode
+      e.preventDefault();
+      handleCellBlur(timeframe, rowIndex, columnIndex);
+    } else if (e.key === 'Escape') {
+      // Escape = cancel editing
+      setEditingCell(null);
+      setEditValue('');
+      setEditingItemIndex(null);
+      setEditingItemKey(null);
+    }
+  };
+
+  const handleStatusClick = useCallback((timeframe, rowIndex, columnIndex, itemId, itemIndex, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (!organizationSlug) {
+      setError('Organization slug is missing. Please refresh the page.');
+      return;
+    }
+
     const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
     const item = cellItems.find(i => (itemId && i.id === itemId) || (itemIndex !== undefined && i.item_index === itemIndex)) || cellItems[0];
     if (!item) return;
-    
+
     const currentStatus = item.status || 'neutral';
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
     const nextIndex = (currentIndex + 1) % STATUS_CYCLE.length;
     const nextStatus = STATUS_CYCLE[nextIndex];
 
     console.log('🔄 Status click:', { timeframe, rowIndex, columnIndex, itemId, itemIndex, currentStatus, nextStatus });
-    saveItem(timeframe, rowIndex, columnIndex, { 
-      status: nextStatus, 
-      item_id: item.id, 
-      item_index: item.item_index || 0 
+
+    // IMPORTANT: Include cell_value to preserve the text when updating status
+    saveItem(timeframe, rowIndex, columnIndex, {
+      status: nextStatus,
+      cell_value: item.cell_value || '', // Preserve existing text
+      item_id: item.id,
+      item_index: item.item_index || 0
     });
   }, [organizationSlug, saveItem, getCellItems]);
 
-  const handleYearRangeChange = (direction) => {
-    setYearRange(prev => prev + (direction === 'next' ? 5 : -5));
+  const handleDeleteItem = useCallback(async (timeframe, rowIndex, columnIndex, itemId) => {
+    if (!organizationSlug || !itemId) {
+      console.error('Cannot delete: missing organizationSlug or itemId');
+      return;
+    }
+
+    // Optimistically remove from UI
+    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
+    setItems(prev => {
+      const newItems = { ...prev };
+      const existingItems = prev[key] || [];
+      newItems[key] = existingItems.filter(item => item.id !== itemId);
+      return newItems;
+    });
+
+    try {
+      const base = resolveApiOrigin();
+      // Include organization_slug in query params for DELETE request
+      const params = new URLSearchParams({
+        id: itemId,
+        organization_slug: organizationSlug,
+      });
+      const response = await fetch(`${base}/api/strategic_map?${params.toString()}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+
+      if (!response.ok) {
+        // If not OK, try to get error message
+        if (contentType && contentType.includes('application/json')) {
+          const json = await response.json();
+          throw new Error(json.msg || json.error || `Failed to delete item (${response.status})`);
+        } else {
+          const text = await response.text();
+          throw new Error(text || `Failed to delete item (${response.status})`);
+        }
+      }
+
+      // Response is OK, parse as JSON
+      const json = await response.json();
+
+      if (json.code !== 0) {
+        throw new Error(json.msg || 'Failed to delete item');
+      }
+
+      console.log('✅ Item deleted successfully');
+      refreshCascadeTimeframes(timeframe).catch(err => {
+        console.error(`Failed to refresh cascaded timeframes after ${timeframe} delete:`, err);
+      });
+    } catch (err) {
+      console.error('❌ Delete error:', err);
+      setError(err.message || 'Failed to delete item. Please try again.');
+
+      // Revert optimistic update on error - reload cell data
+      const key = `${timeframe}_${rowIndex}_${columnIndex}`;
+      // Reload data for this cell by fetching from API
+      // For now, we'll just show the error - user can refresh
+    }
+  }, [organizationSlug]);
+
+  // Year navigation handlers
+  const handleYearNavigation = (direction) => {
+    if (direction === 'prev') {
+      setFocusYear(prev => prev - 1);
+    } else if (direction === 'next') {
+      setFocusYear(prev => prev + 1);
+    }
   };
 
-  const renderCell = (timeframe, category, col, isSmall = false) => {
-    const cellItems = getCellItems(timeframe, category.id, col.index);
+  const handleYearSpanChange = (delta) => {
+    setYearSpan(prev => Math.max(1, Math.min(20, prev + delta))); // Limit between 1-20 years
+  };
+
+  const handleYearStartOffsetChange = (delta) => {
+    setYearStartOffset(prev => prev + delta);
+  };
+
+  // Memoized renderCell function using the memoized cell component
+  const renderCell = useCallback((timeframe, category, col, isSmall = false, hasRightBorder = true, hasLeftBorder = false) => {
+    const cellItemsData = getCellItems(timeframe, category.id, col.index);
     const cellKey = `${timeframe}_${category.id}_${col.index}`;
     const isEditing = editingCell === cellKey;
 
-    const getStatusDot = (status, itemId, itemIndex) => {
-      let color = '#ccc';
-      if (status === 'done') color = '#4caf50';
-      else if (status === 'fail') color = '#f44336';
-      
       return (
-        <Box 
-          onClick={(e) => handleStatusClick(timeframe, category.id, col.index, itemId, itemIndex, e)}
-          onMouseDown={(e) => e.stopPropagation()}
-          sx={{ 
-            width: 6, 
-            height: 6, 
-            borderRadius: '50%', 
-            backgroundColor: color,
-            cursor: 'pointer',
-            flexShrink: 0,
-            '&:hover': {
-              transform: 'scale(1.3)',
-            },
-          }}
+        <StrategicMapCell
+          key={col.index}
+          timeframe={timeframe}
+          rowIndex={category.id}
+          columnIndex={col.index}
+          cellItems={cellItemsData}
+          isEditing={isEditing}
+          editValue={isEditing || editingItemKey !== null ? editValue : ''}
+          editingItemIndex={editingItemIndex}
+          editingItemKey={editingItemKey}
+          isSmall={isSmall}
+          hasRightBorder={hasRightBorder}
+          hasLeftBorder={hasLeftBorder}
+          onCellClick={() => handleCellClick(timeframe, category.id, col.index)}
+          onItemClick={handleItemClick}
+          onCellBlur={() => handleCellBlur(timeframe, category.id, col.index)}
+          onCellKeyDown={(e) => handleCellKeyDown(e, timeframe, category.id, col.index)}
+          onStatusClick={handleStatusClick}
+          onDeleteItem={handleDeleteItem}
+          onEditValueChange={handleEditValueChange}
+          editInputRef={editInputRef}
         />
       );
-    };
+  }, [getCellItems, editingCell, editValue, editingItemIndex, editingItemKey, handleCellClick, handleItemClick, handleCellBlur, handleCellKeyDown, handleStatusClick, handleDeleteItem, handleEditValueChange]);
+
+  // Mobile Card Component for responsive view
+  const MobileCategoryCard = useCallback(({ category, timeframe, columns }) => {
+    const stats = getCategoryStats(category.id, timeframe);
+    const isExpanded = expandedCategories[category.id];
+    // Subtle alternating colors
+    const bgColor = category.id % 2 === 0 ? '#f8f9fa' : '#ffffff';
 
     return (
-      <TableCell
-        key={col.index}
-        onClick={() => handleCellClick(timeframe, category.id, col.index)}
+      <Card
+        key={category.id}
         sx={{
-          minWidth: isSmall ? 50 : 100,
-          maxWidth: isSmall ? 50 : 100,
-          minHeight: 50,
-          px: isSmall ? 0.25 : 0.5,
-          py: 0.5,
-          cursor: 'pointer',
-          verticalAlign: 'top',
-          position: 'relative',
-          fontSize: '0.7rem',
-          '&:hover': {
-            backgroundColor: '#f0f7ff',
-          },
+          mb: 2,
+          boxShadow: 2,
+          borderRadius: 2,
+          backgroundColor: bgColor,
         }}
       >
-        {isEditing ? (
-          <TextField
-            inputRef={editInputRef}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={() => handleCellBlur(timeframe, category.id, col.index)}
-            onKeyDown={(e) => handleCellKeyDown(e, timeframe, category.id, col.index)}
-            multiline
-            fullWidth
-            autoFocus
-            size="small"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                fontSize: '0.65rem',
-                p: 0.25,
-              },
-            }}
-          />
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            {cellItems.length === 0 ? null : (
-              cellItems.map((item, idx) => (
-                <Box 
-                  key={item.id || idx} 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
-                    gap: 0.5,
-                    minHeight: 16,
+        <CardHeader
+          action={
+            <IconButton onClick={() => toggleCategory(category.id)} size="large">
+              {isExpanded ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
+            </IconButton>
+          }
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
+              {category.label}
+            </Typography>
+          }
+          subheader={
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '1rem', mb: 0.5 }}>
+                {category.description}
+              </Typography>
+              {stats.total > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Typography variant="caption" sx={{ fontSize: '1rem', fontWeight: 600 }}>
+                      完成进度: {stats.completionRate}%
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.9375rem' }} color="text.secondary">
+                      {stats.completed}/{stats.total}
+                    </Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={stats.completionRate}
+                    sx={{
+                      height: 10,
+                      borderRadius: 1,
+                      backgroundColor: '#e0e0e0',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: '#1976d2',
+                        borderRadius: 1,
+                      }
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
+          }
+          sx={{ pb: 1 }}
+        />
+        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+          <CardContent sx={{ pt: 0 }}>
+            {columns.map((col) => {
+              const cellItems = getCellItems(timeframe, category.id, col.index);
+              const hasItems = cellItems.length > 0;
+
+              return (
+                <Box
+                  key={col.index}
+                  sx={{
+                    mb: 2,
+                    pb: 2,
+                    borderBottom: col.index < columns.length - 1 ? '1px solid #e0e0e0' : 'none'
                   }}
                 >
-                  {getStatusDot(item.status || 'neutral', item.id, item.item_index)}
                   <Typography
-                    variant="body2"
+                    variant="subtitle2"
                     sx={{
-                      fontSize: isSmall ? '0.6rem' : '0.65rem',
-                      lineHeight: 1.2,
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
+                      fontWeight: 700,
+                      mb: 1.5,
+                      fontSize: '1.125rem'
                     }}
                   >
-                    {item.cell_value || ''}
+                    {timeframe === 'yearly' ? col.year : col.label}
                   </Typography>
+
+                  {hasItems ? (
+                    cellItems.map((item, idx) => (
+                      <Box
+                        key={item.id || idx}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 1.5,
+                          mb: 1.5,
+                          p: 2,
+                          backgroundColor: '#ffffff',
+                          borderRadius: 2,
+                          border: '1px solid #e0e0e0',
+                          minHeight: 56, // Larger touch target
+                          '&:hover': {
+                            backgroundColor: '#f5f5f5',
+                            boxShadow: 1,
+                          }
+                        }}
+                      >
+                        <Box
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStatusClick(timeframe, category.id, col.index, item.id, item.item_index, e);
+                          }}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minWidth: 32,
+                            minHeight: 32,
+                            cursor: 'pointer',
+                            borderRadius: '50%',
+                            '&:hover': {
+                              backgroundColor: '#e0e0e0',
+                            }
+                          }}
+                        >
+                          {item.status === 'done' ? (
+                            <svg width={24} height={24} viewBox="0 0 20 20" fill="none">
+                              <path
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                fill="#4caf50"
+                              />
+                            </svg>
+                          ) : item.status === 'fail' ? (
+                            <svg width={24} height={24} viewBox="0 0 20 20" fill="none">
+                              <path
+                                fillRule="evenodd"
+                                clipRule="evenodd"
+                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                fill="#f44336"
+                              />
+                            </svg>
+                          ) : (
+                            <svg width={24} height={24} viewBox="0 0 20 20" fill="none">
+                              <circle
+                                cx="10"
+                                cy="10"
+                                r="8"
+                                stroke="#9e9e9e"
+                                strokeWidth="1.5"
+                                fill="none"
+                              />
+                            </svg>
+                          )}
+                        </Box>
+                        <Typography
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleItemClick(timeframe, category.id, col.index, item.id, item.item_index, item.cell_value);
+                          }}
+                          sx={{
+                            flex: 1,
+                            fontSize: '1.0625rem', // 17px - larger and readable
+                            lineHeight: 1.6,
+                            cursor: 'pointer',
+                            py: 0.5,
+                          }}
+                        >
+                          {item.cell_value}
+                        </Typography>
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (item.id && !item.id.toString().startsWith('temp-')) {
+                              handleDeleteItem(timeframe, category.id, col.index, item.id);
+                            }
+                          }}
+                          size="small"
+                          sx={{ minWidth: 32, minHeight: 32 }}
+                        >
+                          <svg width={16} height={16} viewBox="0 0 20 20" fill="none">
+                            <path
+                              fillRule="evenodd"
+                              clipRule="evenodd"
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                              fill="#9e9e9e"
+                            />
+                          </svg>
+                        </IconButton>
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        fontStyle: 'italic',
+                        textAlign: 'center',
+                        py: 2,
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      暂无目标项目...
+                    </Typography>
+                  )}
+
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<Plus size={20} />}
+                    onClick={() => handleCellClick(timeframe, category.id, col.index)}
+                    sx={{
+                      mt: 1.5,
+                      minHeight: 48,
+                      fontSize: '1rem',
+                      '&:hover': {
+                        backgroundColor: '#f5f5f5',
+                      }
+                    }}
+                  >
+                    添加新项目
+                  </Button>
                 </Box>
-              ))
-            )}
-          </Box>
-        )}
-      </TableCell>
+              );
+            })}
+          </CardContent>
+        </Collapse>
+      </Card>
     );
-  };
+  }, [expandedCategories, getCellItems, getCategoryStats, handleCellClick, handleItemClick, handleStatusClick, handleDeleteItem, toggleCategory]);
 
   if (!organizationSlug) {
     return (
@@ -734,104 +1775,12 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
 
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', m: 0, p: 0 }}>
-      {/* Header */}
-      <Box sx={{ textAlign: 'center', py: 0.5, backgroundColor: 'white', borderBottom: '1px solid #e0e0e0' }}>
-        <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1rem', m: 0 }}>
-          战略地图 (Strategic Map)
-        </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-          {scope === 'company' ? organizationName : userName}
-        </Typography>
-      </Box>
-
-      {/* Control Panel - Stacked Vertically */}
-      <Box sx={{ px: 0.5, py: 0.75, backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
-        <Stack spacing={0.75}>
-          {/* Row 1: Scope Selection */}
-          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <ToggleButtonGroup
-              value={scope}
-              exclusive
-              onChange={(e, newScope) => newScope && setScope(newScope)}
-              size="small"
-              sx={{ width: '100%', maxWidth: 400 }}
-            >
-              <ToggleButton value="company" sx={{ flex: 1, py: 0.5, fontSize: '0.8rem' }}>
-                公司视图 (Company)
-              </ToggleButton>
-              <ToggleButton value="individual" sx={{ flex: 1, py: 0.5, fontSize: '0.8rem' }}>
-                个人视图 (Individual)
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-
-          {/* Row 2: Year Range + Refresh */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-            <Button 
-              size="small"
-              onClick={() => handleYearRangeChange('prev')}
-              sx={{ minWidth: 36, px: 0.5, height: 32 }}
-            >
-              <ChevronLeft size={16} />
-            </Button>
-            <Chip 
-              label={`${yearRange}-${yearRange + 4}`}
-              color="primary"
-              sx={{ fontSize: '0.85rem', fontWeight: 600, height: 32, minWidth: 100 }}
-            />
-            <Button 
-              size="small"
-              onClick={() => handleYearRangeChange('next')}
-              sx={{ minWidth: 36, px: 0.5, height: 32 }}
-            >
-              <ChevronRight size={16} />
-            </Button>
-            
-            <Button
-              variant="contained"
-              startIcon={<RefreshCw size={14} />}
-              onClick={fetchItems}
-              size="small"
-              sx={{ height: 32, fontSize: '0.75rem', ml: 1 }}
-            >
-              刷新数据
-            </Button>
-
-            {saving && (
-              <Chip 
-                label="保存中" 
-                color="primary" 
-                size="small"
-                sx={{ height: 24, fontSize: '0.7rem' }}
-              />
-            )}
-          </Box>
-
-          {/* Row 3: Focus Year selection */}
-          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <ToggleButtonGroup
-              value={focusYear}
-              exclusive
-              onChange={(e, newFocus) => newFocus && setFocusYear(newFocus)}
-              size="small"
-              sx={{ width: '100%', maxWidth: 500, flexWrap: 'wrap' }}
-            >
-              {Array.from({ length: 5 }, (_, i) => yearRange + i).map((year) => (
-                <ToggleButton key={year} value={year} sx={{ flex: 1, minWidth: 80, py: 0.5, fontSize: '0.75rem' }}>
-                  {year}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-          </Box>
-        </Stack>
-      </Box>
-
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={() => setError(null)}
-          sx={{ 
-            m: 0.5, 
+          sx={{
+            m: 0.5,
             py: 0.25,
             px: 1,
             minHeight: 'auto',
@@ -867,229 +1816,722 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       )}
 
       {/* Scrollable Content */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 0 }}>
-        {/* Yearly Table */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="h6" sx={{ fontSize: '0.9rem', fontWeight: 700, textAlign: 'center', py: 0.5, backgroundColor: '#f5f5f5' }}>
-            战略地图 (Strategic Map)
-          </Typography>
-          <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}>
-                    项目
-                  </TableCell>
-                  {years.map((year) => (
-                    <TableCell 
-                      key={year.index} 
-                      align="center" 
-                      sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}
-                    >
-                      {year.year}
+      <Box ref={scrollContainerRef} sx={{ flex: 1, overflow: 'auto', px: isMobile ? 1 : 2, py: isMobile ? 1 : 1 }}>
+        {/* Yearly View - Responsive */}
+        <Box ref={monthlySectionRef} sx={{ mb: 3 }}>
+          {/* Controls integrated above the table */}
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flexWrap: 'wrap',
+            mb: 2,
+            py: 1
+          }}>
+            {/* Scope Selection - Radio Buttons */}
+            <FormControl component="fieldset">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="company"
+                    checked={scope === 'company'}
+                    onChange={(e) => setScope(e.target.value)}
+                    style={{ marginRight: '4px' }}
+                  />
+                  <Typography sx={{ fontSize: '0.875rem' }}>公司视图</Typography>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="individual"
+                    checked={scope === 'individual'}
+                    onChange={(e) => setScope(e.target.value)}
+                    style={{ marginRight: '4px' }}
+                  />
+                  <Typography sx={{ fontSize: '0.875rem' }}>个人视图</Typography>
+                </label>
+              </Box>
+            </FormControl>
+
+            {/* Year Navigation */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <IconButton
+                size="small"
+                onClick={() => handleYearNavigation('prev')}
+                sx={{ width: 32, height: 32 }}
+              >
+                <ChevronLeft size={18} />
+              </IconButton>
+
+              <FormControl size="small" sx={{ minWidth: 90 }}>
+                <InputLabel>年份</InputLabel>
+                <Select
+                  value={focusYear}
+                  label="年份"
+                  onChange={(e) => setFocusYear(Number(e.target.value))}
+                  sx={{ fontSize: '0.875rem' }}
+                >
+                  {Array.from({ length: 50 }, (_, i) => {
+                    const year = getYear(new Date()) - 3 + i;
+                    return (
+                      <MenuItem key={year} value={year}>
+                        {year}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+
+              <IconButton
+                size="small"
+                onClick={() => handleYearNavigation('next')}
+                sx={{ width: 32, height: 32 }}
+              >
+                <ChevronRight size={18} />
+              </IconButton>
+            </Box>
+          </Box>
+
+          {isMobile ? (
+            // Mobile Card View
+            <Box sx={{ mt: 2 }}>
+              {CATEGORIES.map((category) => (
+                <MobileCategoryCard
+                  key={category.id}
+                  category={category}
+                  timeframe="yearly"
+                  columns={years}
+                />
+              ))}
+            </Box>
+          ) : (
+            // Desktop Table View with Colors
+            <TableContainer
+              component={Paper}
+              sx={{
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                borderRadius: 2,
+                border: '1px solid #e0e0e0',
+                overflow: 'hidden'
+              }}
+            >
+              <Table
+                size="small"
+                sx={{
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{
+                      minWidth: 100,
+                      fontWeight: 700,
+                      backgroundColor: '#437eb9',
+                      color: '#ffffff',
+                      fontSize: '0.875rem',
+                      p: 1.5,
+                      borderBottom: '2px solid #e0e0e0',
+                      borderRight: '1px solid #e0e0e0',
+                    }}>
+                      项目
                     </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {CATEGORIES.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell sx={{ fontWeight: 600, backgroundColor: '#fafafa', p: 0.5, fontSize: '0.7rem' }}>
-                      <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                        {category.label}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                        {category.en}
-                      </Typography>
-                    </TableCell>
-                    {years.map((year) => renderCell('yearly', category, year))}
+                    {years.map((year, idx) => (
+                      <TableCell
+                        key={year.index}
+                        align="center"
+                        sx={{
+                          minWidth: 100,
+                          fontWeight: 700,
+                          backgroundColor: '#437eb9',
+                          color: '#ffffff',
+                          fontSize: '0.875rem',
+                          p: 1.5,
+                          borderBottom: '2px solid #e0e0e0',
+                          borderRight: idx < years.length - 1 ? '1px solid #e0e0e0' : 'none',
+                        }}
+                      >
+                        {year.year}
+                      </TableCell>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {CATEGORIES.map((category, catIdx) => {
+                    const stats = getCategoryStats(category.id, 'yearly');
+                    // Subtle alternating background
+                    const rowBg = category.id % 2 === 0 ? '#fafafa' : '#ffffff';
+
+                    return (
+                      <TableRow
+                        key={category.id}
+                        sx={{
+                          '&:hover': { backgroundColor: '#f0f4f8' },
+                          '&:last-child td': { borderBottom: 'none' }
+                        }}
+                      >
+                        <TableCell sx={{
+                          fontWeight: 600,
+                          backgroundColor: rowBg,
+                          p: 1.5,
+                          fontSize: '0.9rem',
+                          borderBottom: '1px solid #e8e8e8',
+                          borderRight: '1px solid #e0e0e0',
+                        }}>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontSize: '0.9375rem', fontWeight: 700 }}>
+                              {category.label}
+                            </Typography>
+                            {stats.total > 0 && (
+                              <Typography variant="caption" sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>
+                                {stats.completed}/{stats.total} ({stats.completionRate}%)
+                              </Typography>
+                            )}
+                          </Box>
+                        </TableCell>
+                        {years.map((year, yearIdx) => renderCell('yearly', category, year, false, yearIdx < years.length - 1))}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </Box>
 
-        {/* Monthly Tables - Split into 2 halves */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="h6" sx={{ fontSize: '0.9rem', fontWeight: 700, textAlign: 'center', py: 0.5, backgroundColor: '#f5f5f5' }}>
-            上半年 {focusYear} 年度计划
-          </Typography>
-          <TableContainer component={Paper} sx={{ boxShadow: 'none', mb: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}>
-                    项目
-                  </TableCell>
-                  {months.slice(0, 6).map((month) => (
-                    <TableCell 
-                      key={month.index} 
-                      align="center" 
-                      sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}
-                    >
-                      {month.label}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {CATEGORIES.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell sx={{ fontWeight: 600, backgroundColor: '#fafafa', p: 0.5, fontSize: '0.7rem' }}>
-                      <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                        {category.label}
-                      </Typography>
-                    </TableCell>
-                    {months.slice(0, 6).map((month) => renderCell('monthly', category, month))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          <Typography variant="h6" sx={{ fontSize: '0.9rem', fontWeight: 700, textAlign: 'center', py: 0.5, backgroundColor: '#f5f5f5' }}>
-            下半年 {focusYear} 年度计划
-          </Typography>
-          <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}>
-                    项目
-                  </TableCell>
-                  {months.slice(6).map((month) => (
-                    <TableCell 
-                      key={month.index} 
-                      align="center" 
-                      sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}
-                    >
-                      {month.label}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {CATEGORIES.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell sx={{ fontWeight: 600, backgroundColor: '#fafafa', p: 0.5, fontSize: '0.7rem' }}>
-                      <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                        {category.label}
-                      </Typography>
-                    </TableCell>
-                    {months.slice(6).map((month) => renderCell('monthly', category, month))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        {/* Tabs for Monthly/Weekly/Daily */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3, display: 'flex', justifyContent: 'center' }}>
+          <Tabs
+            value={activeTab}
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            sx={{ minHeight: 48 }}
+            centered
+          >
+            <Tab label="月度计划" value="monthly" sx={{ fontSize: '0.9375rem', minHeight: 48, fontWeight: 600 }} />
+            <Tab label="周度计划" value="weekly" sx={{ fontSize: '0.9375rem', minHeight: 48, fontWeight: 600 }} />
+            <Tab label="日度计划" value="daily" sx={{ fontSize: '0.9375rem', minHeight: 48, fontWeight: 600 }} />
+          </Tabs>
         </Box>
 
-        {/* Weekly Tables - Split into chunks */}
-        <Box sx={{ mb: 2 }}>
-          {[0, 1, 2, 3].map((chunkIndex) => {
-            const startIdx = chunkIndex * 13;
-            const endIdx = Math.min(startIdx + 13, 52);
-            const weekChunk = weeks.slice(startIdx, endIdx);
-            
-            return (
-              <Box key={chunkIndex} sx={{ mb: 2 }}>
-                <Typography variant="h6" sx={{ fontSize: '0.9rem', fontWeight: 700, textAlign: 'center', py: 0.5, backgroundColor: '#f5f5f5' }}>
-                  {focusYear} 周度计划 (Week {startIdx + 1}-{endIdx})
+        {/* Monthly Tables - Only show when tab is active */}
+        {activeTab === 'monthly' && (
+          <Box sx={{ mb: 2 }}>
+            {tabLoading.monthly ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    py: 1,
+                    px: 2,
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 1,
+                    mb: 1.5,
+                    borderBottom: '2px solid #e0e0e0'
+                  }}
+                >
+                  上半年 {focusYear} 年度计划
                 </Typography>
-                <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-                  <Table size="small">
+                <TableContainer
+                  component={Paper}
+                  sx={{
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0',
+                    overflow: 'hidden',
+                    mb: 2
+                  }}
+                >
+                  <Table size="small" sx={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}>
+                        <TableCell sx={{
+                          minWidth: 100,
+                          fontWeight: 700,
+                          backgroundColor: '#437eb9',
+                          color: '#ffffff',
+                          fontSize: '0.875rem',
+                          p: 1.5,
+                          borderBottom: '2px solid #e0e0e0',
+                          borderRight: '1px solid #e0e0e0',
+                        }}>
                           项目
                         </TableCell>
-                        {weekChunk.map((week) => (
-                          <TableCell 
-                            key={week.index} 
-                            align="center" 
-                            sx={{ minWidth: 60, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.7rem', p: 0.25 }}
-                          >
-                            {week.label}
+                        {months.slice(0, 6).map((month, idx) => (
+                      <TableCell
+                        key={month.index}
+                        align="center"
+                        sx={{
+                          minWidth: 100,
+                          fontWeight: 700,
+                          backgroundColor: '#437eb9',
+                          color: '#ffffff',
+                          fontSize: '0.875rem',
+                          p: 1.5,
+                          borderBottom: '2px solid #e0e0e0',
+                          borderRight: idx < 5 ? '1px solid #e0e0e0' : 'none',
+                        }}
+                      >
+                        {month.label}
+                      </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {CATEGORIES.map((category) => {
+                        const stats = getCategoryStats(category.id, 'monthly');
+                        const rowBg = category.id % 2 === 0 ? '#fafafa' : '#ffffff';
+
+                        return (
+                          <TableRow key={category.id} sx={{ '&:hover': { backgroundColor: '#f0f4f8' }, '&:last-child td': { borderBottom: 'none' } }}>
+                      <TableCell sx={{
+                        fontWeight: 600,
+                        backgroundColor: rowBg,
+                        p: 1.5,
+                        fontSize: '0.9rem',
+                        borderBottom: '1px solid #e8e8e8',
+                        borderRight: '1px solid #e0e0e0',
+                      }}>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontSize: '0.9375rem', fontWeight: 700 }}>
+                                  {category.label}
+                                </Typography>
+                                {stats.total > 0 && (
+                                  <Typography variant="caption" sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>
+                                    {stats.completed}/{stats.total}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            {months.slice(0, 6).map((month, idx) => renderCell('monthly', category, month, false, idx < 5))}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: '0.9375rem',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    py: 1,
+                    px: 2,
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 1,
+                    mb: 1.5,
+                    borderBottom: '2px solid #e0e0e0'
+                  }}
+                >
+                  下半年 {focusYear} 年度计划
+                </Typography>
+                <TableContainer
+                  component={Paper}
+                  sx={{
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <Table size="small" sx={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                    <TableHead>
+                      <TableRow>
+                          <TableCell sx={{ 
+                            minWidth: 100, 
+                            fontWeight: 700, 
+                            backgroundColor: '#437eb9', 
+                            color: '#ffffff',
+                            fontSize: '0.875rem', 
+                            p: 1.5, 
+                            borderBottom: '2px solid #e0e0e0',
+                            borderRight: '1px solid #e0e0e0',
+                          }}>
+                          项目
+                        </TableCell>
+                        {months.slice(6).map((month, idx) => (
+                       <TableCell
+                         key={month.index}
+                         align="center"
+                         sx={{
+                           minWidth: 100,
+                           fontWeight: 700,
+                           backgroundColor: '#437eb9',
+                           color: '#ffffff',
+                           fontSize: '0.875rem',
+                           p: 1.5,
+                           borderBottom: '2px solid #e0e0e0',
+                           borderRight: idx < 5 ? '1px solid #e0e0e0' : 'none',
+                         }}
+                       >
+                            {month.label}
                           </TableCell>
                         ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {CATEGORIES.map((category) => (
-                        <TableRow key={category.id}>
-                          <TableCell sx={{ fontWeight: 600, backgroundColor: '#fafafa', p: 0.5, fontSize: '0.7rem' }}>
-                            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                              {category.label}
-                            </Typography>
-                          </TableCell>
-                          {weekChunk.map((week) => renderCell('weekly', category, week, true))}
-                        </TableRow>
-                      ))}
+                      {CATEGORIES.map((category) => {
+                        const stats = getCategoryStats(category.id, 'monthly');
+                        const rowBg = category.id % 2 === 0 ? '#fafafa' : '#ffffff';
+
+                        return (
+                          <TableRow key={category.id} sx={{ '&:hover': { backgroundColor: '#f0f4f8' }, '&:last-child td': { borderBottom: 'none' } }}>
+                            <TableCell sx={{
+                              fontWeight: 600,
+                              backgroundColor: rowBg,
+                              p: 1.5,
+                              fontSize: '0.9rem',
+                              borderBottom: '1px solid #e8e8e8',
+                              borderRight: '1px solid #e0e0e0',
+                            }}>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontSize: '0.9375rem', fontWeight: 700 }}>
+                                  {category.label}
+                                </Typography>
+                                {stats.total > 0 && (
+                                  <Typography variant="caption" sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>
+                                    {stats.completed}/{stats.total}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            {months.slice(6).map((month, idx) => renderCell('monthly', category, month, false, idx < 5))}
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
+              </>
+            )}
+          </Box>
+        )}
+
+        {/* Weekly Tables - Only show when tab is active */}
+        {activeTab === 'weekly' && (
+          <Box sx={{ mb: 2 }}>
+            <Box ref={weeklySectionRef} sx={{ mb: 2 }}>
+              {tabLoading.weekly ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <>
+                  {weeksByMonth.map(({ month, weeks: monthWeeks }, monthIdx) => {
+                    const slotCount = Math.max(monthWeeks.length, 5);
+                    const weekSlots = Array.from({ length: slotCount }, (_, idx) => monthWeeks[idx] || null);
+
+                    return (
+                      <Box key={month.index} sx={{ mb: 3 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            textAlign: 'center',
+                            py: 0.5,
+                            backgroundColor: '#f5f5f5',
+                          }}
+                        >
+                          {focusYear} {month.label} 周度计划
+                        </Typography>
+                        <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell
+                                  sx={{
+                                    minWidth: 100,
+                                    fontWeight: 700,
+                                    backgroundColor: '#437eb9',
+                                    color: '#ffffff',
+                                    fontSize: '0.75rem',
+                                    p: 0.5,
+                                  }}
+                                >
+                                  项目
+                                </TableCell>
+                                {weekSlots.map((week, idx) => (
+                                  <TableCell
+                                    key={week ? week.index : `week-placeholder-${idx}`}
+                                    align="center"
+                                    sx={{
+                                      minWidth: 60,
+                                      fontWeight: 700,
+                                      backgroundColor: '#437eb9',
+                                      color: '#ffffff',
+                                      fontSize: '0.7rem',
+                                      p: 0.25,
+                                    }}
+                                  >
+                                    {week ? week.isoWeekLabel : ''}
+                                  </TableCell>
+                                ))}
+                                <TableCell
+                                  align="center"
+                                  sx={{
+                                    minWidth: 75,
+                                    fontWeight: 700,
+                                    backgroundColor: '#437eb9',
+                                    color: '#ffffff',
+                                    fontSize: '0.7rem',
+                                    p: 0.25,
+                                  }}
+                                >
+                                  {month.label}
+                                </TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {CATEGORIES.map((category) => (
+                                <TableRow key={category.id}>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 600,
+                                      backgroundColor: '#fafafa',
+                                      p: 0.5,
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                      {category.label}
+                                    </Typography>
+                                  </TableCell>
+                                  {weekSlots.map((week, idx) =>
+                                    week ? (
+                                      renderCell('weekly', category, week, true, idx < weekSlots.length - 1)
+                                    ) : (
+                                      <TableCell
+                                        key={`empty-week-${category.id}-${idx}`}
+                                        sx={{
+                                          minWidth: 60,
+                                          borderBottom: '1px solid #e8e8e8',
+                                          borderRight: idx < weekSlots.length - 1 ? '1px solid #e0e0e0' : 'none',
+                                        }}
+                                      />
+                                    )
+                                  )}
+                                  {months[monthIdx] ? (
+                                    renderCell('monthly', category, months[monthIdx], false, false, true)
+                                  ) : (
+                                    <TableCell
+                                      sx={{
+                                        minWidth: 75,
+                                        borderBottom: '1px solid #e8e8e8',
+                                        borderLeft: '1px solid #e0e0e0',
+                                      }}
+                                    />
+                                  )}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    );
+                  })}
+                </>
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {/* Daily Tables - Only show when tab is active */}
+        {activeTab === 'daily' && (
+          <Box ref={dailySectionRef} sx={{ mb: 2 }}>
+            {tabLoading.daily ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
               </Box>
-            );
-          })}
-        </Box>
+            ) : (
+              <>
+                {weeks.map((week) => {
+                  const weekStart = parseISO(week.value);
+                  const anchorDate = addDays(weekStart, 3);
+                  if (getISOWeekYear(anchorDate) !== focusYear) {
+                    return null;
+                  }
 
-        {/* Daily Tables - Split into months */}
-        <Box sx={{ mb: 2 }}>
-          {Array.from({ length: 12 }, (_, monthIdx) => {
-            const monthDays = days.filter((day, i) => {
-              const date = new Date(day.value);
-              return date.getMonth() === monthIdx;
-            });
+                  const isoWeekNumber = getISOWeek(weekStart);
+                  const isoWeekLabel = String(isoWeekNumber).padStart(2, '0');
+                  const weekLabel = `Week ${isoWeekLabel}`;
+                  const weekKey = `${getISOWeekYear(weekStart)}-${isoWeekLabel}`;
+                  const weekDays = daysByWeek.get(weekKey) || [];
 
-            if (monthDays.length === 0) return null;
+                  const dayColumns = Array.from({ length: 7 }, (_, idx) => {
+                    const slot = weekDays.find((day) => day.dayOfWeek === idx + 1);
+                    return slot || null;
+                  });
 
-            const monthName = format(new Date(focusYear, monthIdx, 1), 'MMMM');
+                  const hasVisibleDays = dayColumns.some((day) => day !== null);
+                  if (!hasVisibleDays && !weekDays.length) {
+                    return null;
+                  }
 
-            return (
-              <Box key={monthIdx} sx={{ mb: 2 }}>
-                <Typography variant="h6" sx={{ fontSize: '0.9rem', fontWeight: 700, textAlign: 'center', py: 0.5, backgroundColor: '#f5f5f5' }}>
-                  {focusYear} {monthName} 日度计划 (Daily Plan)
-                </Typography>
-                <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ minWidth: 100, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.75rem', p: 0.5 }}>
-                          项目
-                        </TableCell>
-                        {monthDays.map((day) => (
-                          <TableCell 
-                            key={day.index} 
-                            align="center" 
-                            sx={{ minWidth: 50, maxWidth: 50, fontWeight: 700, backgroundColor: '#f5f5f5', fontSize: '0.65rem', p: 0.25 }}
-                          >
-                            {day.shortLabel}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {CATEGORIES.map((category) => (
-                        <TableRow key={category.id}>
-                          <TableCell sx={{ fontWeight: 600, backgroundColor: '#fafafa', p: 0.5, fontSize: '0.7rem' }}>
-                            <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                              {category.label}
-                            </Typography>
-                          </TableCell>
-                          {monthDays.map((day) => renderCell('daily', category, day, true))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            );
-          })}
-        </Box>
+                  const weekMeta = {
+                    ...week,
+                    isoWeekNumber,
+                    isoWeekLabel,
+                    weekStart,
+                  };
+
+                  return (
+                    <Box key={`daily-week-${isoWeekNumber}`} sx={{ mb: 2 }}>
+                      <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell
+                                sx={{
+                                  minWidth: 100,
+                                  fontWeight: 700,
+                                  backgroundColor: '#437eb9',
+                                  color: '#ffffff',
+                                  fontSize: '0.75rem',
+                                  p: 0.5,
+                                }}
+                              >
+                                项目
+                              </TableCell>
+                              {dayColumns.map((day, idx) => (
+                                <TableCell
+                                  key={day ? day.index : `empty-day-${isoWeekNumber}-${idx}`}
+                                  align="center"
+                                  sx={{
+                                    minWidth: 60,
+                                    maxWidth: 60,
+                                    fontWeight: 700,
+                                    backgroundColor: '#437eb9',
+                                    color: '#ffffff',
+                                    fontSize: '0.65rem',
+                                    p: 0.25,
+                                  }}
+                                >
+                                  {day
+                                    ? `${format(day.date, 'dd')} (${format(day.date, 'EEE')})`
+                                    : ''}
+                                </TableCell>
+                              ))}
+                              <TableCell
+                                align="center"
+                                sx={{
+                                  minWidth: 90,
+                                  fontWeight: 700,
+                                  backgroundColor: '#437eb9',
+                                  color: '#ffffff',
+                                  fontSize: '0.7rem',
+                                  p: 0.25,
+                                }}
+                              >
+                                {weekLabel}
+                              </TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {CATEGORIES.map((category) => (
+                              <TableRow key={category.id}>
+                                <TableCell
+                                  sx={{
+                                    fontWeight: 600,
+                                    backgroundColor: '#fafafa',
+                                    p: 0.5,
+                                    fontSize: '0.7rem',
+                                  }}
+                                >
+                                  <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                    {category.label}
+                                  </Typography>
+                                </TableCell>
+                                {dayColumns.map((day, idx) =>
+                                  day ? (
+                                    renderCell('daily', category, day, true, idx < dayColumns.length - 1)
+                                  ) : (
+                                    <TableCell
+                                      key={`empty-day-cell-${category.id}-${isoWeekNumber}-${idx}`}
+                                      sx={{
+                                        minWidth: 60,
+                                        borderBottom: '1px solid #e8e8e8',
+                                        borderRight: idx < dayColumns.length - 1 ? '1px solid #e0e0e0' : 'none',
+                                      }}
+                                    />
+                                  )
+                                )}
+                                {weekMeta ? (
+                                  renderCell('weekly', category, weekMeta, false, false, true)
+                                ) : (
+                                  <TableCell
+                                    sx={{
+                                      minWidth: 90,
+                                      borderBottom: '1px solid #e8e8e8',
+                                      borderLeft: '1px solid #e0e0e0',
+                                    }}
+                                  />
+                                )}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
+                  );
+                })}
+              </>
+            )}
+          </Box>
+        )}
+
       </Box>
+
+      {/* Floating Action Button for Mobile - Quick Add */}
+      {isMobile && (
+        <Tooltip title="快速添加" placement="left">
+          <Fab
+            color="primary"
+            sx={{
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+              zIndex: 1000,
+            }}
+            onClick={() => {
+              // Scroll to top
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            <Plus size={24} />
+          </Fab>
+        </Tooltip>
+      )}
+      <Fab
+        size="small"
+        color="primary"
+        onClick={() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        sx={{
+          position: 'fixed',
+          right: 32,
+          top: '90%',
+          transform: 'translateY(-50%)',
+          zIndex: 1400,
+        }}
+      >
+        <ChevronUp size={20} />
+      </Fab>
     </Box>
   );
 };
 
 export default StrategicMapView;
+

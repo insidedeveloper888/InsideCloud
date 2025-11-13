@@ -157,7 +157,7 @@ module.exports = async function handler(req, res) {
   const mergedParams = method === 'GET' ? queryParams : { ...queryParams, ...bodyParams };
   console.log('  - Merged params:', JSON.stringify(mergedParams, null, 2));
   
-  const { organization_slug, scope = 'company', timeframe = 'yearly', timeframe_value, individual_id } = mergedParams;
+  const { organization_slug, scope = 'company', timeframe = 'yearly', timeframe_value, individual_id, year_range, focus_year } = mergedParams;
 
   console.log('🔍 Extracted params:');
   console.log('  - organization_slug:', organization_slug);
@@ -213,10 +213,30 @@ module.exports = async function handler(req, res) {
         .eq('scope', scope)
         .eq('timeframe', timeframe);
 
-      // For yearly timeframe, match any date within the year range
-      // For monthly, match any date within that month
-      // For weekly, match exact timeframe_value (start of week)
-      if (timeframe_value) {
+      // Batch fetching support: if year_range or focus_year provided, fetch all data for that range
+      if (year_range || focus_year) {
+        const startYear = focus_year ? parseInt(focus_year) : parseInt(year_range);
+        const endYear = focus_year ? parseInt(focus_year) : (parseInt(year_range) + 4);
+        
+        if (timeframe === 'yearly') {
+          // Fetch all years in the range
+          query = query.gte('timeframe_value', `${startYear}-01-01`)
+                       .lt('timeframe_value', `${endYear + 1}-01-01`);
+        } else if (timeframe === 'monthly') {
+          // Fetch all months for the focus year
+          query = query.gte('timeframe_value', `${startYear}-01-01`)
+                       .lt('timeframe_value', `${startYear + 1}-01-01`);
+        } else if (timeframe === 'weekly') {
+          // Fetch all weeks for the focus year
+          query = query.gte('timeframe_value', `${startYear}-01-01`)
+                       .lt('timeframe_value', `${startYear + 1}-01-01`);
+        } else if (timeframe === 'daily') {
+          // Fetch all days for the focus year
+          query = query.gte('timeframe_value', `${startYear}-01-01`)
+                       .lt('timeframe_value', `${startYear + 1}-01-01`);
+        }
+      } else if (timeframe_value) {
+        // Single timeframe_value query (backward compatibility)
         if (timeframe === 'yearly') {
           // Extract year from timeframe_value (format: YYYY-MM-DD)
           const year = new Date(timeframe_value).getFullYear();
@@ -363,6 +383,22 @@ module.exports = async function handler(req, res) {
       let data, error;
       if (item_id) {
         console.log('🔄 Updating item by ID:', item_id);
+        const { data: existingItem, error: existingFetchError } = await supabase
+          .from('strategic_map_items')
+          .select('id, is_auto_generated, cell_value')
+          .eq('id', item_id)
+          .single();
+        if (existingFetchError) {
+          console.error('❌ Error fetching existing item for update:', existingFetchError);
+        }
+        if (existingItem && existingItem.is_auto_generated === true) {
+          const newCell = itemData.cell_value;
+          const oldCell = existingItem.cell_value;
+          if (typeof newCell === 'string' && newCell !== oldCell) {
+            res.status(403).json(failResponse('Auto-generated items are read-only'));
+            return;
+          }
+        }
         ({ data, error } = await supabase
           .from('strategic_map_items')
           .update(itemData)
@@ -392,7 +428,7 @@ module.exports = async function handler(req, res) {
         
         const { data: existing, error: queryError } = await supabase
           .from('strategic_map_items')
-          .select('id')
+          .select('id, is_auto_generated, cell_value')
           .match(queryConditions)
           .maybeSingle();
         
@@ -401,8 +437,15 @@ module.exports = async function handler(req, res) {
         }
         
         if (existing && existing.id) {
-          // Update existing
           console.log('🔄 Updating existing item:', existing.id);
+          if (existing.is_auto_generated === true) {
+            const newCell = itemData.cell_value;
+            const oldCell = existing.cell_value;
+            if (typeof newCell === 'string' && newCell !== oldCell) {
+              res.status(403).json(failResponse('Auto-generated items are read-only'));
+              return;
+            }
+          }
           ({ data, error } = await supabase
             .from('strategic_map_items')
             .update(itemData)

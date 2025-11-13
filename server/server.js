@@ -29,6 +29,13 @@ async function getUserAccessToken(ctx) {
 
     console.log("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------")
     serverUtil.configAccessControl(ctx)
+    
+    // Handle OPTIONS preflight request
+    if (ctx.method === 'OPTIONS') {
+        ctx.status = 200
+        return
+    }
+    
     console.log(`接入服务方第① 步: 接收到前端免登请求`)
     
     // Get organization_id from query or session
@@ -81,19 +88,21 @@ async function getUserAccessToken(ctx) {
     
     // If no code, check if there's a token in Authorization header for verification
     if (code.length == 0) {
-        // Check for token in Authorization header
-        const authHeader = ctx.headers.authorization || ctx.headers.Authorization;
+        // Check for token in Authorization header (check both lowercase and capitalized)
+        const authHeader = ctx.headers.authorization || ctx.headers.Authorization || ctx.headers['authorization'] || ctx.headers['Authorization'];
+        console.log("🔍 Debug - All headers keys:", Object.keys(ctx.headers).filter(k => k.toLowerCase().includes('auth')));
         console.log("🔍 Debug - Authorization header:", authHeader ? authHeader.substring(0, 20) + '...' : 'not found');
         
-        const tokenFromHeader = authHeader && authHeader.startsWith('Bearer ') 
-            ? authHeader.substring(7) 
+        const tokenFromHeader = authHeader && (authHeader.startsWith('Bearer ') || authHeader.startsWith('bearer '))
+            ? authHeader.replace(/^Bearer\s+/i, '')
             : null;
         const tokenFromQuery = ctx.query.token || null;
         const token = tokenFromHeader || tokenFromQuery;
         
         console.log("🔍 Debug - Extracted token:", token ? token.substring(0, 20) + '...' : 'not found');
+        console.log("🔍 Debug - Token length:", token ? token.length : 0);
         
-        if (token) {
+        if (token && token.length > 0) {
             console.log("接入服务方第② 步: 检测到token参数，验证token有效性");
             try {
                 // Verify token with Lark API to get user info
@@ -138,10 +147,15 @@ async function getUserAccessToken(ctx) {
                     return;
                 } else {
                     console.error('❌ Token verification failed - invalid response:', userInfoRes.data);
+                    // Token is invalid/expired - return specific error code so frontend can clear it
+                    ctx.body = serverUtil.failResponse("Token验证失败，请重新登录", -2) // -2 indicates token invalidity
+                    return
                 }
             } catch (tokenError) {
                 console.error('❌ Token verification failed:', tokenError.response?.data || tokenError.message);
-                // Fall through to return error
+                // Token is invalid/expired - return specific error code so frontend can clear it
+                ctx.body = serverUtil.failResponse("Token验证失败，请重新登录", -2) // -2 indicates token invalidity
+                return
             }
         }
         
@@ -1226,6 +1240,48 @@ router.post('/api/strategic_map', async (ctx) => {
             ctx.body = data;
         },
         setHeader: () => {},
+    })
+})
+
+router.delete('/api/strategic_map', async (ctx) => {
+    serverUtil.configAccessControl(ctx)
+    
+    // Handle OPTIONS preflight request
+    if (ctx.method === 'OPTIONS') {
+        ctx.status = 200
+        return
+    }
+    
+    const strategicMapHandler = require('../api/strategic_map')
+    
+    console.log('🔍 Koa DELETE /api/strategic_map');
+    console.log('  - Method:', ctx.method);
+    console.log('  - Query:', ctx.query);
+    console.log('  - ID:', ctx.query.id);
+    
+    await strategicMapHandler({ 
+        method: ctx.method, 
+        query: ctx.query, 
+        body: ctx.request.body || {},
+        headers: ctx.headers 
+    }, {
+        status: (code) => {
+            console.log('📤 Setting status:', code);
+            return {
+                json: (data) => {
+                    console.log('📤 Sending JSON response:', JSON.stringify(data, null, 2));
+                    ctx.status = code;
+                    ctx.body = data;
+                }
+            };
+        },
+        json: (data) => {
+            console.log('📤 Sending JSON response (direct):', JSON.stringify(data, null, 2));
+            ctx.body = data;
+        },
+        setHeader: (name, value) => {
+            ctx.set(name, value);
+        },
     })
 })
 var port = process.env.PORT || serverConfig.config.apiPort;

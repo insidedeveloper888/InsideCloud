@@ -1,17 +1,17 @@
 //工具方法
-function failResponse(msg) {
-    return JSON.stringify({
-        "code": -1,
+function failResponse(msg, errorCode = -1) {
+    return {
+        "code": errorCode,
         "msg": msg || "error"
-    })
+    }
 }
 
 function okResponse(data) {
-    return JSON.stringify({
+    return {
         "code": 0,
         "msg": "ok",
         "data": data
-    })
+    }
 }
 
 //处理跨域问题
@@ -20,7 +20,7 @@ function configAccessControl(ctx) {
     ctx.set("Access-Control-Allow-Origin", ctx.headers.origin)
     ctx.set("Access-Control-Allow-Methods", "OPTIONS, GET, PUT, POST, DELETE");
     ctx.set("Access-Control-Allow-Credentials", "true");  //表示是否允许发送Cookie
-    ctx.set("Access-Control-Allow-Headers", "x-requested-with, accept, origin, content-type");
+    ctx.set("Access-Control-Allow-Headers", "x-requested-with, accept, origin, content-type, authorization, Authorization");
 }
 
 //设置Cookie
