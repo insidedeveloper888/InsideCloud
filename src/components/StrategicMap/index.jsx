@@ -2,10 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from '
 import {
   Box,
   Typography,
-  TextField,
   Button,
-  ToggleButton,
-  ToggleButtonGroup,
   CircularProgress,
   Alert,
   Table,
@@ -15,8 +12,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Chip,
-  Stack,
   Tabs,
   Tab,
   useMediaQuery,
@@ -35,20 +30,13 @@ import {
   InputLabel,
 } from '@mui/material';
 import {
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Plus,
   ChevronDown,
   ChevronUp,
-  TrendingUp,
-  DollarSign,
-  Users,
-  Settings,
-  Award,
-  BookOpen,
 } from 'lucide-react';
-import { format, getYear, startOfMonth, eachWeekOfInterval, eachDayOfInterval, parseISO, addDays, getISOWeek, getISOWeekYear, getMonth, startOfISOWeek } from 'date-fns';
+import { format, getYear, eachWeekOfInterval, eachDayOfInterval, parseISO, addDays, getISOWeek, getISOWeekYear, getMonth, startOfISOWeek } from 'date-fns';
 
 const resolveApiOrigin = () => {
   const clientConfig = require('../../config/client_config.js').default;
@@ -81,12 +69,12 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const [focusYear, setFocusYear] = useState(() => {
     return getYear(new Date()); // Default to current year
   });
-  const [yearSpan, setYearSpan] = useState(5); // Number of years to display (default 5)
-  const [yearStartOffset, setYearStartOffset] = useState(0); // Offset from focusYear to start displaying
+  const [yearSpan] = useState(5); // Number of years to display (default 5)
+  const [yearStartOffset] = useState(0); // Offset from focusYear to start displaying
 
   const [items, setItems] = useState({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  
   const [error, setError] = useState(null);
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -114,8 +102,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const [expandedCategories, setExpandedCategories] = useState(
     CATEGORIES.reduce((acc, cat) => ({ ...acc, [cat.id]: true }), {})
   );
-  const [showFab, setShowFab] = useState(false);
-  const [showScrollTopButton, setShowScrollTopButton] = useState(false);
+  
 
   const scrollContainerRef = useRef(null);
   const monthlySectionRef = useRef(null);
@@ -290,7 +277,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     });
 
     return map;
-  }, [getDays, focusYear]);
+  }, [getDays]);
 
   // Fetch batch data for a timeframe (optimized - single API call)
   const fetchBatchTimeframeData = useCallback(async (timeframeType, focusYearValue, yearStart, yearEnd) => {
@@ -458,7 +445,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
         setLoading(false);
       }
     }
-  }, [organizationSlug, focusYear, yearSpan, yearStartOffset, getYears, fetchBatchTimeframeData]);
+  }, [organizationSlug, focusYear, getYears, fetchBatchTimeframeData]);
 
   // Load tab data on demand
   const loadTabData = useCallback(async (tabName, forceReload = false) => {
@@ -996,7 +983,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    setSaving(true);
+    
     try {
       const base = resolveApiOrigin();
       let timeframeValue = '';
@@ -1123,7 +1110,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       });
       setError(err.message || 'Failed to save. Please try again.');
     } finally {
-      setSaving(false);
+      
     }
   }, [organizationSlug, scope, getYears, getMonths, getWeeks, getDays, refreshCascadeTimeframes]);
 
@@ -1132,7 +1119,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     setEditValue(newValue);
   }, []);
 
-  const handleCellClick = (timeframe, rowIndex, columnIndex) => {
+  const handleCellClick = useCallback((timeframe, rowIndex, columnIndex) => {
     if (!organizationSlug) {
       setError('Organization slug is missing. Please refresh the page.');
       return;
@@ -1143,7 +1130,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     setEditValue('');
     setEditingItemIndex(null); // Always create new item when clicking cell
     setEditingItemKey(null); // Clear editing item key when adding new item
-  };
+  }, [organizationSlug]);
 
   const handleItemClick = useCallback((timeframe, rowIndex, columnIndex, itemId, itemIndex, currentValue) => {
     if (!organizationSlug) {
@@ -1156,7 +1143,58 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     setEditingItemKey(`${timeframe}_${rowIndex}_${columnIndex}_${itemIndex}`);
   }, [organizationSlug]);
 
-  const handleCellBlur = (timeframe, rowIndex, columnIndex) => {
+  const callDeleteItem = useCallback(async (timeframe, rowIndex, columnIndex, itemId) => {
+    if (!organizationSlug || !itemId) {
+      console.error('Cannot delete: missing organizationSlug or itemId');
+      return;
+    }
+
+    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
+    setItems(prev => {
+      const newItems = { ...prev };
+      const existingItems = prev[key] || [];
+      newItems[key] = existingItems.filter(item => item.id !== itemId);
+      return newItems;
+    });
+
+    try {
+      const base = resolveApiOrigin();
+      const params = new URLSearchParams({
+        id: itemId,
+        organization_slug: organizationSlug,
+      });
+      const response = await fetch(`${base}/api/strategic_map?${params.toString()}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!response.ok) {
+        if (contentType && contentType.includes('application/json')) {
+          const json = await response.json();
+          throw new Error(json.msg || json.error || `Failed to delete item (${response.status})`);
+        } else {
+          const text = await response.text();
+          throw new Error(text || `Failed to delete item (${response.status})`);
+        }
+      }
+
+      const json = await response.json();
+      if (json.code !== 0) {
+        throw new Error(json.msg || 'Failed to delete item');
+      }
+
+      refreshCascadeTimeframes(timeframe).catch(err => {
+        console.error(`Failed to refresh cascaded timeframes after ${timeframe} delete:`, err);
+      });
+    } catch (err) {
+      console.error('❌ Delete error:', err);
+      setError(err.message || 'Failed to delete item. Please try again.');
+    }
+  }, [organizationSlug, refreshCascadeTimeframes]);
+
+  const handleCellBlur = useCallback((timeframe, rowIndex, columnIndex) => {
     const key = `${timeframe}_${rowIndex}_${columnIndex}`;
 
     // Handle inline item editing blur - only if this is the cell being edited
@@ -1183,7 +1221,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
         const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
         const existingItem = cellItems.find(i => i.item_index === itemIndex);
         if (existingItem && existingItem.id && !existingItem.id.toString().startsWith('temp-')) {
-          handleDeleteItem(timeframe, rowIndex, columnIndex, existingItem.id);
+          callDeleteItem(timeframe, rowIndex, columnIndex, existingItem.id);
         }
       }
 
@@ -1220,9 +1258,9 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       setEditingItemIndex(null);
       setEditingItemKey(null);
     }
-  };
+  }, [editingItemKey, editTextareaRef, editValue, getCellItems, saveItem, callDeleteItem, editingCell]);
 
-  const handleCellKeyDown = (e, timeframe, rowIndex, columnIndex) => {
+  const handleCellKeyDown = useCallback((e, timeframe, rowIndex, columnIndex) => {
     const composing = (e.nativeEvent && e.nativeEvent.isComposing) || e.keyCode === 229;
     if (composing) {
       return;
@@ -1258,7 +1296,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
           const cellItems = getCellItems(timeframe, rowIndex, columnIndex);
           const existingItem = cellItems.find(i => i.item_index === itemIndex);
           if (existingItem && existingItem.id && !existingItem.id.toString().startsWith('temp-')) {
-            handleDeleteItem(timeframe, rowIndex, columnIndex, existingItem.id);
+            callDeleteItem(timeframe, rowIndex, columnIndex, existingItem.id);
           }
           setEditValue('');
           setEditingItemIndex(null);
@@ -1373,7 +1411,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       setEditingItemIndex(null);
       setEditingItemKey(null);
     }
-  };
+  }, [editingItemKey, editTextareaRef, editValue, getCellItems, saveItem, callDeleteItem, handleCellBlur]);
 
   const handleStatusClick = useCallback((timeframe, rowIndex, columnIndex, itemId, itemIndex, e) => {
     e.stopPropagation();
@@ -1404,71 +1442,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     });
   }, [organizationSlug, saveItem, getCellItems]);
 
-  const handleDeleteItem = useCallback(async (timeframe, rowIndex, columnIndex, itemId) => {
-    if (!organizationSlug || !itemId) {
-      console.error('Cannot delete: missing organizationSlug or itemId');
-      return;
-    }
-
-    // Optimistically remove from UI
-    const key = `${timeframe}_${rowIndex}_${columnIndex}`;
-    setItems(prev => {
-      const newItems = { ...prev };
-      const existingItems = prev[key] || [];
-      newItems[key] = existingItems.filter(item => item.id !== itemId);
-      return newItems;
-    });
-
-    try {
-      const base = resolveApiOrigin();
-      // Include organization_slug in query params for DELETE request
-      const params = new URLSearchParams({
-        id: itemId,
-        organization_slug: organizationSlug,
-      });
-      const response = await fetch(`${base}/api/strategic_map?${params.toString()}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'ngrok-skip-browser-warning': 'true',
-        },
-      });
-
-      // Check if response is JSON before parsing
-      const contentType = response.headers.get('content-type');
-
-      if (!response.ok) {
-        // If not OK, try to get error message
-        if (contentType && contentType.includes('application/json')) {
-          const json = await response.json();
-          throw new Error(json.msg || json.error || `Failed to delete item (${response.status})`);
-        } else {
-          const text = await response.text();
-          throw new Error(text || `Failed to delete item (${response.status})`);
-        }
-      }
-
-      // Response is OK, parse as JSON
-      const json = await response.json();
-
-      if (json.code !== 0) {
-        throw new Error(json.msg || 'Failed to delete item');
-      }
-
-      console.log('✅ Item deleted successfully');
-      refreshCascadeTimeframes(timeframe).catch(err => {
-        console.error(`Failed to refresh cascaded timeframes after ${timeframe} delete:`, err);
-      });
-    } catch (err) {
-      console.error('❌ Delete error:', err);
-      setError(err.message || 'Failed to delete item. Please try again.');
-
-      // Revert optimistic update on error - reload cell data
-      const key = `${timeframe}_${rowIndex}_${columnIndex}`;
-      // Reload data for this cell by fetching from API
-      // For now, we'll just show the error - user can refresh
-    }
-  }, [organizationSlug]);
+  
 
   // Year navigation handlers
   const handleYearNavigation = (direction) => {
@@ -1479,13 +1453,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     }
   };
 
-  const handleYearSpanChange = (delta) => {
-    setYearSpan(prev => Math.max(1, Math.min(20, prev + delta))); // Limit between 1-20 years
-  };
-
-  const handleYearStartOffsetChange = (delta) => {
-    setYearStartOffset(prev => prev + delta);
-  };
+  
 
   // Memoized renderCell function using the memoized cell component
   const renderCell = useCallback((timeframe, category, col, isSmall = false, hasRightBorder = true, hasLeftBorder = false) => {
@@ -1512,12 +1480,12 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
           onCellBlur={() => handleCellBlur(timeframe, category.id, col.index)}
           onCellKeyDown={(e) => handleCellKeyDown(e, timeframe, category.id, col.index)}
           onStatusClick={handleStatusClick}
-          onDeleteItem={handleDeleteItem}
+          onDeleteItem={callDeleteItem}
           onEditValueChange={handleEditValueChange}
           editInputRef={editInputRef}
         />
       );
-  }, [getCellItems, editingCell, editValue, editingItemIndex, editingItemKey, handleCellClick, handleItemClick, handleCellBlur, handleCellKeyDown, handleStatusClick, handleDeleteItem, handleEditValueChange]);
+  }, [getCellItems, editingCell, editValue, editingItemIndex, editingItemKey, handleCellClick, handleItemClick, handleCellBlur, handleCellKeyDown, handleStatusClick, callDeleteItem, handleEditValueChange]);
 
   // Mobile Card Component for responsive view
   const MobileCategoryCard = useCallback(({ category, timeframe, columns }) => {
@@ -1693,7 +1661,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (item.id && !item.id.toString().startsWith('temp-')) {
-                              handleDeleteItem(timeframe, category.id, col.index, item.id);
+                              callDeleteItem(timeframe, category.id, col.index, item.id);
                             }
                           }}
                           size="small"
@@ -1748,7 +1716,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
         </Collapse>
       </Card>
     );
-  }, [expandedCategories, getCellItems, getCategoryStats, handleCellClick, handleItemClick, handleStatusClick, handleDeleteItem, toggleCategory]);
+  }, [expandedCategories, getCellItems, getCategoryStats, handleCellClick, handleItemClick, handleStatusClick, toggleCategory, callDeleteItem]);
 
   if (!organizationSlug) {
     return (
@@ -1771,7 +1739,6 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const years = getYears();
   const months = getMonths();
   const weeks = getWeeks();
-  const days = getDays();
 
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', m: 0, p: 0 }}>
