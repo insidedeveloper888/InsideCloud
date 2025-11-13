@@ -681,25 +681,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     }
   }, [activeTab, loadedTabs.weekly, loadedTabs.monthly, tabLoading.weekly, tabLoading.monthly, loadTabData]);
 
-  const refreshCascadeTimeframes = useCallback(async (changedTimeframe) => {
-    if (!organizationSlug) {
-      return;
-    }
-
-    const timeframesToRefresh = [changedTimeframe];
-
-    for (const timeframeKey of timeframesToRefresh) {
-      try {
-        if (timeframeKey === 'yearly') {
-          await fetchYearlyData(false, true);
-        } else {
-          await loadTabData(timeframeKey, true);
-        }
-      } catch (err) {
-        console.error(`Failed to refresh ${timeframeKey} data after ${changedTimeframe} update:`, err);
-      }
-    }
-  }, [organizationSlug, fetchYearlyData, loadTabData]);
+  
 
   const getCellItems = useCallback((timeframe, rowIndex, columnIndex) => {
     const key = `${timeframe}_${rowIndex}_${columnIndex}`;
