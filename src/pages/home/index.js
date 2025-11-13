@@ -718,6 +718,34 @@ const Home = () => {
     }
 
     setIsAuthenticating(true);
+
+    const AUTH_TIMEOUT_MS = 8000;
+    const withTimeout = (promise, ms) => {
+      return new Promise((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            resolve(null);
+          }
+        }, ms);
+        promise
+          .then((val) => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(val);
+            }
+          })
+          .catch(() => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(null);
+            }
+          });
+      });
+    };
     
     try {
       if (orgSlug) {
@@ -759,9 +787,9 @@ const Home = () => {
       }
 
       // Handle user authentication (supports both JSAPI and OAuth flows)
-      let userData = await new Promise((resolve) => {
+      let userData = await withTimeout(new Promise((resolve) => {
         handleUserAuth(resolve, orgSlug);
-      });
+      }), AUTH_TIMEOUT_MS);
 
       if (userData) {
         setUserInfo(userData);
@@ -789,13 +817,13 @@ const Home = () => {
         Cookies.remove('lk_token');
         localStorage.removeItem('lk_token');
         // Re-run JSAPI config to ensure app_id is fresh for this org
-        const jsapiSuccessRetry = await new Promise((resolve) => {
+        const jsapiSuccessRetry = await withTimeout(new Promise((resolve) => {
           handleJSAPIAccess(resolve, orgSlug);
-        });
+        }), AUTH_TIMEOUT_MS);
         if (jsapiSuccessRetry) {
-          userData = await new Promise((resolve) => {
+          userData = await withTimeout(new Promise((resolve) => {
             handleUserAuth(resolve, orgSlug);
-          });
+          }), AUTH_TIMEOUT_MS);
           if (userData) {
             setUserInfo(userData);
             setAuthError(null);
