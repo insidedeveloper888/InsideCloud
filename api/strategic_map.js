@@ -1,4 +1,4 @@
-const { handleCors, okResponse, failResponse } = require('./_utils');
+const { handleCors, okResponse, failResponse, getAuthFromCookie } = require('./_utils');
 const { supabase } = require('./supabase_helper');
 const cookie = require('cookie');
 
@@ -8,6 +8,28 @@ const cookie = require('cookie');
  * We need to call Lark API to get user info, then look up in Supabase
  */
 async function getIndividualIdFromCookie(req) {
+  // Preferred path: use our own auth cookie if available
+  const auth = getAuthFromCookie(req);
+  if (auth && auth.user_id) {
+    try {
+      const { data: individual, error: individualError } = await supabase
+        .from('individuals')
+        .select('id')
+        .eq('user_id', auth.user_id)
+        .maybeSingle();
+
+      if (individualError) {
+        console.error('❌ Error querying individuals via auth_token:', individualError);
+      }
+
+      if (individual && individual.id) {
+        return individual.id;
+      }
+    } catch (e) {
+      console.error('❌ Error resolving individual via auth_token:', e);
+    }
+  }
+
   // Try multiple ways to get cookies
   let cookies = {};
   if (req.headers.cookie) {
@@ -263,11 +285,13 @@ module.exports = async function handler(req, res) {
         // Get individual_id from cookie
         const foundIndividualId = await getIndividualIdFromCookie(req);
         const finalIndividualId = foundIndividualId || individual_id;
-        
+
         if (finalIndividualId) {
           query = query.eq('individual_id', finalIndividualId);
         } else {
-          console.warn('⚠️ Individual scope but no individual_id found');
+          console.warn('⚠️ Individual scope but no individual_id found, returning empty data');
+          res.status(200).json(okResponse([]));
+          return;
         }
       } else if (scope === 'company') {
         query = query.is('individual_id', null);

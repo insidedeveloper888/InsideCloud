@@ -557,7 +557,10 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
 
     if (isInitialMount.current || scopeChanged || focusYearChanged || yearSpanChanged || yearStartOffsetChanged) {
       isInitialMount.current = false;
-      if (focusYearChanged || yearSpanChanged || yearStartOffsetChanged) {
+      if (scopeChanged) {
+        setItems({});
+        setLoadedTabs({ yearly: false, monthly: false, weekly: false, daily: false });
+      } else if (focusYearChanged || yearSpanChanged || yearStartOffsetChanged) {
         setLoadedTabs(prev => ({
           ...prev,
           monthly: false,
@@ -573,11 +576,13 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
           });
           return newItems;
         });
-        // Defer non-yearly reloads to tab-activation and focusYear-change handlers to avoid races
       }
       reloadTimeframe('yearly', { silent: false });
+      if (scopeChanged && activeTab !== 'yearly') {
+        reloadTimeframe(activeTab);
+      }
     }
-  }, [organizationSlug, reloadTimeframe, scope, focusYear, yearSpan, yearStartOffset]);
+  }, [organizationSlug, reloadTimeframe, scope, focusYear, yearSpan, yearStartOffset, activeTab]);
 
   // Reload tab data when focusYear changes (if tab is active)
   useEffect(() => {
@@ -639,8 +644,20 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
   const getCellItems = useCallback((timeframe, rowIndex, columnIndex) => {
     const key = `${timeframe}_${rowIndex}_${columnIndex}`;
     const cellItems = items[key];
-    return Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
-  }, [items]);
+    let arr = Array.isArray(cellItems) ? cellItems : (cellItems ? [cellItems] : []);
+    if (timeframe === 'yearly') {
+      const years = getYears();
+      const targetYear = years[columnIndex]?.year;
+      if (targetYear) {
+        arr = arr.filter(i => {
+          if (!i || !i.timeframe_value) return false;
+          const y = parseInt(String(i.timeframe_value).substring(0, 4), 10);
+          return y === targetYear;
+        });
+      }
+    }
+    return arr;
+  }, [items, getYears]);
 
   // Memoized Cell Component to prevent unnecessary re-renders
   const StrategicMapCell = memo(({ 
