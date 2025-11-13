@@ -1208,7 +1208,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
     } finally {
       
     }
-  }, [organizationSlug, scope, getYears, getMonths, getWeeks, getDays, refreshCascadeTimeframes]);
+  }, [organizationSlug, scope, getYears, getMonths, getWeeks, getDays, fetchSingleTimeframeData]);
 
   // Simple onChange handler - native textarea handles cursor positioning automatically
   const handleEditValueChange = useCallback((newValue) => {
@@ -1285,7 +1285,7 @@ const StrategicMapView = ({ organizationSlug, userName, organizationName }) => {
       console.error('❌ Delete error:', err);
       setError(err.message || 'Failed to delete item. Please try again.');
     }
-  }, [organizationSlug, refreshCascadeTimeframes]);
+  }, [organizationSlug]);
 
   const handleCellBlur = useCallback((timeframe, rowIndex, columnIndex) => {
     if (isComposingRef.current) {
