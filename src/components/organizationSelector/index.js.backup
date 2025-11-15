@@ -3,7 +3,7 @@ import axios from 'axios';
 import { motion } from 'framer-motion';
 import { Building2, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import clientConfig from '../../config/client_config.js';
-import { cn } from '../../lib/utils';
+import './index.css';
 
 const ORGANIZATION_SLUG_KEY = 'lark_organization_slug';
 
@@ -15,16 +15,6 @@ function getOrigin(apiPort) {
   return window.location.origin;
 }
 
-/**
- * OrganizationSelector Component
- *
- * Allows users to select their organization by entering organization slug
- * Validates organization existence and displays organization info
- * Migrated from custom CSS to Tailwind CSS (ADR-002)
- *
- * @param {Object} props
- * @param {Function} props.onOrganizationSelected - Callback when organization is selected
- */
 const OrganizationSelector = ({ onOrganizationSelected }) => {
   const [organizationSlug, setOrganizationSlug] = useState('');
   const [isValidating, setIsValidating] = useState(false);
@@ -128,71 +118,48 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-[#667eea] to-[#764ba2] p-5">
+    <div className="organization-selector-container">
       <motion.div
-        className="bg-white/95 backdrop-blur-md rounded-2xl p-10 max-w-[500px] w-full shadow-2xl"
+        className="organization-selector-card"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Building2 className="w-16 h-16 text-[#667eea] mx-auto mb-4" />
-          <h2 className="text-[28px] font-bold text-gray-900 mb-2">
-            Select Organization
-          </h2>
-          <p className="text-gray-600 text-sm">
-            Enter your organization identifier to continue
-          </p>
+        <div className="organization-selector-header">
+          <Building2 className="organization-icon" />
+          <h2>Select Organization</h2>
+          <p>Enter your organization identifier to continue</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mb-6">
-          <div className="mb-6">
-            <label
-              htmlFor="org-slug"
-              className="block font-semibold text-gray-800 mb-2 text-sm"
-            >
-              Organization Slug
-            </label>
-
-            {/* Input wrapper with icon */}
-            <div className="relative">
+        <form onSubmit={handleSubmit} className="organization-selector-form">
+          <div className="input-group">
+            <label htmlFor="org-slug">Organization Slug</label>
+            <div className="input-wrapper">
               <input
                 id="org-slug"
                 type="text"
                 value={organizationSlug || ''}
                 onChange={handleSlugChange}
                 placeholder="e.g., cloud, inside"
-                className={cn(
-                  "w-full px-4 pr-12 py-3 border-2 rounded-lg text-base text-gray-900 bg-white transition-all",
-                  "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#667eea]/20",
-                  isValidating && "border-yellow-400",
-                  isValid && "border-green-500",
-                  validationError && organizationSlug.trim().length > 0 && !isValidating && "border-red-500",
-                  !isValidating && !isValid && !validationError && "border-gray-300 focus:border-[#667eea]"
-                )}
+                className={`org-input ${isValidating ? 'validating' : ''} ${isValid ? 'valid' : ''} ${validationError && organizationSlug.trim().length > 0 && !isValidating ? 'error' : ''}`}
                 autoFocus
                 autoComplete="off"
                 spellCheck="false"
               />
-
-              {/* Status icons */}
               {isValidating && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-yellow-400 animate-spin" />
+                <Loader2 className="input-icon loading" />
               )}
               {!isValidating && isValid && (
-                <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                <CheckCircle className="input-icon success" />
               )}
-              {!isValidating && validationError && organizationSlug.trim().length > 0 && (
-                <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-500" />
+              {!isValidating && validationError && (
+                <XCircle className="input-icon error" />
               )}
             </div>
-
-            {/* Error message */}
+            
             {validationError && organizationSlug.trim().length > 0 && !isValidating && (
               <motion.div
-                className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm"
+                className="error-message"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -201,10 +168,9 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
               </motion.div>
             )}
 
-            {/* Success message */}
             {isValid && orgInfo && (
               <motion.div
-                className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm"
+                className="success-message"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
               >
@@ -213,39 +179,22 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
             )}
           </div>
 
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={!isValid || isValidating}
-            className={cn(
-              "w-full px-6 py-3 rounded-lg text-base font-semibold text-white transition-all",
-              "bg-gradient-to-r from-[#667eea] to-[#764ba2]",
-              "hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
-              "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            )}
-          >
-            Continue
-          </button>
+          <div className="button-group">
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!isValid || isValidating}
+            >
+              Continue
+            </button>
+          </div>
         </form>
 
-        {/* Help section */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-[#667eea]">
-          <p className="text-sm text-gray-700 font-medium mb-2">
-            <strong>Available organizations:</strong>
-          </p>
-          <ul className="ml-5 space-y-1">
-            <li className="text-sm text-gray-600">
-              <code className="bg-gray-200 px-2 py-0.5 rounded text-[13px] font-mono text-[#667eea]">
-                cloud
-              </code>{' '}
-              - Cloud Organization
-            </li>
-            <li className="text-sm text-gray-600">
-              <code className="bg-gray-200 px-2 py-0.5 rounded text-[13px] font-mono text-[#667eea]">
-                inside
-              </code>{' '}
-              - Inside Organization
-            </li>
+        <div className="organization-selector-help">
+          <p><strong>Available organizations:</strong></p>
+          <ul>
+            <li><code>cloud</code> - Cloud Organization</li>
+            <li><code>inside</code> - Inside Organization</li>
           </ul>
         </div>
       </motion.div>

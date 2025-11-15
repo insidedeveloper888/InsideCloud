@@ -78,9 +78,9 @@ function configJSAPIAccess(data, complete) {
         jsApiList: jsApiList,
         //成功回调
         onSuccess: (res) => {
-            console.log(`鉴权成功: ${JSON.stringify(res)}`);
+            console.log(`Authenticated: ${JSON.stringify(res)}`);
             window.tt.showToast({
-                title: "鉴权成功",
+                title: "Authenticated",
                 icon: "success",
                 duration: 2000
             });

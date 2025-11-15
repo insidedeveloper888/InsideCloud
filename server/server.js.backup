@@ -1201,7 +1201,7 @@ router.get('/api/strategic_map', async (ctx) => {
     }, {
         status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
         json: (data) => { ctx.body = data },
-        setHeader: (name, value) => { ctx.set(name, value) },
+        setHeader: () => {},
     })
 })
 
@@ -1239,7 +1239,7 @@ router.post('/api/strategic_map', async (ctx) => {
             console.log('📤 Sending JSON response (direct):', JSON.stringify(data, null, 2));
             ctx.body = data;
         },
-        setHeader: (name, value) => { ctx.set(name, value) },
+        setHeader: () => {},
     })
 })
 
@@ -1292,19 +1292,7 @@ router.get('/api/organization', async (ctx) => {
 })
 
 // Strategic Map v2 API routes (new backend with auto-cascading)
-
-// OPTIONS handler for CORS preflight
-router.options('/api/strategic_map_v2', async (ctx) => {
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-    ctx.status = 200;
-})
-
 router.get('/api/strategic_map_v2', async (ctx) => {
-    // Set CORS headers first
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-
     const strategicMapV2Handler = require('../api/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
@@ -1319,10 +1307,6 @@ router.get('/api/strategic_map_v2', async (ctx) => {
 })
 
 router.post('/api/strategic_map_v2', async (ctx) => {
-    // Set CORS headers first
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-
     const strategicMapV2Handler = require('../api/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
@@ -1332,15 +1316,11 @@ router.post('/api/strategic_map_v2', async (ctx) => {
     }, {
         status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
         json: (data) => { ctx.body = data },
-        setHeader: (name, value) => { ctx.set(name, value) },
+        setHeader: () => {},
     })
 })
 
 router.put('/api/strategic_map_v2', async (ctx) => {
-    // Set CORS headers first
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-
     const strategicMapV2Handler = require('../api/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
@@ -1350,15 +1330,11 @@ router.put('/api/strategic_map_v2', async (ctx) => {
     }, {
         status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
         json: (data) => { ctx.body = data },
-        setHeader: (name, value) => { ctx.set(name, value) },
+        setHeader: () => {},
     })
 })
 
 router.delete('/api/strategic_map_v2', async (ctx) => {
-    // Set CORS headers first
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-
     const strategicMapV2Handler = require('../api/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
@@ -1368,22 +1344,11 @@ router.delete('/api/strategic_map_v2', async (ctx) => {
     }, {
         status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
         json: (data) => { ctx.body = data },
-        setHeader: (name, value) => { ctx.set(name, value) },
+        setHeader: () => {},
     })
 })
 
-// OPTIONS handler for batch endpoint CORS preflight
-router.options('/api/strategic_map_v2/batch', async (ctx) => {
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-    ctx.status = 200;
-})
-
 router.post('/api/strategic_map_v2/batch', async (ctx) => {
-    // Set CORS headers first
-    const serverUtil = require('./server_util');
-    serverUtil.configAccessControl(ctx);
-
     const strategicMapV2BatchHandler = require('../api/strategic_map_v2_batch')
     await strategicMapV2BatchHandler({
         method: ctx.method,
@@ -1393,7 +1358,7 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
     }, {
         status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
         json: (data) => { ctx.body = data },
-        setHeader: (name, value) => { ctx.set(name, value) },
+        setHeader: () => {},
     })
 })
 var port = process.env.PORT || serverConfig.config.apiPort;

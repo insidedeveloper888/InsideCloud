@@ -47,8 +47,10 @@ function setJsapiTicket(ticket) {
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-key-change-in-production';
 
 // CORS configuration
-function setCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+function setCorsHeaders(res, req) {
+    // When using credentials, must specify exact origin (cannot use '*')
+    const origin = req.headers.origin || 'http://localhost:3000';
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -56,7 +58,7 @@ function setCorsHeaders(res) {
 
 // Handle CORS preflight
 function handleCors(req, res) {
-    setCorsHeaders(res);
+    setCorsHeaders(res, req);
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return true;

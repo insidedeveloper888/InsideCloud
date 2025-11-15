@@ -1,28 +1,24 @@
 import { useState } from "react";
-import {
-  AppBar,
-  Box,
-  Toolbar,
-  IconButton,
-  Typography,
-  Avatar,
-  Container,
-  Tabs,
-  Tab,
-  useMediaQuery,
-  useTheme,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Divider,
-  Stack,
-} from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import CloseIcon from "@mui/icons-material/Close";
-import { User } from "lucide-react";
+import { Menu, X, User } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { Button } from "../components/ui/button";
+import { cn } from "../lib/utils";
 
+/**
+ * ProtectedLayout Component
+ *
+ * Main application layout with navigation header, mobile drawer, and footer
+ * Replaces Material-UI with Tailwind CSS + shadcn/ui (ADR-002)
+ *
+ * @param {Object} props
+ * @param {Object} props.user - Current user object
+ * @param {string} props.organizationName - Organization display name
+ * @param {string} props.organizationSlug - Organization slug
+ * @param {string} props.activeView - Currently active view key
+ * @param {Function} props.onNavigate - Navigation handler
+ * @param {Array} props.navItems - Navigation items array
+ * @param {React.ReactNode} props.children - Page content
+ */
 function ProtectedLayout({
   user,
   organizationName,
@@ -33,10 +29,6 @@ function ProtectedLayout({
   children,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const isVerySmallScreen = useMediaQuery("(max-width: 400px)");
-  const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
 
   const handleNavigate = (key) => {
     if (onNavigate) {
@@ -49,64 +41,90 @@ function ProtectedLayout({
     setMobileOpen(!mobileOpen);
   };
 
+  // Get user initials for avatar fallback
+  const getUserInitials = () => {
+    const name = user?.en_name || user?.name || "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Mobile drawer content
   const drawer = (
-    <Box sx={{ width: { xs: "85vw", sm: 280 }, maxWidth: 320, display: "flex", flexDirection: "column", height: "100%" }}>
-      <Box sx={{ p: { xs: 1.5, sm: 2 }, display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-        <IconButton onClick={handleDrawerToggle} size="small">
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      <Divider />
-      <Box sx={{ px: { xs: 1.5, sm: 2 }, py: { xs: 2, sm: 3 } }}>
-        <Stack spacing={1} alignItems="center" sx={{ mb: { xs: 2, sm: 3 } }}>
-          <Avatar
-            sx={{ width: { xs: 56, sm: 64 }, height: { xs: 56, sm: 64 } }}
-            src={user?.avatar_url || user?.avatarUrl || undefined}
-          >
-            <User size={isVerySmallScreen ? 20 : 24} />
+    <div className="flex flex-col h-full w-[85vw] sm:w-[280px] max-w-[320px]">
+      {/* Drawer header with close button */}
+      <div className="flex justify-end items-center p-3 sm:p-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleDrawerToggle}
+          className="h-8 w-8"
+        >
+          <X size={20} />
+        </Button>
+      </div>
+
+      <div className="border-t border-neutral-200" />
+
+      {/* User profile section */}
+      <div className="px-3 sm:px-4 py-4 sm:py-6">
+        <div className="flex flex-col items-center space-y-2 mb-4 sm:mb-6">
+          <Avatar className="w-14 h-14 sm:w-16 sm:h-16">
+            <AvatarImage
+              src={user?.avatar_url || user?.avatarUrl}
+              alt={user?.en_name || user?.name}
+            />
+            <AvatarFallback>
+              <User size={24} className="text-neutral-600" />
+            </AvatarFallback>
           </Avatar>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: { xs: "0.9375rem", sm: "1rem" } }}>
+          <h3 className="text-[15px] sm:text-base font-semibold text-neutral-900">
             {user?.en_name || user?.name || "User"}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: "0.7rem", sm: "0.75rem" } }}>
+          </h3>
+          <p className="text-[11px] sm:text-xs text-neutral-500">
             {organizationName || organizationSlug || "Organisation"}
-          </Typography>
-        </Stack>
-        <List sx={{ py: 0 }}>
+          </p>
+        </div>
+
+        {/* Navigation list */}
+        <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const selected = item.key === activeView;
+            const isSelected = item.key === activeView;
             return (
-              <ListItemButton
+              <button
                 key={item.key}
-                selected={selected}
                 onClick={() => handleNavigate(item.key)}
-                sx={{ borderRadius: 2, mb: 0.5, py: { xs: 1, sm: 1.25 } }}
+                className={cn(
+                  "w-full flex items-center space-x-3 px-3 py-2 sm:py-2.5 rounded-lg text-[14px] sm:text-[15px] font-medium transition-colors",
+                  isSelected
+                    ? "bg-primary-50 text-primary-700"
+                    : "text-neutral-700 hover:bg-neutral-100"
+                )}
               >
-                <ListItemIcon sx={{ minWidth: { xs: 36, sm: 40 } }}>
-                  <Icon size={isVerySmallScreen ? 18 : 20} />
-                </ListItemIcon>
-                <ListItemText 
-                  primary={item.label} 
-                  primaryTypographyProps={{ 
-                    fontSize: { xs: "0.875rem", sm: "0.9375rem" } 
-                  }} 
-                />
-              </ListItemButton>
+                <Icon size={18} className="flex-shrink-0" />
+                <span>{item.label}</span>
+              </button>
             );
           })}
-        </List>
-      </Box>
-      <Box sx={{ p: { xs: 1.5, sm: 2 }, mt: "auto" }}>
-        <Typography variant="caption" color="text.secondary" align="center" display="block" sx={{ fontSize: { xs: "0.65rem", sm: "0.75rem" } }}>
+        </nav>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-auto p-3 sm:p-4 border-t border-neutral-200">
+        <p className="text-[10px] sm:text-xs text-neutral-500 text-center">
           © 2025 Inside Advisory
-        </Typography>
-      </Box>
-    </Box>
+        </p>
+      </div>
+    </div>
   );
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div className="flex flex-col min-h-screen">
+      {/* Hide scrollbars globally */}
       <style>
         {`
           * {
@@ -118,237 +136,108 @@ function ProtectedLayout({
           }
         `}
       </style>
-      <AppBar
-        position="sticky"
-        elevation={0}
-        sx={{
-          backgroundColor: "background.paper",
-          borderBottom: 1,
-          borderColor: "divider",
-          color: "text.primary",
-        }}
-      >
-        <Container maxWidth="xl" sx={{ px: { xs: 0.75, sm: 1, md: 1.5 } }}>
-          <Toolbar 
-            disableGutters 
-            sx={{ 
-              minHeight: { xs: 44, sm: 46, md: 48 }, 
-              py: 0, 
-              justifyContent: "space-between", 
-              alignItems: "center",
-              gap: { xs: 0.5, sm: 1, md: 1.5 },
-            }}
-          >
-            {isMobile && (
-              <IconButton
-                size="small"
-                edge="start"
+
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-50 bg-white border-b border-neutral-200">
+        <div className="px-2 sm:px-3 md:px-4">
+          <div className="flex items-center justify-between h-11 sm:h-12 md:h-12">
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleDrawerToggle}
-                sx={{ 
-                  p: { xs: 0.5, sm: 0.75 },
-                  minWidth: { xs: 36, sm: 40 },
-                }}
+                className="h-9 w-9 sm:h-10 sm:w-10"
               >
-                <MenuIcon fontSize={isVerySmallScreen ? "small" : "medium"} />
-              </IconButton>
-            )}
+                <Menu size={20} />
+              </Button>
+            </div>
 
-            {!isMobile && (
-              <Box sx={{ flex: 1, display: "flex", alignItems: "center", minWidth: 0, mr: { md: 1.5, lg: 2 } }}>
-                <Tabs
-                  value={activeView}
-                  onChange={(e, newValue) => handleNavigate(newValue)}
-                  sx={{ 
-                    height: { md: 48, lg: 48 },
-                    minWidth: 0,
-                    width: "100%",
-                    "& .MuiTabs-scrollButtons": {
-                      width: { md: 24, lg: 28 },
-                    },
-                    "& .MuiTabs-indicator": {
-                      display: "none",
-                    },
-                    "& .MuiTabs-flexContainer": {
-                      gap: 0,
-                    },
-                  }}
-                  variant={isDesktop ? "standard" : "scrollable"}
-                  scrollButtons={isDesktop ? false : "auto"}
-                >
-                  {navItems.map((item) => {
-                    const isSelected = item.key === activeView;
-                    return (
-                      <Tab
-                        key={item.key}
-                        label={item.label}
-                        value={item.key}
-                        sx={{ 
-                          minHeight: { md: 48, lg: 48 },
-                          minWidth: 0,
-                          flex: isDesktop ? 1 : "none",
-                          px: { md: 1, lg: 1.5 },
-                          textTransform: "none", 
-                          fontSize: { md: "0.75rem", lg: "0.8125rem" },
-                          fontWeight: isSelected ? 600 : 500,
-                          color: isSelected ? "primary.main" : "text.secondary",
-                          borderBottom: isSelected ? "2px solid" : "2px solid transparent",
-                          borderBottomColor: isSelected ? "primary.main" : "transparent",
-                          borderRadius: 0,
-                          "&:hover": {
-                            color: "primary.main",
-                            backgroundColor: "transparent",
-                          },
-                          "&.Mui-selected": {
-                            color: "primary.main",
-                            borderLeft: "none",
-                            borderRight: "none",
-                            borderTop: "none",
-                          },
-                        }}
-                      />
-                    );
-                  })}
-                </Tabs>
-              </Box>
-            )}
+            {/* Desktop navigation tabs */}
+            <nav className="hidden md:flex flex-1 items-center space-x-1 mr-4">
+              {navItems.map((item) => {
+                const isSelected = item.key === activeView;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => handleNavigate(item.key)}
+                    className={cn(
+                      "px-3 lg:px-4 py-2 text-xs lg:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap",
+                      isSelected
+                        ? "text-primary-600 border-primary-600"
+                        : "text-neutral-600 border-transparent hover:text-primary-600"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
 
-            <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0, ml: "auto" }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: { xs: 0, sm: 0.5, md: 0.75, lg: 1 },
-                  px: { xs: 0.25, sm: 0.5, md: 0.75, lg: 1 },
-                  py: { xs: 0.25, sm: 0.25, md: 0.5 },
-                }}
-              >
-                <Avatar
+            {/* User profile section (always visible) */}
+            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-2 lg:space-x-3 ml-auto">
+              <Avatar className="w-7 h-7 sm:w-8 sm:h-8 md:w-7 md:h-7 lg:w-8 lg:h-8">
+                <AvatarImage
+                  src={user?.avatar_url || user?.avatarUrl}
                   alt={user?.en_name || user?.name}
-                  src={user?.avatar_url || user?.avatarUrl || undefined}
-                  sx={{ 
-                    width: { 
-                      xs: isVerySmallScreen ? 28 : 30, 
-                      sm: 32, 
-                      md: 28, 
-                      lg: 32 
-                    }, 
-                    height: { 
-                      xs: isVerySmallScreen ? 28 : 30, 
-                      sm: 32, 
-                      md: 28, 
-                      lg: 32 
-                    }, 
-                    flexShrink: 0,
-                  }}
-                >
-                  <User size={isVerySmallScreen ? 14 : 16} />
-                </Avatar>
-                <Stack 
-                  spacing={0} 
-                  alignItems="flex-start" 
-                  sx={{ 
-                    display: { 
-                      xs: "none", 
-                      sm: isVerySmallScreen ? "none" : "flex",
-                      md: "flex",
-                      lg: "flex" 
-                    },
-                    minWidth: 0,
-                    maxWidth: { sm: 120, md: 150, lg: 180 },
-                    flexShrink: 0,
-                  }}
-                >
-                  <Typography 
-                    variant="body2" 
-                    fontWeight={600} 
-                    noWrap 
-                    sx={{ 
-                      fontSize: { sm: "0.7rem", md: "0.75rem", lg: "0.8125rem" },
-                      lineHeight: 1.2,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      width: "100%",
-                    }}
-                  >
-                    {user?.en_name || user?.name || "User"}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    color="text.secondary" 
-                    noWrap 
-                    sx={{ 
-                      fontSize: { sm: "0.6rem", md: "0.625rem", lg: "0.6875rem" },
-                      lineHeight: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      width: "100%",
-                      display: { sm: "none", md: "block", lg: "block" },
-                    }}
-                  >
-                    {organizationName || organizationSlug || "Organisation"}
-                  </Typography>
-                </Stack>
-              </Box>
-            </Box>
-          </Toolbar>
-        </Container>
-      </AppBar>
+                />
+                <AvatarFallback className="text-xs">
+                  {getUserInitials()}
+                </AvatarFallback>
+              </Avatar>
 
-      <Drawer
-        variant="temporary"
-        open={mobileOpen}
-        onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: "block", md: "none" },
-          "& .MuiDrawer-paper": { 
-            boxSizing: "border-box", 
-            width: { xs: "85vw", sm: 280 },
-            maxWidth: 320,
-          },
-        }}
-      >
-        {drawer}
-      </Drawer>
+              {/* User name and org (hidden on very small screens) */}
+              <div className="hidden sm:flex md:flex flex-col max-w-[120px] md:max-w-[150px] lg:max-w-[180px]">
+                <p className="text-[11px] sm:text-xs md:text-[11px] lg:text-[13px] font-semibold text-neutral-900 truncate leading-tight">
+                  {user?.en_name || user?.name || "User"}
+                </p>
+                <p className="hidden md:block text-[10px] lg:text-[11px] text-neutral-500 truncate leading-tight">
+                  {organizationName || organizationSlug || "Organisation"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
 
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          backgroundColor: "background.default",
-          minHeight: { xs: "calc(100vh - 44px)", sm: "calc(100vh - 46px)", md: "calc(100vh - 48px)" },
-        }}
-      >
-        <Container
-          maxWidth={activeView === 'strategic_map' ? false : "xl"}
-          disableGutters={activeView === 'strategic_map'}
-          sx={{
-            px: activeView === 'strategic_map' ? 0 : { xs: 2, sm: 3, md: 4 },
-            py: activeView === 'strategic_map' ? 0 : { xs: 2.5, md: 3.5 },
-          }}
+      {/* Mobile Drawer Overlay */}
+      {mobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={handleDrawerToggle}
+          />
+
+          {/* Drawer */}
+          <div className="fixed inset-y-0 left-0 z-50 bg-white shadow-xl md:hidden">
+            {drawer}
+          </div>
+        </>
+      )}
+
+      {/* Main Content */}
+      <main className="flex-grow bg-gray-50 min-h-[calc(100vh-44px)] sm:min-h-[calc(100vh-48px)]">
+        <div
+          className={cn(
+            activeView === "strategic_map" || activeView === "strategic_map_v2"
+              ? "p-0"
+              : "px-4 sm:px-6 md:px-8 py-5 md:py-7"
+          )}
         >
           {children}
-        </Container>
-      </Box>
+        </div>
+      </main>
 
-      <Box
-        component="footer"
-        sx={{
-          py: 2,
-          px: 2,
-          mt: "auto",
-          backgroundColor: "background.paper",
-          borderTop: 1,
-          borderColor: "divider",
-        }}
-      >
-        <Container maxWidth="xl">
-          <Typography variant="caption" color="text.secondary" align="center" display="block">
+      {/* Footer */}
+      <footer className="py-4 px-4 bg-white border-t border-neutral-200">
+        <div className="max-w-screen-2xl mx-auto">
+          <p className="text-xs text-neutral-500 text-center">
             © 2025 Inside Advisory. All rights reserved.
-          </Typography>
-        </Container>
-      </Box>
-    </Box>
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }
 

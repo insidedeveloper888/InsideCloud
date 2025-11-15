@@ -7,12 +7,9 @@ import ProtectedLayout from '../../layouts/ProtectedLayout.jsx';
 import {
   Box,
   Stack,
-  Grid,
   Card,
   CardContent,
   Typography,
-  Button,
-  Avatar,
   Chip,
   CircularProgress,
   Alert,
@@ -31,9 +28,15 @@ import {
   LayoutDashboard,
   UserCircle2,
   Map,
+  Loader2,
 } from 'lucide-react';
+import { Button } from '../../components/ui/button';
+import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
+import { cn } from '../../lib/utils';
 import './index.css';
-import StrategicMapView from '../../components/StrategicMap/index.jsx';
+// Old StrategicMapView archived - using v2 only
+import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
+import { TargetIcon, PromotionIcon, SheetIcon } from '../../components/ui/icons';
 
 const resolveApiOrigin = () =>
   clientConfig.apiOrigin && clientConfig.apiOrigin.length > 0
@@ -55,47 +58,43 @@ const slugify = (value) =>
     .substring(0, 60);
 
 const DashboardContent = ({ onNavigate }) => (
-  <Box>
-    <Grid container spacing={3}>
-      <Grid item xs={12} sm={6} md={4}>
-        <Card
-          sx={{
-            borderRadius: 3,
-            height: '100%',
-            minHeight: 200,
-            transition: 'all 0.3s ease',
-            cursor: 'pointer',
-            '&:hover': {
-              transform: 'translateY(-8px)',
-              boxShadow: 6,
-            },
-          }}
-          onClick={() => onNavigate && onNavigate('strategic_map')}
-        >
-          <CardContent sx={{ p: 4, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-            <Avatar
-              sx={{
-                width: 64,
-                height: 64,
-                bgcolor: 'primary.main',
-                color: 'white',
-                mx: 'auto',
-                mb: 2,
-              }}
-            >
-              <Map size={32} />
-            </Avatar>
-            <Typography variant="h5" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
-              战略地图
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', mt: 1 }}>
-              Strategic Map
-            </Typography>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  </Box>
+  <div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <div
+        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
+        onClick={() => onNavigate && onNavigate('strategic_map')}
+      >
+        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
+          <TargetIcon size={56} />
+        </div>
+        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+          战略地图
+        </h3>
+      </div>
+      <div
+        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
+        // onClick={() => onNavigate && onNavigate('strategic_map')}
+      >
+        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
+          <SheetIcon size={56} />
+        </div>
+        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+          工作规格
+        </h3>
+      </div>
+      <div
+        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
+        // onClick={() => onNavigate && onNavigate('strategic_map')}
+      >
+        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
+          <PromotionIcon size={56} />
+        </div>
+        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+          晋升机制
+        </h3>
+      </div>
+    </div>
+  </div>
 );
 
 const SupabaseMembers = ({ organizationSlug }) => {
@@ -138,95 +137,108 @@ const SupabaseMembers = ({ organizationSlug }) => {
   }, [fetchMembers]);
 
   return (
-    <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-      <CardContent sx={{ p: 3 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 3 }} spacing={2}>
-          <Box>
-            <Typography variant="h6" fontWeight={600}>
-              Team Members
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Manage your organisation's team
-            </Typography>
-          </Box>
-          <Button variant="contained" startIcon={<RefreshCw size={18} />} onClick={fetchMembers} size="small">
+    <div className="bg-white rounded-3xl shadow-sm">
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900">Team Members</h3>
+            <p className="text-sm text-gray-600 mt-1">Manage your organisation's team</p>
+          </div>
+          <Button variant="default" size="sm" onClick={fetchMembers} className="gap-2">
+            <RefreshCw size={16} />
             Refresh
           </Button>
-        </Stack>
+        </div>
 
+        {/* Loading State */}
         {loading ? (
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }} spacing={2}>
-            <CircularProgress />
-            <Typography variant="body2" color="text.secondary">
-              Loading team members…
-            </Typography>
-          </Stack>
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+            <p className="text-sm text-gray-600">Loading team members…</p>
+          </div>
         ) : error ? (
-          <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>
+          /* Error State */
+          <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
         ) : members.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 6 }}>
-            <Typography variant="body1" color="text.secondary">
-              No members found for this organisation.
-            </Typography>
-          </Box>
+          /* Empty State */
+          <div className="text-center py-12">
+            <p className="text-base text-gray-600">No members found for this organisation.</p>
+          </div>
         ) : (
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Member</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Joined</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {members.map((member) => (
-                  <TableRow key={member.id} hover sx={{ '&:last-child td': { border: 0 } }}>
-                    <TableCell>
-                      <Stack direction="row" spacing={2} alignItems="center">
-                        <Avatar src={member.avatar_url || undefined} sx={{ width: 40, height: 40 }}>
-                          {(member.name || 'U').charAt(0)}
+          /* Members Table */
+          <div className="overflow-x-auto -mx-6 sm:mx-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-900">Member</th>
+                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-900">Role</th>
+                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-900">Status</th>
+                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-900">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((member, index) => (
+                  <tr
+                    key={member.id}
+                    className={cn(
+                      "hover:bg-gray-50 transition-colors",
+                      index !== members.length - 1 && "border-b border-gray-100"
+                    )}
+                  >
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={member.avatar_url} alt={member.name} />
+                          <AvatarFallback className="bg-primary-100 text-primary-700 font-medium">
+                            {(member.name || 'U').charAt(0).toUpperCase()}
+                          </AvatarFallback>
                         </Avatar>
-                        <Box>
-                          <Typography variant="body2" fontWeight={600}>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
                             {member.name || 'Unknown User'}
-                          </Typography>
+                          </p>
                           {member.email && (
-                            <Typography variant="caption" color="text.secondary">
-                              {member.email}
-                            </Typography>
+                            <p className="text-xs text-gray-500">{member.email}</p>
                           )}
-                        </Box>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={(member.role_code || 'member').toUpperCase()}
-                        size="small"
-                        color={member.role_code === 'admin' ? 'primary' : 'default'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={member.status || 'unknown'}
-                        size="small"
-                        color={member.status === 'active' ? 'success' : 'default'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDateTime(member.joined_at)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={cn(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                        member.role_code === 'admin'
+                          ? "bg-primary-100 text-primary-700"
+                          : member.role_code === 'owner'
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-gray-100 text-gray-700"
+                      )}>
+                        {(member.role_code || 'member').toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={cn(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                        member.status === 'active'
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-700"
+                      )}>
+                        {member.status || 'unknown'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-gray-600">{formatDateTime(member.joined_at)}</p>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </Box>
+              </tbody>
+            </table>
+          </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
@@ -555,53 +567,33 @@ const OrganizationView = ({ isAdmin }) => {
 };
 
 const LoadingState = () => (
-  <Box
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      background: 'linear-gradient(135deg, #1f4fff 0%, #7c3aed 100%)',
-      color: 'common.white',
-      flexDirection: 'column',
-      gap: 2,
-    }}
-  >
-    <CircularProgress color="inherit" />
-    <Typography variant="body1">Authenticating with Lark…</Typography>
-  </Box>
+  <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-[#1f4fff] to-[#7c3aed] text-white gap-4">
+    <Loader2 className="w-10 h-10 animate-spin" />
+    <p className="text-base">Authenticating with Lark…</p>
+  </div>
 );
 
 const ErrorState = ({ message, onRetry, onChangeOrganization, isOrgError }) => (
-  <Box
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)',
-      color: 'common.white',
-      textAlign: 'center',
-      px: 3,
-    }}
-  >
-    <Stack spacing={2} maxWidth={420}>
-      <Typography variant="h5" fontWeight={700}>
-        Authentication Failed
-      </Typography>
-      <Typography variant="body1">{message}</Typography>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="center">
+  <div className="flex items-center justify-center h-screen bg-gradient-to-br from-[#ff6b6b] to-[#ee5a24] text-white text-center px-6">
+    <div className="flex flex-col gap-4 max-w-[420px]">
+      <h2 className="text-2xl font-bold">Authentication Failed</h2>
+      <p className="text-base">{message}</p>
+      <div className="flex flex-col sm:flex-row gap-2 justify-center">
         {isOrgError && (
-          <Button variant="contained" onClick={onChangeOrganization}>
+          <Button variant="default" onClick={onChangeOrganization}>
             Change Organisation
           </Button>
         )}
-        <Button variant="outlined" onClick={onRetry} sx={{ color: 'common.white', borderColor: 'rgba(255,255,255,0.6)' }}>
+        <Button
+          variant="outline"
+          onClick={onRetry}
+          className="text-white border-white/60 hover:bg-white/10 hover:text-white"
+        >
           Retry
         </Button>
-      </Stack>
-    </Stack>
-  </Box>
+      </div>
+    </div>
+  </div>
 );
 
 const Home = () => {
@@ -630,7 +622,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map') {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
@@ -649,6 +641,7 @@ const Home = () => {
       { key: 'users', label: 'Users', icon: Users, section: 'Team' },
       { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
       { key: 'organization', label: 'Organization', icon: Building2, section: 'System' },
+      { key: 'strategic_map_v2', label: 'Strategic Map v2', icon: Map, section: 'Product' },
     ];
   }, [isAdmin]);
 
@@ -659,7 +652,7 @@ const Home = () => {
       const cacheBuster = `_t=${Date.now()}`;
       const response = await fetch(`${base}/api/get_organization_config?organization_slug=${slug}&${cacheBuster}`, {
         credentials: 'include',
-        headers: { 
+        headers: {
           'ngrok-skip-browser-warning': 'true',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -746,7 +739,7 @@ const Home = () => {
           });
       });
     };
-    
+
     try {
       if (orgSlug) {
         setSelectedOrganizationSlug(orgSlug);
@@ -754,11 +747,11 @@ const Home = () => {
 
       // Check if JSAPI is available (production environment inside Lark)
       const isJSAPIAvailable = typeof window.h5sdk !== 'undefined';
-      
+
       if (isJSAPIAvailable) {
         // Production: Use JSAPI authentication flow
         console.log('🔐 Using JSAPI authentication flow (production)');
-        
+
         const jsapiSuccess = await new Promise((resolve) => {
           handleJSAPIAccess(resolve, orgSlug);
         });
@@ -871,11 +864,10 @@ const Home = () => {
   const renderActiveView = () => {
     switch (activeView) {
       case 'strategic_map':
+      case 'strategic_map_v2':
         return (
-          <StrategicMapView
+          <StrategicMapV2Preview
             organizationSlug={selectedOrganizationSlug}
-            userName={userInfo?.name || userInfo?.en_name}
-            organizationName={selectedOrganizationName}
           />
         );
       case 'account':

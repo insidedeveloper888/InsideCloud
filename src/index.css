@@ -10,7 +10,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #ebf1fd;
-  text-align: center;
+  text-align: initial;
 }
 
 code {
@@ -18,12 +18,4 @@ code {
     monospace;
 }
 
-button {
-  width: 90vw;
-  height: 40px;
-  border-radius: 4px;
-  align-self: center;
-  font-size: 15px;
-  /* background-color: #0033ff; */
-  color: white;
-}
+/* Removed global button styling to prevent layout breakage across pages */
