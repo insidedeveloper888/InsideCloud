@@ -75,9 +75,6 @@ const getDaysInWeek = (weekStartDate) => {
   return days;
 };
 
-// Generate unique ID
-const generateId = () => `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
 // Checklist Item Component
 const ChecklistItem = ({ item, onToggle, onRemove, onEdit, readOnly }) => {
   const [isEditing, setIsEditing] = useState(false);

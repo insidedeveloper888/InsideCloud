@@ -305,7 +305,7 @@ export const migrateLocalStorageToDatabase = async (organizationSlug) => {
   }
 };
 
-export default {
+const StrategicMapAPI = {
   loadItems,
   createItem,
   updateItem,
@@ -314,3 +314,5 @@ export default {
   loadFromLocalStorage,
   saveToLocalStorage
 };
+
+export default StrategicMapAPI;

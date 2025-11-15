@@ -24,10 +24,11 @@ Avatar.displayName = "Avatar";
  *
  * The actual image inside the avatar
  */
-const AvatarImage = React.forwardRef(({ className, ...props }, ref) => (
+const AvatarImage = React.forwardRef(({ className, alt = "", ...props }, ref) => (
   <img
     ref={ref}
     className={cn("aspect-square h-full w-full object-cover", className)}
+    alt={alt}
     {...props}
   />
 ));
