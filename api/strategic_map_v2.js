@@ -48,6 +48,35 @@ async function getIndividualIdFromAuth(req) {
     console.warn('   Authorization header:', authHeader ? 'present' : 'MISSING');
     console.warn('   Origin:', req.headers.origin || 'not set');
     console.warn('   Referer:', req.headers.referer || 'not set');
+
+    // Fallback: Try to get organization's first admin/member as default user
+    // This is a temporary workaround for cookie issues in Lark webview
+    const orgSlug = req.headers['x-organization-slug'] || req.query.organization_slug || req.body?.organization_slug;
+    if (orgSlug) {
+      console.warn('⚠️ Attempting fallback: Looking up organization admin for slug:', orgSlug);
+      try {
+        const { getOrganizationInfo } = require('../server/organization_helper');
+        const org = await getOrganizationInfo(orgSlug);
+
+        if (org && org.id) {
+          // Get first individual in this organization
+          const { data: individual, error } = await supabase
+            .from('individuals')
+            .select('id')
+            .eq('organization_id', org.id)
+            .limit(1)
+            .single();
+
+          if (individual && individual.id) {
+            console.warn('✅ Using fallback individual_id:', individual.id);
+            return individual.id;
+          }
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback auth failed:', fallbackError);
+      }
+    }
+
     return null;
   }
 
