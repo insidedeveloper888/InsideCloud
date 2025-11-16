@@ -273,6 +273,13 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
             console.log("接入方前端[免登处理]第③ 步: 获取user_access_token信息")
             complete(data)
             localStorage.setItem(LJ_TOKEN_KEY, data.access_token)
+
+            // Store individual_id for API requests (cookie workaround)
+            if (data.individual_id) {
+                localStorage.setItem('individual_id', data.individual_id);
+                console.log("✅ Stored individual_id in localStorage:", data.individual_id);
+            }
+
             console.log("----------[接入网页方免登处理 END]----------\n")
         } else {
             console.error("接入方前端[免登处理]第③ 步: 未获取user_access_token信息")

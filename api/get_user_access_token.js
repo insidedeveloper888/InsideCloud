@@ -186,6 +186,7 @@ module.exports = async function handler(req, res) {
         console.log("接入服务方第⑥ 步: 获取颁发的用户授权码凭证的user_access_token, 更新到Cookie，返回给前端");
         const newAccessToken = authenv1Res.data.data;
         
+        let individualId = null;
         if (newAccessToken) {
             // Set authentication cookie
             setAuthCookie(res, newAccessToken);
@@ -199,12 +200,34 @@ module.exports = async function handler(req, res) {
                     organizationId: larkCredentials?.organization_id || null
                 });
                 console.log('✅  [API] syncLarkUser complete');
+
+                // Query individual_id to return to frontend for localStorage
+                if (supabase && larkCredentials?.organization_id) {
+                    const { data: individual, error: individualError } = await supabase
+                        .from('individuals')
+                        .select('id')
+                        .eq('lark_user_id', newAccessToken.user_id)
+                        .eq('organization_id', larkCredentials.organization_id)
+                        .single();
+
+                    if (individual && individual.id) {
+                        individualId = individual.id;
+                        console.log('✅  Found individual_id:', individualId);
+                    } else if (individualError) {
+                        console.error('❌  Error querying individual_id:', individualError);
+                    }
+                }
             } catch (syncError) {
                 console.error('❌  [API] Failed to sync Lark user to Supabase:', syncError);
             }
         }
 
-        res.status(200).json(okResponse(newAccessToken));
+        // Include individual_id in response for frontend localStorage
+        const responseData = {
+            ...newAccessToken,
+            individual_id: individualId
+        };
+        res.status(200).json(okResponse(responseData));
         console.log("-------------------[接入服务端免登处理 END]-----------------------------\n");
 
     } catch (error) {

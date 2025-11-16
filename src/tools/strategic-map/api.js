@@ -112,11 +112,19 @@ export const createItem = async (organizationSlug, timeframe, rowIndex, colIndex
   }
 
   try {
+    // Get individual_id from localStorage (cookie workaround)
+    const individualId = localStorage.getItem('individual_id');
+    const headers = {};
+    if (individualId) {
+      headers['X-Individual-ID'] = individualId;
+    }
+
     const response = await axios.post(`${API_BASE}/api/strategic_map_v2`, {
       organization_slug: organizationSlug,
       ...itemData
     }, {
-      withCredentials: true  // Send cookies for authentication
+      withCredentials: true,  // Send cookies for authentication
+      headers
     });
 
     if (response.data.success) {
@@ -170,11 +178,18 @@ export const updateItem = async (organizationSlug, itemId, timeframe, rowIndex, 
   }
 
   try {
+    const individualId = localStorage.getItem('individual_id');
+    const headers = {};
+    if (individualId) {
+      headers['X-Individual-ID'] = individualId;
+    }
+
     const response = await axios.put(`${API_BASE}/api/strategic_map_v2?id=${itemId}`, {
       organization_slug: organizationSlug,
       ...updates
     }, {
-      withCredentials: true  // Send cookies for authentication
+      withCredentials: true,  // Send cookies for authentication
+      headers
     });
 
     if (response.data.success) {
@@ -222,10 +237,17 @@ export const deleteItem = async (organizationSlug, itemId, timeframe, rowIndex, 
   }
 
   try {
+    const individualId = localStorage.getItem('individual_id');
+    const headers = {};
+    if (individualId) {
+      headers['X-Individual-ID'] = individualId;
+    }
+
     const response = await axios.delete(
       `${API_BASE}/api/strategic_map_v2?id=${itemId}&organization_slug=${organizationSlug}`,
       {
-        withCredentials: true  // Send cookies for authentication
+        withCredentials: true,  // Send cookies for authentication
+        headers
       }
     );
 

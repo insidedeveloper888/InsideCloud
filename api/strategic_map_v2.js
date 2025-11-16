@@ -9,7 +9,14 @@ const cookie = require('cookie');
  * Reuses the same logic as the v1 API for consistency
  */
 async function getIndividualIdFromAuth(req) {
-  // Preferred path: use our own auth cookie if available
+  // First priority: Check X-Individual-ID header (localStorage workaround)
+  const headerIndividualId = req.headers['x-individual-id'];
+  if (headerIndividualId) {
+    console.log('✅ Using individual_id from header:', headerIndividualId);
+    return headerIndividualId;
+  }
+
+  // Second priority: use our own auth cookie if available
   const auth = getAuthFromCookie(req);
   if (auth && auth.user_id) {
     try {
