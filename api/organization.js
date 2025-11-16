@@ -6,54 +6,43 @@
  */
 
 const { getOrganizationInfo } = require('../server/organization_helper');
-const { configAccessControl } = require('../server/server_util');
+const { handleCors, failResponse } = require('./_utils');
 
-module.exports = async (ctx) => {
+module.exports = async function handler(req, res) {
   // Handle CORS
-  configAccessControl(ctx);
+  if (handleCors(req, res)) return;
 
-  // Handle OPTIONS preflight
-  if (ctx.method === 'OPTIONS') {
-    ctx.status = 200;
-    return;
-  }
-
-  const { slug } = ctx.query;
+  const { slug } = req.query;
 
   if (!slug) {
-    ctx.status = 400;
-    ctx.body = {
+    return res.status(400).json({
       success: false,
       error: 'Missing required parameter: slug',
-    };
-    return;
+    });
   }
 
   try {
     const org = await getOrganizationInfo(slug);
 
     if (!org) {
-      ctx.status = 404;
-      ctx.body = {
+      return res.status(404).json({
         success: false,
         error: `Organization not found: ${slug}`,
-      };
-      return;
+      });
     }
 
-    ctx.status = 200;
-    ctx.body = {
+    return res.status(200).json({
       id: org.id,
       slug: org.slug,
       name: org.name,
       is_active: org.is_active,
-    };
+    });
   } catch (error) {
-    console.error('Error fetching organization:', error);
-    ctx.status = 500;
-    ctx.body = {
+    console.error('❌ Error fetching organization:', error);
+    return res.status(500).json({
       success: false,
       error: 'Internal server error',
-    };
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
   }
 };
