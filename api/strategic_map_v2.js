@@ -43,6 +43,11 @@ async function getIndividualIdFromAuth(req) {
 
   if (!lkToken) {
     console.warn('⚠️ No lk_token found for authentication');
+    console.warn('   Cookie header:', req.headers.cookie ? 'present' : 'MISSING');
+    console.warn('   Cookies found:', Object.keys(cookies).join(', ') || 'none');
+    console.warn('   Authorization header:', authHeader ? 'present' : 'MISSING');
+    console.warn('   Origin:', req.headers.origin || 'not set');
+    console.warn('   Referer:', req.headers.referer || 'not set');
     return null;
   }
 
