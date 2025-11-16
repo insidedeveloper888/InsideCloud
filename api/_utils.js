@@ -101,12 +101,12 @@ function setAuthCookie(res, userInfo) {
     const token = createToken(userInfo);
     const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: true, // Always use secure in production (HTTPS required)
+        sameSite: 'none', // Allow cross-site cookies (required for Lark webview)
         maxAge: 2 * 60 * 60 * 1000, // 2 hours
         path: '/'
     };
-    
+
     res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, cookieOptions));
     return token;
 }
