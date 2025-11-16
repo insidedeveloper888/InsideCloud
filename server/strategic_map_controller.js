@@ -71,9 +71,11 @@ class StrategicMapController {
       }
 
       // 2. Build insert data
+      // Note: created_by_individual_id is left null since we're in organization mode only
+      // The individualId is just the Lark user_id (not a UUID from individuals table)
       const insertData = {
         organization_id: org.id,
-        created_by_individual_id: individualId,
+        created_by_individual_id: null,  // Organization mode - no individual tracking
         text: itemData.text,
         status: itemData.status || 'neutral',
         timeframe: itemData.timeframe,
@@ -132,10 +134,11 @@ class StrategicMapController {
       }
 
       // Build update data
+      // Note: updated_by_individual_id is left null since we're in organization mode only
       const updateData = {
         ...updates,
         updated_at: new Date().toISOString(),
-        updated_by_individual_id: individualId
+        updated_by_individual_id: null  // Organization mode - no individual tracking
       };
 
       // Update item
