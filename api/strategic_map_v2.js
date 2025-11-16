@@ -1,41 +1,19 @@
 const { handleCors, failResponse } = require('./_utils');
 const StrategicMapController = require('../server/strategic_map_controller');
 const { getAuthFromCookie } = require('./_utils');
-const { supabase } = require('./supabase_helper');
 const cookie = require('cookie');
 
 /**
- * Helper function to get individual_id from authentication
- * Reuses the same logic as the v1 API for consistency
+ * Helper function to get user ID from authentication for audit trail
+ * Since we're in organization mode only (no individual mode), we just need
+ * to verify the user is authenticated and return their Lark user_id for created_by/modified_by
  */
 async function getIndividualIdFromAuth(req) {
-  // First priority: Check X-Individual-ID header (localStorage workaround)
-  const headerIndividualId = req.headers['x-individual-id'];
-  if (headerIndividualId) {
-    console.log('✅ Using individual_id from header:', headerIndividualId);
-    return headerIndividualId;
-  }
-
-  // Second priority: use our own auth cookie if available
+  // First priority: use our own auth cookie if available
   const auth = getAuthFromCookie(req);
   if (auth && auth.user_id) {
-    try {
-      const { data: individual, error: individualError } = await supabase
-        .from('individuals')
-        .select('id')
-        .eq('user_id', auth.user_id)
-        .maybeSingle();
-
-      if (individualError) {
-        console.error('❌ Error querying individuals via auth_token:', individualError);
-      }
-
-      if (individual && individual.id) {
-        return individual.id;
-      }
-    } catch (e) {
-      console.error('❌ Error resolving individual via auth_token:', e);
-    }
+    console.log('✅ Using Lark user_id from auth cookie:', auth.user_id);
+    return auth.user_id; // Return Lark user_id directly (no individuals table lookup needed)
   }
 
   // Try lk_token from cookie or Authorization header
@@ -49,41 +27,10 @@ async function getIndividualIdFromAuth(req) {
   const lkToken = bearerToken || cookies.lk_token || cookies['lk_token'];
 
   if (!lkToken) {
-    console.warn('⚠️ No lk_token found for authentication');
+    console.warn('⚠️ No authentication found (no auth cookie or lk_token)');
     console.warn('   Cookie header:', req.headers.cookie ? 'present' : 'MISSING');
     console.warn('   Cookies found:', Object.keys(cookies).join(', ') || 'none');
     console.warn('   Authorization header:', authHeader ? 'present' : 'MISSING');
-    console.warn('   Origin:', req.headers.origin || 'not set');
-    console.warn('   Referer:', req.headers.referer || 'not set');
-
-    // Fallback: Try to get organization's first admin/member as default user
-    // This is a temporary workaround for cookie issues in Lark webview
-    const orgSlug = req.headers['x-organization-slug'] || req.query.organization_slug || req.body?.organization_slug;
-    if (orgSlug) {
-      console.warn('⚠️ Attempting fallback: Looking up organization admin for slug:', orgSlug);
-      try {
-        const { getOrganizationInfo } = require('../server/organization_helper');
-        const org = await getOrganizationInfo(orgSlug);
-
-        if (org && org.id) {
-          // Get first individual in this organization
-          const { data: individual, error } = await supabase
-            .from('individuals')
-            .select('id')
-            .eq('organization_id', org.id)
-            .limit(1)
-            .single();
-
-          if (individual && individual.id) {
-            console.warn('✅ Using fallback individual_id:', individual.id);
-            return individual.id;
-          }
-        }
-      } catch (fallbackError) {
-        console.error('❌ Fallback auth failed:', fallbackError);
-      }
-    }
-
     return null;
   }
 
@@ -111,34 +58,8 @@ async function getIndividualIdFromAuth(req) {
       return null;
     }
 
-    // Use RPC function to get auth user ID
-    const { data: authUserId, error: rpcError } = await supabase.rpc('get_auth_user_by_lark', {
-      p_lark_user_id: larkUserId,
-      p_email: null
-    });
-
-    if (rpcError || !authUserId) {
-      console.error('❌ RPC error or no auth user found:', rpcError);
-      return null;
-    }
-
-    const { data: individual, error: individualError } = await supabase
-      .from('individuals')
-      .select('id')
-      .eq('user_id', authUserId)
-      .maybeSingle();
-
-    if (individualError) {
-      console.error('❌ Error querying individuals:', individualError);
-      return null;
-    }
-
-    if (individual) {
-      return individual.id;
-    } else {
-      console.warn('⚠️ No individual record found for user_id:', authUserId);
-      return null;
-    }
+    console.log('✅ Using Lark user_id from lk_token:', larkUserId);
+    return larkUserId; // Return Lark user_id directly (no individuals table lookup needed)
   } catch (e) {
     if (e.response) {
       console.error('❌ Lark API HTTP error:', e.response.status, e.response.data);

@@ -185,8 +185,7 @@ module.exports = async function handler(req, res) {
 
         console.log("接入服务方第⑥ 步: 获取颁发的用户授权码凭证的user_access_token, 更新到Cookie，返回给前端");
         const newAccessToken = authenv1Res.data.data;
-        
-        let individualId = null;
+
         if (newAccessToken) {
             // Set authentication cookie
             setAuthCookie(res, newAccessToken);
@@ -200,60 +199,12 @@ module.exports = async function handler(req, res) {
                     organizationId: larkCredentials?.organization_id || null
                 });
                 console.log('✅  [API] syncLarkUser complete');
-
-                // Query individual_id to return to frontend for localStorage
-                if (supabase && larkCredentials?.organization_id) {
-                    console.log('🔍 Querying individual_id for lark_user_id:', newAccessToken.user_id);
-                    console.log('🔍 Organization ID:', larkCredentials.organization_id);
-
-                    // Try query by lark_user_id first
-                    let { data: individual, error: individualError } = await supabase
-                        .from('individuals')
-                        .select('id')
-                        .eq('lark_user_id', newAccessToken.user_id)
-                        .eq('organization_id', larkCredentials.organization_id)
-                        .maybeSingle();
-
-                    if (individualError) {
-                        console.error('❌  Error querying individual_id by lark_user_id:', individualError);
-                    }
-
-                    // If not found, try to get ANY individual in this org (fallback)
-                    if (!individual || !individual.id) {
-                        console.warn('⚠️  No individual found by lark_user_id, trying organization fallback');
-                        const { data: fallbackIndividual, error: fallbackError } = await supabase
-                            .from('individuals')
-                            .select('id')
-                            .eq('organization_id', larkCredentials.organization_id)
-                            .limit(1)
-                            .maybeSingle();
-
-                        if (fallbackIndividual && fallbackIndividual.id) {
-                            individual = fallbackIndividual;
-                            console.warn('✅  Using fallback individual_id from org:', individual.id);
-                        } else if (fallbackError) {
-                            console.error('❌  Fallback query also failed:', fallbackError);
-                        }
-                    }
-
-                    if (individual && individual.id) {
-                        individualId = individual.id;
-                        console.log('✅  Found individual_id:', individualId);
-                    } else {
-                        console.error('❌  No individual_id found at all');
-                    }
-                }
             } catch (syncError) {
                 console.error('❌  [API] Failed to sync Lark user to Supabase:', syncError);
             }
         }
 
-        // Include individual_id in response for frontend localStorage
-        const responseData = {
-            ...newAccessToken,
-            individual_id: individualId
-        };
-        res.status(200).json(okResponse(responseData));
+        res.status(200).json(okResponse(newAccessToken));
         console.log("-------------------[接入服务端免登处理 END]-----------------------------\n");
 
     } catch (error) {
