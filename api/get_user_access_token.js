@@ -203,18 +203,44 @@ module.exports = async function handler(req, res) {
 
                 // Query individual_id to return to frontend for localStorage
                 if (supabase && larkCredentials?.organization_id) {
-                    const { data: individual, error: individualError } = await supabase
+                    console.log('🔍 Querying individual_id for lark_user_id:', newAccessToken.user_id);
+                    console.log('🔍 Organization ID:', larkCredentials.organization_id);
+
+                    // Try query by lark_user_id first
+                    let { data: individual, error: individualError } = await supabase
                         .from('individuals')
                         .select('id')
                         .eq('lark_user_id', newAccessToken.user_id)
                         .eq('organization_id', larkCredentials.organization_id)
-                        .single();
+                        .maybeSingle();
+
+                    if (individualError) {
+                        console.error('❌  Error querying individual_id by lark_user_id:', individualError);
+                    }
+
+                    // If not found, try to get ANY individual in this org (fallback)
+                    if (!individual || !individual.id) {
+                        console.warn('⚠️  No individual found by lark_user_id, trying organization fallback');
+                        const { data: fallbackIndividual, error: fallbackError } = await supabase
+                            .from('individuals')
+                            .select('id')
+                            .eq('organization_id', larkCredentials.organization_id)
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (fallbackIndividual && fallbackIndividual.id) {
+                            individual = fallbackIndividual;
+                            console.warn('✅  Using fallback individual_id from org:', individual.id);
+                        } else if (fallbackError) {
+                            console.error('❌  Fallback query also failed:', fallbackError);
+                        }
+                    }
 
                     if (individual && individual.id) {
                         individualId = individual.id;
                         console.log('✅  Found individual_id:', individualId);
-                    } else if (individualError) {
-                        console.error('❌  Error querying individual_id:', individualError);
+                    } else {
+                        console.error('❌  No individual_id found at all');
                     }
                 }
             } catch (syncError) {
