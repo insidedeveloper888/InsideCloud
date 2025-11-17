@@ -1011,7 +1011,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     }));
 
     // Debounced API call (waits 500ms after user stops editing)
-    debouncedEditAPICall.current(organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation);
+    debouncedEditAPICall(organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation);
   };
 
   // Toggle item status (with optimistic updates)
