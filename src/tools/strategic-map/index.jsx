@@ -358,22 +358,55 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   const [organizationId, setOrganizationId] = useState(null);
 
   // Track recent mutations to ignore realtime duplicates
-  const recentMutationsRef = useRef(new Set());
+  // Using cell-based tracking instead of ID-based (since IDs aren't known until after API)
+  const recentMutationsRef = useRef(new Map()); // Map<cellKey, Set<operation>>
 
-  // Helper to track mutation and auto-clear after delay
-  const trackMutation = useCallback((itemId, operation = 'any') => {
-    const key = `${operation}_${itemId}`;
-    recentMutationsRef.current.add(key);
+  // Helper to track mutation by cell location
+  const trackMutationByCell = useCallback((timeframe, rowIndex, colIndex, operation = 'INSERT') => {
+    const cellKey = `${timeframe}_${rowIndex}_${colIndex}`;
 
-    // Auto-clear after 3 seconds (enough time for realtime to arrive)
+    if (!recentMutationsRef.current.has(cellKey)) {
+      recentMutationsRef.current.set(cellKey, new Set());
+    }
+
+    recentMutationsRef.current.get(cellKey).add(operation);
+    console.log(`🔒 Tracking mutation: ${operation} at ${cellKey}`);
+
+    // Auto-clear after 2 seconds (enough time for realtime to arrive)
     setTimeout(() => {
-      recentMutationsRef.current.delete(key);
-    }, 3000);
+      const operations = recentMutationsRef.current.get(cellKey);
+      if (operations) {
+        operations.delete(operation);
+        if (operations.size === 0) {
+          recentMutationsRef.current.delete(cellKey);
+        }
+      }
+      console.log(`🔓 Cleared mutation tracking: ${operation} at ${cellKey}`);
+    }, 2000);
   }, []);
 
-  // Helper to check if mutation was recent
+  // Helper to check if mutation was recent for a cell
+  const isRecentMutationForCell = useCallback((timeframe, rowIndex, colIndex, operation = 'INSERT') => {
+    const cellKey = `${timeframe}_${rowIndex}_${colIndex}`;
+    const operations = recentMutationsRef.current.get(cellKey);
+    return operations ? operations.has(operation) : false;
+  }, []);
+
+  // Track by item ID (for updates and deletes where we know the ID)
+  const recentItemMutationsRef = useRef(new Set());
+
+  const trackMutation = useCallback((itemId, operation = 'any') => {
+    const key = `${operation}_${itemId}`;
+    recentItemMutationsRef.current.add(key);
+
+    // Auto-clear after 2 seconds
+    setTimeout(() => {
+      recentItemMutationsRef.current.delete(key);
+    }, 2000);
+  }, []);
+
   const isRecentMutation = useCallback((itemId, operation = 'any') => {
-    return recentMutationsRef.current.has(`${operation}_${itemId}`);
+    return recentItemMutationsRef.current.has(`${operation}_${itemId}`);
   }, []);
 
   // Get today's date info for auto-expansion
@@ -527,22 +560,32 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     console.log('📡 Processing realtime event:', eventType, newRecord || oldRecord);
 
     if (eventType === 'INSERT' && newRecord) {
-      // Check if this is our own mutation
-      if (isRecentMutation(newRecord.id, 'INSERT')) {
-        console.log('⏭️  Skipping INSERT realtime event (our own mutation):', newRecord.id);
-        return;
-      }
-
-      // Another user created an item
       const item = transformItemToFrontend(newRecord);
       const key = `${item.timeframe}_${item.rowIndex}_${item.colIndex}`;
 
+      // Check if this is our own mutation (cell-based tracking)
+      if (isRecentMutationForCell(item.timeframe, item.rowIndex, item.colIndex, 'INSERT')) {
+        console.log('⏭️  Skipping INSERT realtime event (our own mutation):', item.id, 'at', key);
+        return;
+      }
+
       setData(prev => {
-        // Check if item already exists (avoid duplicates from our own actions)
         const existing = prev[key] || [];
+
+        // Check if item already exists by ID
         if (existing.some(i => i.id === item.id)) {
-          console.log('⏭️  Item already exists, skipping:', item.id);
-          return prev; // Already have this item
+          console.log('⏭️  Item already exists (by ID), skipping:', item.id);
+          return prev;
+        }
+
+        // Check if there's a temp item (optimistic) - replace it with real item
+        const hasTempItem = existing.some(i => i.id && i.id.startsWith('temp_'));
+        if (hasTempItem) {
+          console.log('🔄 Replacing temp item with real item from realtime:', item.id, 'at', key);
+          return {
+            ...prev,
+            [key]: existing.map(i => i.id && i.id.startsWith('temp_') ? item : i),
+          };
         }
 
         console.log('➕ Adding item from realtime:', key, item);
@@ -720,6 +763,45 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   const handleAddItem = async (timeframe, rowIndex, colIndex, text) => {
     const key = `${timeframe}_${rowIndex}_${colIndex}`;
 
+    // Track mutation BEFORE API call (cell-based)
+    trackMutationByCell(timeframe, rowIndex, colIndex, 'INSERT');
+
+    // Pre-track cascaded cells (we know the cascade pattern)
+    if (timeframe === 'yearly') {
+      // Yearly cascades to: monthly (Dec), weekly (last week of Dec), daily (Sunday of last week)
+      const year = currentYear + colIndex;
+      const monthColIndex = year * 12 + 11; // December
+      trackMutationByCell('monthly', rowIndex, monthColIndex, 'INSERT');
+
+      // Calculate last week of December (ISO week)
+      const lastDayOfDec = new Date(year, 11, 31); // Dec 31
+      let lastWeekNumber = getISOWeek(lastDayOfDec);
+
+      // If week 1, it means Dec 31 belongs to next year, use previous week
+      if (lastWeekNumber === 1) {
+        const prevDay = new Date(year, 11, 31 - 7);
+        lastWeekNumber = getISOWeek(prevDay);
+      }
+
+      trackMutationByCell('weekly', rowIndex, lastWeekNumber, 'INSERT');
+
+      // Calculate Sunday of that week
+      let sunday = new Date(year, 11, 31);
+      while (sunday.getDay() !== 0) { // 0 = Sunday
+        sunday.setDate(sunday.getDate() - 1);
+      }
+
+      // Only track if this Sunday is in December
+      if (sunday.getMonth() === 11) {
+        const sundayDateKey = parseInt(
+          sunday.getFullYear() +
+          String(sunday.getMonth() + 1).padStart(2, '0') +
+          String(sunday.getDate()).padStart(2, '0')
+        );
+        trackMutationByCell('daily', rowIndex, sundayDateKey, 'INSERT');
+      }
+    }
+
     // Generate temporary ID
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -745,8 +827,12 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       // API call in background
       const result = await StrategicMapAPI.createItem(organizationSlug, timeframe, rowIndex, colIndex, text);
 
-      // Track mutation to ignore realtime duplicate
-      trackMutation(result.newItem.id, 'INSERT');
+      // Track all cascaded cells IMMEDIATELY (before realtime can arrive)
+      if (result.cascadedItems && result.cascadedItems.length > 0) {
+        result.cascadedItems.forEach(item => {
+          trackMutationByCell(item.timeframe, item.rowIndex, item.colIndex, 'INSERT');
+        });
+      }
 
       // Replace temporary item with real item from server
       setData(prev => ({
@@ -758,9 +844,6 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
       // Add cascaded items if present
       if (result.cascadedItems && result.cascadedItems.length > 0) {
-        // Track all cascaded items too
-        result.cascadedItems.forEach(item => trackMutation(item.id, 'INSERT'));
-
         setData(prev => {
           const updated = { ...prev };
           result.cascadedItems.forEach(cascadedItem => {
