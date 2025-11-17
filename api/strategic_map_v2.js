@@ -112,18 +112,14 @@ module.exports = async function handler(req, res) {
 
     // POST: Create item
     if (method === 'POST') {
-      const { organization_slug, ...itemData } = body;
+      const { organization_slug, individual_id, ...itemData } = body;
 
       if (!organization_slug) {
         return res.status(400).json(failResponse('organization_slug is required'));
       }
 
-      // Get individual_id from auth
-      const individualId = await getIndividualIdFromAuth(req);
-
-      if (!individualId) {
-        return res.status(401).json(failResponse('Authentication required'));
-      }
+      // Use individual_id from request body (sent by frontend)
+      const individualId = individual_id || null;
 
       console.log('📝 Creating item:', { organization_slug, itemData, individualId });
       const result = await controller.createItem(organization_slug, itemData, individualId);
@@ -133,17 +129,14 @@ module.exports = async function handler(req, res) {
     // PUT: Update item
     if (method === 'PUT') {
       const { id } = query;
-      const { organization_slug, ...updates } = body;
+      const { organization_slug, individual_id, ...updates } = body;
 
       if (!id || !organization_slug) {
         return res.status(400).json(failResponse('id and organization_slug are required'));
       }
 
-      const individualId = await getIndividualIdFromAuth(req);
-
-      if (!individualId) {
-        return res.status(401).json(failResponse('Authentication required'));
-      }
+      // Use individual_id from request body (sent by frontend)
+      const individualId = individual_id || null;
 
       console.log('✏️ Updating item:', { id, organization_slug, updates, individualId });
       const result = await controller.updateItem(id, organization_slug, updates, individualId);

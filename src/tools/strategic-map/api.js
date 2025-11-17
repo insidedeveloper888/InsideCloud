@@ -83,12 +83,13 @@ export const loadItems = async (organizationSlug, timeframe = null) => {
 /**
  * Create a new item
  */
-export const createItem = async (organizationSlug, timeframe, rowIndex, colIndex, text) => {
+export const createItem = async (organizationSlug, timeframe, rowIndex, colIndex, text, individualId = null) => {
   const itemData = {
     text,
     status: 'neutral',
     timeframe,
     categoryIndex: rowIndex,
+    individual_id: individualId,
     ...getColIndexFields(timeframe, colIndex)
   };
 
@@ -152,7 +153,7 @@ export const createItem = async (organizationSlug, timeframe, rowIndex, colIndex
 /**
  * Update an item
  */
-export const updateItem = async (organizationSlug, itemId, timeframe, rowIndex, colIndex, updates) => {
+export const updateItem = async (organizationSlug, itemId, timeframe, rowIndex, colIndex, updates, individualId = null) => {
   if (!USE_API) {
     // localStorage mode
     const data = loadFromLocalStorage(organizationSlug);
@@ -172,6 +173,7 @@ export const updateItem = async (organizationSlug, itemId, timeframe, rowIndex, 
   try {
     const response = await axios.put(`${API_BASE}/api/strategic_map_v2?id=${itemId}`, {
       organization_slug: organizationSlug,
+      individual_id: individualId,
       ...updates
     }, {
       withCredentials: true  // Send cookies for authentication

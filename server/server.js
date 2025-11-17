@@ -243,7 +243,10 @@ async function getUserAccessToken(ctx) {
                         
                         if (individual && individual.id) {
                             console.log(`✅ Session: Found individual: id=${individual.id}`)
-                            
+
+                            // Store individual_id in session
+                            ctx.session.individual_id = individual.id
+
                             // Get organization member role
                             const { data: orgMember, error: memberError } = await supabase
                                 .from('organization_members')
@@ -251,7 +254,7 @@ async function getUserAccessToken(ctx) {
                                 .eq('individual_id', individual.id)
                                 .eq('organization_id', ctx.session.organization_id)
                                 .maybeSingle()
-                            
+
                             if (orgMember) {
                                 ctx.session.is_admin = orgMember.role_code === 'admin' || orgMember.role_code === 'owner'
                                 console.log(`✅ Session role RESULT: lark_user_id=${larkUserId}, role_code=${orgMember.role_code}, isAdmin=${ctx.session.is_admin}`)
@@ -261,6 +264,7 @@ async function getUserAccessToken(ctx) {
                             }
                         } else {
                             ctx.session.is_admin = false
+                            ctx.session.individual_id = null
                             console.log(`⚠️ Session: No individual found for auth_user.id=${authUserId}:`, indError)
                         }
                     } else {
@@ -1289,6 +1293,28 @@ router.delete('/api/strategic_map', async (ctx) => {
 router.get('/api/organization', async (ctx) => {
     const organizationHandler = require('../api/organization')
     await organizationHandler(ctx)
+})
+
+// Current user API route
+router.get('/api/current_user', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    try {
+        // Return session info including individual_id
+        const userInfo = {
+            individual_id: ctx.session.individual_id || null,
+            organization_id: ctx.session.organization_id || null,
+            organization_slug: ctx.session.organization_slug || null,
+            is_admin: ctx.session.is_admin || false,
+            lark_user_id: ctx.session.userinfo?.data?.user_id || null,
+        };
+
+        ctx.body = serverUtil.okResponse(userInfo);
+    } catch (error) {
+        console.error('Error getting current user:', error);
+        ctx.body = serverUtil.failResponse('Failed to get current user info');
+    }
 })
 
 // Strategic Map v2 API routes (new backend with auto-cascading)

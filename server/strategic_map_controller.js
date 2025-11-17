@@ -36,8 +36,27 @@ class StrategicMapController {
         throw error;
       }
 
-      // 3. Transform to frontend format
-      const transformedData = this.transformToFrontendFormat(data || []);
+      // 3. Fetch avatar URLs for all creators
+      const items = data || [];
+      const creatorIds = [...new Set(items.map(item => item.created_by_individual_id).filter(Boolean))];
+
+      let avatarMap = {};
+      if (creatorIds.length > 0) {
+        const { data: individuals, error: indError } = await this.supabase
+          .from('individuals')
+          .select('id, avatar_url')
+          .in('id', creatorIds);
+
+        if (!indError && individuals) {
+          avatarMap = individuals.reduce((acc, ind) => {
+            acc[ind.id] = ind.avatar_url;
+            return acc;
+          }, {});
+        }
+      }
+
+      // 4. Transform to frontend format with avatar URLs
+      const transformedData = this.transformToFrontendFormat(items, avatarMap);
 
       return {
         success: true,
@@ -71,11 +90,10 @@ class StrategicMapController {
       }
 
       // 2. Build insert data
-      // Note: created_by_individual_id is left null since we're in organization mode only
-      // The individualId is just the Lark user_id (not a UUID from individuals table)
+      // Use individualId from frontend (UUID from individuals table)
       const insertData = {
         organization_id: org.id,
-        created_by_individual_id: null,  // Organization mode - no individual tracking
+        created_by_individual_id: individualId || null,  // Use provided individual_id
         text: itemData.text,
         status: itemData.status || 'neutral',
         timeframe: itemData.timeframe,
@@ -104,11 +122,25 @@ class StrategicMapController {
       await this.sleep(100);
       const cascadedItems = await this.getCascadedItems(data.id);
 
+      // 5. Fetch creator avatar if available
+      let avatarMap = {};
+      if (individualId) {
+        const { data: individual } = await this.supabase
+          .from('individuals')
+          .select('id, avatar_url')
+          .eq('id', individualId)
+          .maybeSingle();
+
+        if (individual) {
+          avatarMap[individual.id] = individual.avatar_url;
+        }
+      }
+
       return {
         success: true,
         data: {
-          item: this.transformItemToFrontend(data),
-          cascadedItems: cascadedItems.map(item => this.transformItemToFrontend(item))
+          item: this.transformItemToFrontend(data, avatarMap),
+          cascadedItems: cascadedItems.map(item => this.transformItemToFrontend(item, avatarMap))
         }
       };
     } catch (error) {
@@ -134,11 +166,11 @@ class StrategicMapController {
       }
 
       // Build update data
-      // Note: updated_by_individual_id is left null since we're in organization mode only
+      // Use individualId from frontend (UUID from individuals table)
       const updateData = {
         ...updates,
         updated_at: new Date().toISOString(),
-        updated_by_individual_id: null  // Organization mode - no individual tracking
+        updated_by_individual_id: individualId || null  // Use provided individual_id
       };
 
       // Update item
@@ -160,11 +192,25 @@ class StrategicMapController {
       await this.sleep(100);
       const cascadedItems = await this.getCascadedItems(itemId);
 
+      // Fetch creator avatar if available
+      let avatarMap = {};
+      if (data.created_by_individual_id) {
+        const { data: individual } = await this.supabase
+          .from('individuals')
+          .select('id, avatar_url')
+          .eq('id', data.created_by_individual_id)
+          .maybeSingle();
+
+        if (individual) {
+          avatarMap[individual.id] = individual.avatar_url;
+        }
+      }
+
       return {
         success: true,
         data: {
-          item: this.transformItemToFrontend(data),
-          cascadedItems: cascadedItems.map(item => this.transformItemToFrontend(item))
+          item: this.transformItemToFrontend(data, avatarMap),
+          cascadedItems: cascadedItems.map(item => this.transformItemToFrontend(item, avatarMap))
         }
       };
     } catch (error) {
@@ -314,9 +360,10 @@ class StrategicMapController {
    * Transform database rows to frontend format
    * Converts flat rows into nested object keyed by cell position
    * @param {Array} rows - Database rows
+   * @param {Object} avatarMap - Map of individual_id to avatar_url
    * @returns {Object} Frontend format data
    */
-  transformToFrontendFormat(rows) {
+  transformToFrontendFormat(rows, avatarMap = {}) {
     const result = {};
 
     rows.forEach(row => {
@@ -327,7 +374,7 @@ class StrategicMapController {
         result[cellKey] = [];
       }
 
-      result[cellKey].push(this.transformItemToFrontend(row));
+      result[cellKey].push(this.transformItemToFrontend(row, avatarMap));
     });
 
     return result;
@@ -335,8 +382,10 @@ class StrategicMapController {
 
   /**
    * Transform single item to frontend format
+   * @param {Object} row - Database row
+   * @param {Object} avatarMap - Map of individual_id to avatar_url
    */
-  transformItemToFrontend(row) {
+  transformItemToFrontend(row, avatarMap = {}) {
     return {
       id: row.id,
       text: row.text,
@@ -349,7 +398,8 @@ class StrategicMapController {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       createdById: row.created_by_individual_id,
-      updatedById: row.updated_by_individual_id
+      updatedById: row.updated_by_individual_id,
+      creatorAvatarUrl: row.created_by_individual_id ? avatarMap[row.created_by_individual_id] : null
     };
   }
 

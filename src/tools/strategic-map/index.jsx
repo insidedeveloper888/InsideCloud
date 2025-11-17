@@ -215,6 +215,15 @@ const ChecklistItem = ({ item, onToggle, onRemove, onEdit, readOnly }) => {
             <circle cx="10" cy="10" r="8" />
           </svg>
         </div>
+        {/* Creator avatar */}
+        {item.creatorAvatarUrl && (
+          <img
+            src={item.creatorAvatarUrl}
+            alt="Creator"
+            className="w-5 h-5 rounded-full flex-shrink-0 mt-0.5 object-cover"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        )}
         <textarea
           ref={editTextareaRef}
           value={editText}
@@ -239,6 +248,15 @@ const ChecklistItem = ({ item, onToggle, onRemove, onEdit, readOnly }) => {
           <circle cx="10" cy="10" r="8" />
         </svg>
       </button>
+      {/* Creator avatar */}
+      {item.creatorAvatarUrl && (
+        <img
+          src={item.creatorAvatarUrl}
+          alt="Creator"
+          className="w-5 h-5 rounded-full flex-shrink-0 mt-0.5 object-cover"
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+      )}
       <span
         className={cn(
           "flex-1 text-xs leading-tight text-black whitespace-pre-wrap cursor-pointer break-words",
@@ -356,6 +374,10 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   const [data, setData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [organizationId, setOrganizationId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Avatar cache: Map of individual_id -> avatar_url
+  const avatarCacheRef = useRef({});
 
   // Track recent mutations to ignore realtime duplicates
   // Using cell-based tracking instead of ID-based (since IDs aren't known until after API)
@@ -421,6 +443,13 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       setIsLoading(true);
       const loadedData = await StrategicMapAPI.loadItems(organizationSlug);
       setData(loadedData);
+
+      // Populate avatar cache from loaded data
+      Object.values(loadedData).flat().forEach(item => {
+        if (item.createdById && item.creatorAvatarUrl) {
+          avatarCacheRef.current[item.createdById] = item.creatorAvatarUrl;
+        }
+      });
 
       // Auto-discover years from loaded data
       const yearsWithData = new Set();
@@ -520,6 +549,34 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     }
   }, [organizationSlug]);
 
+  // Fetch current user info
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const API_BASE = process.env.REACT_APP_API_BASE || '';
+        console.log('🔍 Fetching current user from:', `${API_BASE}/api/current_user`);
+        const response = await axios.get(`${API_BASE}/api/current_user`, {
+          withCredentials: true  // Send cookies for authentication
+        });
+        console.log('📦 Current user API response:', response);
+        // Backend returns {code: 0, msg: "ok", data: {...}}
+        if (response.data && response.data.code === 0 && response.data.data) {
+          setCurrentUser(response.data.data);
+          console.log('✅ Current user fetched successfully:', response.data.data);
+        } else {
+          console.warn('⚠️  API returned unsuccessful response:', response.data);
+          setCurrentUser(null);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching current user:', error);
+        console.error('Error details:', error.response?.data);
+        setCurrentUser(null);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
   // Load data on mount
   useEffect(() => {
     loadData();
@@ -539,6 +596,16 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       colIndex = row.daily_date_key !== null ? row.daily_date_key : null;
     }
 
+    const createdById = row.createdById || row.created_by_individual_id || null;
+    const creatorAvatarUrl = row.creatorAvatarUrl || row.creator_avatar_url ||
+                             (createdById ? avatarCacheRef.current[createdById] : null) ||
+                             null;
+
+    // Cache the avatar URL for future use
+    if (createdById && creatorAvatarUrl) {
+      avatarCacheRef.current[createdById] = creatorAvatarUrl;
+    }
+
     return {
       id: row.id,
       text: row.text,
@@ -550,6 +617,8 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       parentItemId: row.parent_item_id || null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      creatorAvatarUrl,
+      createdById,
     };
   }, []);
 
@@ -865,7 +934,8 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
     try {
       // API call in background
-      const result = await StrategicMapAPI.createItem(organizationSlug, timeframe, rowIndex, colIndex, text);
+      const individualId = currentUser?.individual_id || null;
+      const result = await StrategicMapAPI.createItem(organizationSlug, timeframe, rowIndex, colIndex, text, individualId);
 
       // Track all cascaded cells IMMEDIATELY (before realtime can arrive)
       if (result.cascadedItems && result.cascadedItems.length > 0) {
@@ -873,6 +943,11 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           trackMutationByCell(item.timeframe, item.rowIndex, item.colIndex, 'INSERT');
           console.log(`🔒 Tracking cascaded mutation: INSERT at ${item.timeframe}_${item.rowIndex}_${item.colIndex}`);
         });
+      }
+
+      // Cache avatar for newly created item
+      if (result.newItem.createdById && result.newItem.creatorAvatarUrl) {
+        avatarCacheRef.current[result.newItem.createdById] = result.newItem.creatorAvatarUrl;
       }
 
       // Replace temporary item with real item from server AND add cascaded items in a single state update
@@ -888,6 +963,11 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         if (result.cascadedItems && result.cascadedItems.length > 0) {
           result.cascadedItems.forEach(cascadedItem => {
             const cascadeKey = `${cascadedItem.timeframe}_${cascadedItem.rowIndex}_${cascadedItem.colIndex}`;
+
+            // Cache avatar for cascaded item
+            if (cascadedItem.createdById && cascadedItem.creatorAvatarUrl) {
+              avatarCacheRef.current[cascadedItem.createdById] = cascadedItem.creatorAvatarUrl;
+            }
 
             // Check if item already exists before adding
             const existingItems = updated[cascadeKey] || [];
@@ -937,10 +1017,10 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
   // Debounced API call for edit operations (500ms delay)
   const debouncedEditAPICall = useRef(
-    debounce(async (organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation) => {
+    debounce(async (organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation, individualId) => {
       try {
         // API call after user stops typing
-        const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText });
+        const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText }, individualId);
         console.log('✅ Edit saved to server (debounced)');
 
         // Track mutation to ignore realtime duplicate
@@ -1011,7 +1091,8 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     }));
 
     // Debounced API call (waits 500ms after user stops editing)
-    debouncedEditAPICall(organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation);
+    const individualId = currentUser?.individual_id || null;
+    debouncedEditAPICall(organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation, individualId);
   };
 
   // Toggle item status (with optimistic updates)
@@ -1039,7 +1120,8 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
     try {
       // API call in background
-      const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { status: newStatus });
+      const individualId = currentUser?.individual_id || null;
+      const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { status: newStatus }, individualId);
 
       // Track mutation to ignore realtime duplicate
       trackMutation(itemId, 'UPDATE');
@@ -1184,12 +1266,26 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-black">战略地图 Strategic Map</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-black">战略地图 Strategic Map</h1>
+            {currentUser && currentUser.individual_id && (
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                Individual ID: {currentUser.individual_id}
+              </span>
+            )}
+            {currentUser && !currentUser.individual_id && (
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                No Individual ID (Organization Mode)
+              </span>
+            )}
+          </div>
           <p className="text-sm text-black mt-1">
             Plan your goals from yearly to daily view
-            {/* <span className={`ml-2 px-2 py-0.5 rounded text-xs ${USE_API ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-              {USE_API ? 'Database Mode' : 'Local Storage Mode'}
-            </span> */}
+            {currentUser && currentUser.display_name && (
+              <span className="ml-2 text-gray-600">
+                • {currentUser.display_name}
+              </span>
+            )}
           </p>
         </div>
 
