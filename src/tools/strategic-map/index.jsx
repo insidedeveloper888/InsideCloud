@@ -40,8 +40,12 @@ const getWeeksInMonth = (year, month) => {
     const weekEnd = new Date(currentDate);
     weekEnd.setDate(weekEnd.getDate() + 6); // Sunday
 
-    // Check if week overlaps with the month
-    if (weekStart.getMonth() === month || weekEnd.getMonth() === month) {
+    // ISO 8601: A week belongs to the month that contains its Thursday
+    const thursday = new Date(weekStart);
+    thursday.setDate(thursday.getDate() + 3); // Monday + 3 = Thursday
+
+    // Only include week if Thursday belongs to this month
+    if (thursday.getMonth() === month && thursday.getFullYear() === year) {
       weeks.push({
         weekNumber: getISOWeek(weekStart),
         startDate: weekStart.toISOString().split('T')[0],
@@ -574,8 +578,28 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     debounce(async (organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData) => {
       try {
         // API call after user stops typing
-        await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText });
+        const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText });
         console.log('✅ Edit saved to server (debounced)');
+
+        // Update cascaded items if present (trigger updates them automatically)
+        if (result.data && result.data.cascadedItems && result.data.cascadedItems.length > 0) {
+          setData(prev => {
+            const updated = { ...prev };
+            result.data.cascadedItems.forEach(cascadedItem => {
+              const cascadedKey = `${cascadedItem.timeframe}_${cascadedItem.rowIndex}_${cascadedItem.colIndex}`;
+              if (!updated[cascadedKey]) {
+                updated[cascadedKey] = [];
+              }
+              // Update existing cascaded item
+              const existingIndex = updated[cascadedKey].findIndex(item => item.id === cascadedItem.id);
+              if (existingIndex !== -1) {
+                updated[cascadedKey][existingIndex] = cascadedItem;
+              }
+            });
+            return updated;
+          });
+          console.log(`✅ Updated ${result.data.cascadedItems.length} cascaded items`);
+        }
       } catch (error) {
         console.error('❌ Failed to edit item - rolling back:', error);
 
@@ -644,7 +668,27 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
     try {
       // API call in background
-      await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { status: newStatus });
+      const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { status: newStatus });
+
+      // Update cascaded items if present (trigger updates them automatically)
+      if (result.data && result.data.cascadedItems && result.data.cascadedItems.length > 0) {
+        setData(prev => {
+          const updated = { ...prev };
+          result.data.cascadedItems.forEach(cascadedItem => {
+            const cascadedKey = `${cascadedItem.timeframe}_${cascadedItem.rowIndex}_${cascadedItem.colIndex}`;
+            if (!updated[cascadedKey]) {
+              updated[cascadedKey] = [];
+            }
+            // Update existing cascaded item
+            const existingIndex = updated[cascadedKey].findIndex(item => item.id === cascadedItem.id);
+            if (existingIndex !== -1) {
+              updated[cascadedKey][existingIndex] = cascadedItem;
+            }
+          });
+          return updated;
+        });
+        console.log(`✅ Updated ${result.data.cascadedItems.length} cascaded item statuses`);
+      }
     } catch (error) {
       console.error('❌ Failed to toggle status - rolling back:', error);
 
@@ -1068,10 +1112,11 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                         </td>
                         {days.map((day, dayIdx) => {
                           const dayColIndex = parseInt(day.date.replace(/-/g, ''));
-                          // Sunday (index 6) gets weekly goals
-                          const cascadedItems = dayIdx === 6 ? getCellItems('weekly', rowIndex, weekNumber) : null;
-                          const isReadOnly = dayIdx === 6;
-                          const displayItems = isReadOnly && cascadedItems ? cascadedItems : getCellItems('daily', rowIndex, dayColIndex);
+                          // With database cascading, daily items are created in DB, so just show them
+                          // Sunday items are marked as read-only (cascaded from weekly)
+                          const dailyItems = getCellItems('daily', rowIndex, dayColIndex);
+                          const isReadOnly = dailyItems.some(item => item.isCascaded);
+                          const displayItems = dailyItems;
 
                           return (
                             <td key={day.date} className={cn(
