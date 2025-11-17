@@ -573,8 +573,10 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         const existing = prev[key] || [];
 
         // Check if item already exists by ID
-        if (existing.some(i => i.id === item.id)) {
-          console.log('⏭️  Item already exists (by ID), skipping:', item.id);
+        const alreadyExists = existing.some(i => i.id === item.id);
+        if (alreadyExists) {
+          console.log('⏭️  Item already exists (by ID), skipping realtime add:', item.id, 'at', key);
+          console.log('   Existing items in cell:', existing.map(i => i.id));
           return prev;
         }
 
@@ -588,7 +590,8 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           };
         }
 
-        console.log('➕ Adding item from realtime:', key, item);
+        console.log('➕ Adding item from realtime:', key, item.id);
+        console.log('   Current items in cell:', existing.map(i => i.id));
         return {
           ...prev,
           [key]: [...existing, item],
@@ -826,6 +829,17 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         );
         trackMutationByCell('daily', rowIndex, sundayDateKey, 'INSERT');
       }
+    } else if (timeframe === 'weekly') {
+      // Weekly cascades to: daily (Sunday of that week)
+      // We need to calculate which day is Sunday for this week
+      // The colIndex for weekly is the week number, but we need the actual date
+      // Since we don't have the full context here, we'll track this after API response
+      // For now, we'll rely on post-API tracking
+      console.log('⚠️  Weekly item: Will track daily cascade after API response');
+    } else if (timeframe === 'monthly') {
+      // Monthly cascades to: weekly (last week), daily (Sunday of last week)
+      // Similar to weekly, we need the actual dates which come from API response
+      console.log('⚠️  Monthly item: Will track weekly/daily cascades after API response');
     }
 
     // Generate temporary ID
@@ -857,28 +871,39 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       if (result.cascadedItems && result.cascadedItems.length > 0) {
         result.cascadedItems.forEach(item => {
           trackMutationByCell(item.timeframe, item.rowIndex, item.colIndex, 'INSERT');
+          console.log(`🔒 Tracking cascaded mutation: INSERT at ${item.timeframe}_${item.rowIndex}_${item.colIndex}`);
         });
       }
 
-      // Replace temporary item with real item from server
-      setData(prev => ({
-        ...prev,
-        [key]: (prev[key] || []).map(item =>
-          item.id === tempId ? result.newItem : item
-        ),
-      }));
+      // Replace temporary item with real item from server AND add cascaded items in a single state update
+      setData(prev => {
+        const updated = { ...prev };
 
-      // Add cascaded items if present
-      if (result.cascadedItems && result.cascadedItems.length > 0) {
-        setData(prev => {
-          const updated = { ...prev };
+        // Replace temp item with real item
+        updated[key] = (updated[key] || []).map(item =>
+          item.id === tempId ? result.newItem : item
+        );
+
+        // Add cascaded items if present
+        if (result.cascadedItems && result.cascadedItems.length > 0) {
           result.cascadedItems.forEach(cascadedItem => {
             const cascadeKey = `${cascadedItem.timeframe}_${cascadedItem.rowIndex}_${cascadedItem.colIndex}`;
-            updated[cascadeKey] = [...(updated[cascadeKey] || []), cascadedItem];
+
+            // Check if item already exists before adding
+            const existingItems = updated[cascadeKey] || [];
+            const alreadyExists = existingItems.some(i => i.id === cascadedItem.id);
+
+            if (!alreadyExists) {
+              updated[cascadeKey] = [...existingItems, cascadedItem];
+              console.log(`➕ Adding cascaded item to state: ${cascadeKey}`, cascadedItem.id);
+            } else {
+              console.log(`⏭️  Cascaded item already exists in state: ${cascadeKey}`, cascadedItem.id);
+            }
           });
-          return updated;
-        });
-      }
+        }
+
+        return updated;
+      });
 
       // If adding a yearly item, ensure the year is in the years array
       if (timeframe === 'yearly' && result.newItem.colIndex !== null) {
