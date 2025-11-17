@@ -745,28 +745,35 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         // API call after user stops typing
         const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText });
         console.log('✅ Edit saved to server (debounced)');
+        console.log('📦 API Response:', result);
 
         // Update cascaded items if present (trigger updates them automatically)
         if (result.data && result.data.cascadedItems && result.data.cascadedItems.length > 0) {
+          console.log('🔄 Processing cascaded items:', result.data.cascadedItems);
           setData(prev => {
             const updated = { ...prev };
             result.data.cascadedItems.forEach(cascadedItem => {
               const cascadedKey = `${cascadedItem.timeframe}_${cascadedItem.rowIndex}_${cascadedItem.colIndex}`;
+              console.log(`🔑 Cascaded item key: ${cascadedKey}`, cascadedItem);
               if (!updated[cascadedKey]) {
                 updated[cascadedKey] = [];
               }
               // Update existing cascaded item or add it if not present
               const existingIndex = updated[cascadedKey].findIndex(item => item.id === cascadedItem.id);
               if (existingIndex !== -1) {
+                console.log(`✏️  Updating existing item at index ${existingIndex} in ${cascadedKey}`);
                 updated[cascadedKey][existingIndex] = cascadedItem;
               } else {
-                // Item doesn't exist in state yet (e.g., daily view not expanded), add it
+                console.log(`➕ Adding new item to ${cascadedKey}`);
                 updated[cascadedKey].push(cascadedItem);
               }
             });
+            console.log('📊 Updated state:', updated);
             return updated;
           });
           console.log(`✅ Updated ${result.data.cascadedItems.length} cascaded items`);
+        } else {
+          console.log('⚠️  No cascaded items in response');
         }
       } catch (error) {
         console.error('❌ Failed to edit item - rolling back:', error);

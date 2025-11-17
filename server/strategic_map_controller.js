@@ -267,20 +267,43 @@ class StrategicMapController {
   }
 
   /**
-   * Get cascaded items for a parent item
+   * Get cascaded items for a parent item (ALL descendants, not just direct children)
    * @param {string} parentItemId
-   * @returns {Array} Cascaded items
+   * @returns {Array} Cascaded items (all descendants recursively)
    */
   async getCascadedItems(parentItemId) {
     try {
-      const { data, error } = await this.supabase
-        .from('strategic_map_items')
-        .select('*')
-        .eq('parent_item_id', parentItemId)
-        .eq('is_deleted', false);
+      // Fetch all descendants recursively using multiple queries
+      // (Supabase doesn't support recursive CTEs directly, so we do it iteratively)
+      const allDescendants = [];
+      let currentLevelIds = [parentItemId];
+      let depth = 0;
+      const maxDepth = 10; // Safety limit to prevent infinite loops
 
-      if (error) throw error;
-      return data || [];
+      while (currentLevelIds.length > 0 && depth < maxDepth) {
+        // Fetch children of current level
+        const { data, error } = await this.supabase
+          .from('strategic_map_items')
+          .select('*')
+          .in('parent_item_id', currentLevelIds)
+          .eq('is_deleted', false);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          break; // No more children
+        }
+
+        // Add to results
+        allDescendants.push(...data);
+
+        // Prepare next level (children IDs become parents for next iteration)
+        currentLevelIds = data.map(item => item.id);
+        depth++;
+      }
+
+      console.log(`📊 Fetched ${allDescendants.length} descendants for item ${parentItemId} (depth: ${depth})`);
+      return allDescendants;
     } catch (error) {
       console.error('Error fetching cascaded items:', error);
       return [];
