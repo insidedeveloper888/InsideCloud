@@ -13,7 +13,7 @@ const categories = [
   '客户市场',  // Customer Market
   '内部系统',  // Internal Systems
   '人才资本',  // Human Capital
-  '学习成长',  // Learning & Growth
+  '学习成长',  // Learning & Growth 
 ];
 
 // Helper: Get ISO week number
