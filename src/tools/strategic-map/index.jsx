@@ -357,6 +357,25 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [organizationId, setOrganizationId] = useState(null);
 
+  // Track recent mutations to ignore realtime duplicates
+  const recentMutationsRef = useRef(new Set());
+
+  // Helper to track mutation and auto-clear after delay
+  const trackMutation = useCallback((itemId, operation = 'any') => {
+    const key = `${operation}_${itemId}`;
+    recentMutationsRef.current.add(key);
+
+    // Auto-clear after 3 seconds (enough time for realtime to arrive)
+    setTimeout(() => {
+      recentMutationsRef.current.delete(key);
+    }, 3000);
+  }, []);
+
+  // Helper to check if mutation was recent
+  const isRecentMutation = useCallback((itemId, operation = 'any') => {
+    return recentMutationsRef.current.has(`${operation}_${itemId}`);
+  }, []);
+
   // Get today's date info for auto-expansion
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -508,6 +527,12 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     console.log('📡 Processing realtime event:', eventType, newRecord || oldRecord);
 
     if (eventType === 'INSERT' && newRecord) {
+      // Check if this is our own mutation
+      if (isRecentMutation(newRecord.id, 'INSERT')) {
+        console.log('⏭️  Skipping INSERT realtime event (our own mutation):', newRecord.id);
+        return;
+      }
+
       // Another user created an item
       const item = transformItemToFrontend(newRecord);
       const key = `${item.timeframe}_${item.rowIndex}_${item.colIndex}`;
@@ -516,6 +541,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         // Check if item already exists (avoid duplicates from our own actions)
         const existing = prev[key] || [];
         if (existing.some(i => i.id === item.id)) {
+          console.log('⏭️  Item already exists, skipping:', item.id);
           return prev; // Already have this item
         }
 
@@ -526,6 +552,12 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         };
       });
     } else if (eventType === 'UPDATE' && newRecord) {
+      // Check if this is our own mutation
+      if (isRecentMutation(newRecord.id, 'UPDATE')) {
+        console.log('⏭️  Skipping UPDATE realtime event (our own mutation):', newRecord.id);
+        return;
+      }
+
       // Another user updated an item
       const item = transformItemToFrontend(newRecord);
       const key = `${item.timeframe}_${item.rowIndex}_${item.colIndex}`;
@@ -552,6 +584,12 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         };
       });
     } else if (eventType === 'DELETE' && oldRecord) {
+      // Check if this is our own mutation
+      if (isRecentMutation(oldRecord.id, 'DELETE')) {
+        console.log('⏭️  Skipping DELETE realtime event (our own mutation):', oldRecord.id);
+        return;
+      }
+
       // Another user deleted an item (soft delete)
       const item = transformItemToFrontend(oldRecord);
       const key = `${item.timeframe}_${item.rowIndex}_${item.colIndex}`;
@@ -565,7 +603,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         };
       });
     }
-  }, [transformItemToFrontend]);
+  }, [transformItemToFrontend, isRecentMutation]);
 
   // Subscribe to realtime updates
   useRealtimeSync(organizationId, handleRealtimeUpdate);
@@ -707,6 +745,9 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       // API call in background
       const result = await StrategicMapAPI.createItem(organizationSlug, timeframe, rowIndex, colIndex, text);
 
+      // Track mutation to ignore realtime duplicate
+      trackMutation(result.newItem.id, 'INSERT');
+
       // Replace temporary item with real item from server
       setData(prev => ({
         ...prev,
@@ -717,6 +758,9 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
       // Add cascaded items if present
       if (result.cascadedItems && result.cascadedItems.length > 0) {
+        // Track all cascaded items too
+        result.cascadedItems.forEach(item => trackMutation(item.id, 'INSERT'));
+
         setData(prev => {
           const updated = { ...prev };
           result.cascadedItems.forEach(cascadedItem => {
@@ -759,14 +803,20 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
   // Debounced API call for edit operations (500ms delay)
   const debouncedEditAPICall = useRef(
-    debounce(async (organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData) => {
+    debounce(async (organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation) => {
       try {
         // API call after user stops typing
         const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText });
         console.log('✅ Edit saved to server (debounced)');
 
+        // Track mutation to ignore realtime duplicate
+        trackMutation(itemId, 'UPDATE');
+
         // Update cascaded items if present (trigger updates them automatically)
         if (result.data && result.data.cascadedItems && result.data.cascadedItems.length > 0) {
+          // Track all cascaded items too
+          result.data.cascadedItems.forEach(item => trackMutation(item.id, 'UPDATE'));
+
           setData(prev => {
             const updated = { ...prev };
             result.data.cascadedItems.forEach(cascadedItem => {
@@ -827,7 +877,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     }));
 
     // Debounced API call (waits 500ms after user stops editing)
-    debouncedEditAPICall(organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData);
+    debouncedEditAPICall.current(organizationSlug, itemId, timeframe, rowIndex, colIndex, newText, oldText, key, setData, trackMutation);
   };
 
   // Toggle item status (with optimistic updates)
@@ -857,8 +907,14 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       // API call in background
       const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { status: newStatus });
 
+      // Track mutation to ignore realtime duplicate
+      trackMutation(itemId, 'UPDATE');
+
       // Update cascaded items if present (trigger updates them automatically)
       if (result.data && result.data.cascadedItems && result.data.cascadedItems.length > 0) {
+        // Track all cascaded items too
+        result.data.cascadedItems.forEach(item => trackMutation(item.id, 'UPDATE'));
+
         setData(prev => {
           const updated = { ...prev };
           result.data.cascadedItems.forEach(cascadedItem => {
@@ -915,6 +971,9 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     try {
       // API call in background
       await StrategicMapAPI.deleteItem(organizationSlug, itemId, timeframe, rowIndex, colIndex);
+
+      // Track mutation to ignore realtime duplicate
+      trackMutation(itemId, 'DELETE');
     } catch (error) {
       console.error('❌ Failed to remove item - rolling back:', error);
 
@@ -976,8 +1035,6 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     setExpandedWeeks({ [weekKey]: !isCurrentlyExpanded });
   };
 
-  const USE_API = process.env.REACT_APP_USE_STRATEGIC_MAP_API === 'true';
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
@@ -996,9 +1053,9 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           <h1 className="text-2xl font-bold text-black">战略地图 Strategic Map</h1>
           <p className="text-sm text-black mt-1">
             Plan your goals from yearly to daily view
-            <span className={`ml-2 px-2 py-0.5 rounded text-xs ${USE_API ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+            {/* <span className={`ml-2 px-2 py-0.5 rounded text-xs ${USE_API ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
               {USE_API ? 'Database Mode' : 'Local Storage Mode'}
-            </span>
+            </span> */}
           </p>
         </div>
 
@@ -1039,32 +1096,38 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                       onMouseEnter={() => setHoveredYearIndex(index)}
                       onMouseLeave={() => setHoveredYearIndex(-1)}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center justify-center gap-2 flex-1">
-                          {expandedYears[year] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                          <span>{year}</span>
-                        </div>
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        {/* Eye icon - always on the left */}
                         <button
                           onClick={(e) => toggleYearVisibility(year, e)}
-                          className="p-1 hover:bg-blue-800 rounded transition-colors"
+                          className="p-1 hover:bg-blue-800 rounded transition-colors flex-shrink-0"
                           title="Hide this year"
                         >
                           <EyeOff size={14} />
                         </button>
+
+                        {/* Year text in center */}
+                        <div className="flex items-center justify-center gap-2 flex-1">
+                          {expandedYears[year] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                          <span>{year}</span>
+                        </div>
+
+                        {/* Add Year Button - on the right, only on last column when hovering */}
+                        <div className="w-6 flex-shrink-0">
+                          {index === visibleYears.length - 1 && hoveredYearIndex === index && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddYear();
+                              }}
+                              className="p-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                              title="Add new year"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {/* Add Year Button - show on last visible year hover */}
-                      {index === visibleYears.length - 1 && hoveredYearIndex === index && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddYear();
-                          }}
-                          className="absolute top-2 right-2 p-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
-                          title="Add new year"
-                        >
-                          <Plus size={16} />
-                        </button>
-                      )}
                     </th>
                   ))}
                 </tr>
