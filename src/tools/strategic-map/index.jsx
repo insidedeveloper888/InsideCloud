@@ -740,9 +740,10 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     }
 
     // Filter weekly items to only those whose parent is this month's item
+    // OR standalone items (parentItemId === null) which should always be shown
     const monthlyItemIds = monthlyItems.map(item => item.id);
     const filteredWeeklyItems = allWeeklyItems.filter(item =>
-      monthlyItemIds.includes(item.parentItemId)
+      monthlyItemIds.includes(item.parentItemId) || item.parentItemId === null
     );
 
     return filteredWeeklyItems;
