@@ -646,7 +646,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         };
       });
     }
-  }, [transformItemToFrontend, isRecentMutation]);
+  }, [transformItemToFrontend, isRecentMutation, isRecentMutationForCell]);
 
   // Subscribe to realtime updates
   useRealtimeSync(organizationId, handleRealtimeUpdate);
