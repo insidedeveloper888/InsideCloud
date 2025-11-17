@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import * as StrategicMapAPI from './api';
 import { useRealtimeSync } from './hooks/useRealtimeSync';
@@ -390,6 +390,18 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           const allYears = new Set([...prev, ...yearsWithData]);
           return Array.from(allYears).sort((a, b) => a - b);
         });
+
+        // Auto-hide years outside the default range
+        const defaultRange = Array.from({ length: 5 }, (_, i) => currentYear + i);
+        setHiddenYears(prev => {
+          const newHidden = new Set(prev);
+          yearsWithData.forEach(year => {
+            if (!defaultRange.includes(year)) {
+              newHidden.add(year);
+            }
+          });
+          return newHidden;
+        });
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -415,6 +427,18 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         setYears(prev => {
           const allYears = new Set([...prev, ...yearsWithData]);
           return Array.from(allYears).sort((a, b) => a - b);
+        });
+
+        // Auto-hide years outside the default range
+        const defaultRange = Array.from({ length: 5 }, (_, i) => currentYear + i);
+        setHiddenYears(prev => {
+          const newHidden = new Set(prev);
+          yearsWithData.forEach(year => {
+            if (!defaultRange.includes(year)) {
+              newHidden.add(year);
+            }
+          });
+          return newHidden;
         });
       }
     } finally {
@@ -561,28 +585,17 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   const [expandedWeeks, setExpandedWeeks] = useState({ [`${getTodayWeekStart()}_${currentWeek}`]: true });
   const [hoveredYearIndex, setHoveredYearIndex] = useState(-1);
 
-  // Years state - dynamically managed
+  // Years state - all years including discovered and manually added
   const [years, setYears] = useState(() => Array.from({ length: 5 }, (_, i) => currentYear + i));
+
+  // Hidden years state - tracks which years are hidden from view
+  const [hiddenYears, setHiddenYears] = useState(new Set());
+
+  // Visible years - filter out hidden years
+  const visibleYears = years.filter(year => !hiddenYears.has(year));
 
   // Ref for yearly table scroll container
   const yearlyScrollRef = useRef(null);
-
-  // Auto-scroll to show current year + 4 years (hide extra years added by user)
-  useEffect(() => {
-    if (yearlyScrollRef.current && years.length > 5) {
-      // Find the index of current year
-      const currentYearIndex = years.indexOf(currentYear);
-
-      if (currentYearIndex > 0) {
-        // Scroll to show current year at the start
-        // Each year column is 200px wide + 2px border
-        const columnWidth = 202; // 200px + 2px border
-        const scrollPosition = currentYearIndex * columnWidth;
-
-        yearlyScrollRef.current.scrollLeft = scrollPosition;
-      }
-    }
-  }, [years, currentYear]);
 
   // Months
   const months = [
@@ -723,6 +736,12 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           }
           return prev;
         });
+
+        // Auto-hide if outside default range
+        const defaultRange = Array.from({ length: 5 }, (_, i) => currentYear + i);
+        if (!defaultRange.includes(year)) {
+          setHiddenYears(prev => new Set([...prev, year]));
+        }
       }
     } catch (error) {
       console.error('❌ Failed to add item - rolling back:', error);
@@ -745,35 +764,28 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         // API call after user stops typing
         const result = await StrategicMapAPI.updateItem(organizationSlug, itemId, timeframe, rowIndex, colIndex, { text: newText });
         console.log('✅ Edit saved to server (debounced)');
-        console.log('📦 API Response:', result);
 
         // Update cascaded items if present (trigger updates them automatically)
         if (result.data && result.data.cascadedItems && result.data.cascadedItems.length > 0) {
-          console.log('🔄 Processing cascaded items:', result.data.cascadedItems);
           setData(prev => {
             const updated = { ...prev };
             result.data.cascadedItems.forEach(cascadedItem => {
               const cascadedKey = `${cascadedItem.timeframe}_${cascadedItem.rowIndex}_${cascadedItem.colIndex}`;
-              console.log(`🔑 Cascaded item key: ${cascadedKey}`, cascadedItem);
               if (!updated[cascadedKey]) {
                 updated[cascadedKey] = [];
               }
               // Update existing cascaded item or add it if not present
               const existingIndex = updated[cascadedKey].findIndex(item => item.id === cascadedItem.id);
               if (existingIndex !== -1) {
-                console.log(`✏️  Updating existing item at index ${existingIndex} in ${cascadedKey}`);
                 updated[cascadedKey][existingIndex] = cascadedItem;
               } else {
-                console.log(`➕ Adding new item to ${cascadedKey}`);
+                // Item doesn't exist in state yet (e.g., daily view not expanded), add it
                 updated[cascadedKey].push(cascadedItem);
               }
             });
-            console.log('📊 Updated state:', updated);
             return updated;
           });
           console.log(`✅ Updated ${result.data.cascadedItems.length} cascaded items`);
-        } else {
-          console.log('⚠️  No cascaded items in response');
         }
       } catch (error) {
         console.error('❌ Failed to edit item - rolling back:', error);
@@ -933,6 +945,20 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     setExpandedWeeks({});
   };
 
+  // Toggle year visibility (hide/show column)
+  const toggleYearVisibility = (year, event) => {
+    event.stopPropagation(); // Prevent triggering the expansion toggle
+    setHiddenYears(prev => {
+      const newHidden = new Set(prev);
+      if (newHidden.has(year)) {
+        newHidden.delete(year);
+      } else {
+        newHidden.add(year);
+      }
+      return newHidden;
+    });
+  };
+
   // Toggle month expansion - close all weekly and daily views
   const toggleMonth = (year, monthIndex) => {
     const monthKey = `${year}-${monthIndex}`;
@@ -976,6 +1002,26 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           </p>
         </div>
 
+        {/* Hidden Years Section */}
+        {hiddenYears.size > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-yellow-800 font-medium">Hidden years:</span>
+              {Array.from(hiddenYears).sort((a, b) => a - b).map(year => (
+                <button
+                  key={year}
+                  onClick={(e) => toggleYearVisibility(year, e)}
+                  className="flex items-center gap-1 px-2 py-1 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded text-sm text-yellow-900 transition-colors"
+                  title="Click to show this year"
+                >
+                  <Eye size={14} />
+                  <span>{year}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Yearly View */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
           <div ref={yearlyScrollRef} className="overflow-x-auto">
@@ -985,7 +1031,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <th className="border border-gray-300 p-3 text-left font-semibold w-[150px] sticky left-0 bg-blue-600 z-10">
                     项目
                   </th>
-                  {years.map((year, index) => (
+                  {visibleYears.map((year, index) => (
                     <th
                       key={year}
                       className="border border-gray-300 p-3 text-center font-semibold w-[200px] max-w-[200px] cursor-pointer hover:bg-blue-700 transition-colors relative"
@@ -993,12 +1039,21 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                       onMouseEnter={() => setHoveredYearIndex(index)}
                       onMouseLeave={() => setHoveredYearIndex(-1)}
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        {expandedYears[year] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                        <span>{year}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-center gap-2 flex-1">
+                          {expandedYears[year] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                          <span>{year}</span>
+                        </div>
+                        <button
+                          onClick={(e) => toggleYearVisibility(year, e)}
+                          className="p-1 hover:bg-blue-800 rounded transition-colors"
+                          title="Hide this year"
+                        >
+                          <EyeOff size={14} />
+                        </button>
                       </div>
-                      {/* Add Year Button - show on last year hover */}
-                      {index === years.length - 1 && hoveredYearIndex === index && (
+                      {/* Add Year Button - show on last visible year hover */}
+                      {index === visibleYears.length - 1 && hoveredYearIndex === index && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1020,17 +1075,21 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                     <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black break-words">
                       {category}
                     </td>
-                    {years.map((year, yearIndex) => (
-                      <td key={year} className="border border-gray-300 align-top w-[200px] max-w-[200px] break-words">
-                        <Cell
-                          items={getCellItems('yearly', rowIndex, yearIndex)}
-                          onAddItem={(text) => handleAddItem('yearly', rowIndex, yearIndex, text)}
-                          onToggleStatus={(itemId, status) => handleToggleStatus('yearly', rowIndex, yearIndex, itemId, status)}
-                          onRemoveItem={(itemId) => handleRemoveItem('yearly', rowIndex, yearIndex, itemId)}
-                          onEditItem={(itemId, text) => handleEditItem('yearly', rowIndex, yearIndex, itemId, text)}
-                        />
-                      </td>
-                    ))}
+                    {visibleYears.map((year) => {
+                      // Find the actual index in the full years array for colIndex calculation
+                      const actualYearIndex = year - currentYear;
+                      return (
+                        <td key={year} className="border border-gray-300 align-top w-[200px] max-w-[200px] break-words">
+                          <Cell
+                            items={getCellItems('yearly', rowIndex, actualYearIndex)}
+                            onAddItem={(text) => handleAddItem('yearly', rowIndex, actualYearIndex, text)}
+                            onToggleStatus={(itemId, status) => handleToggleStatus('yearly', rowIndex, actualYearIndex, itemId, status)}
+                            onRemoveItem={(itemId) => handleRemoveItem('yearly', rowIndex, actualYearIndex, itemId)}
+                            onEditItem={(itemId, text) => handleEditItem('yearly', rowIndex, actualYearIndex, itemId, text)}
+                          />
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
