@@ -363,15 +363,58 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
       setIsLoading(true);
       const loadedData = await StrategicMapAPI.loadItems(organizationSlug);
       setData(loadedData);
+
+      // Auto-discover years from loaded data
+      const yearsWithData = new Set();
+      Object.keys(loadedData).forEach(key => {
+        if (key.startsWith('yearly_')) {
+          const items = loadedData[key];
+          items.forEach(item => {
+            if (item.colIndex !== null) {
+              const year = currentYear + item.colIndex; // year_index 0 = current year
+              yearsWithData.add(year);
+            }
+          });
+        }
+      });
+
+      // Add years with data to the years array (if not already included)
+      if (yearsWithData.size > 0) {
+        setYears(prev => {
+          const allYears = new Set([...prev, ...yearsWithData]);
+          return Array.from(allYears).sort((a, b) => a - b);
+        });
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
       // Fallback to localStorage
       const localData = StrategicMapAPI.loadFromLocalStorage(organizationSlug);
       setData(localData);
+
+      // Auto-discover years from local data too
+      const yearsWithData = new Set();
+      Object.keys(localData).forEach(key => {
+        if (key.startsWith('yearly_')) {
+          const items = localData[key];
+          items.forEach(item => {
+            if (item.colIndex !== null) {
+              const year = currentYear + item.colIndex;
+              yearsWithData.add(year);
+            }
+          });
+        }
+      });
+
+      if (yearsWithData.size > 0) {
+        setYears(prev => {
+          const allYears = new Set([...prev, ...yearsWithData]);
+          return Array.from(allYears).sort((a, b) => a - b);
+        });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [organizationSlug]);
+  }, [organizationSlug, currentYear]);
 
   // Fetch organization ID for realtime filtering
   useEffect(() => {
@@ -521,6 +564,26 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   // Years state - dynamically managed
   const [years, setYears] = useState(() => Array.from({ length: 5 }, (_, i) => currentYear + i));
 
+  // Ref for yearly table scroll container
+  const yearlyScrollRef = useRef(null);
+
+  // Auto-scroll to show current year + 4 years (hide extra years added by user)
+  useEffect(() => {
+    if (yearlyScrollRef.current && years.length > 5) {
+      // Find the index of current year
+      const currentYearIndex = years.indexOf(currentYear);
+
+      if (currentYearIndex > 0) {
+        // Scroll to show current year at the start
+        // Each year column is 200px wide + 2px border
+        const columnWidth = 202; // 200px + 2px border
+        const scrollPosition = currentYearIndex * columnWidth;
+
+        yearlyScrollRef.current.scrollLeft = scrollPosition;
+      }
+    }
+  }, [years, currentYear]);
+
   // Months
   const months = [
     { index: 0, name: 'Jan', fullName: 'January' },
@@ -650,6 +713,17 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
           return updated;
         });
       }
+
+      // If adding a yearly item, ensure the year is in the years array
+      if (timeframe === 'yearly' && result.newItem.colIndex !== null) {
+        const year = currentYear + result.newItem.colIndex;
+        setYears(prev => {
+          if (!prev.includes(year)) {
+            return [...prev, year].sort((a, b) => a - b);
+          }
+          return prev;
+        });
+      }
     } catch (error) {
       console.error('❌ Failed to add item - rolling back:', error);
 
@@ -681,10 +755,13 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
               if (!updated[cascadedKey]) {
                 updated[cascadedKey] = [];
               }
-              // Update existing cascaded item
+              // Update existing cascaded item or add it if not present
               const existingIndex = updated[cascadedKey].findIndex(item => item.id === cascadedItem.id);
               if (existingIndex !== -1) {
                 updated[cascadedKey][existingIndex] = cascadedItem;
+              } else {
+                // Item doesn't exist in state yet (e.g., daily view not expanded), add it
+                updated[cascadedKey].push(cascadedItem);
               }
             });
             return updated;
@@ -770,10 +847,13 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
             if (!updated[cascadedKey]) {
               updated[cascadedKey] = [];
             }
-            // Update existing cascaded item
+            // Update existing cascaded item or add it if not present
             const existingIndex = updated[cascadedKey].findIndex(item => item.id === cascadedItem.id);
             if (existingIndex !== -1) {
               updated[cascadedKey][existingIndex] = cascadedItem;
+            } else {
+              // Item doesn't exist in state yet (e.g., daily view not expanded), add it
+              updated[cascadedKey].push(cascadedItem);
             }
           });
           return updated;
@@ -891,7 +971,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
         {/* Yearly View */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-          <div className="overflow-x-auto">
+          <div ref={yearlyScrollRef} className="overflow-x-auto">
             <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="bg-blue-600 text-white">
