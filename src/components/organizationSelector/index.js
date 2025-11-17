@@ -142,7 +142,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
             Select Organization
           </h2>
           <p className="text-gray-600 text-sm">
-            Enter your organization identifier to continue
+            Enter your organization to continue
           </p>
         </div>
 
@@ -153,7 +153,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
               htmlFor="org-slug"
               className="block font-semibold text-gray-800 mb-2 text-sm"
             >
-              Organization Slug
+              Organization
             </label>
 
             {/* Input wrapper with icon */}
@@ -163,7 +163,6 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
                 type="text"
                 value={organizationSlug || ''}
                 onChange={handleSlugChange}
-                placeholder="e.g., cloud, inside"
                 className={cn(
                   "w-full px-4 pr-12 py-3 border-2 rounded-lg text-base text-gray-900 bg-white transition-all",
                   "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#667eea]/20",
@@ -229,7 +228,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
         </form>
 
         {/* Help section */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-[#667eea]">
+        {/* <div className="mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-[#667eea]">
           <p className="text-sm text-gray-700 font-medium mb-2">
             <strong>Available organizations:</strong>
           </p>
@@ -247,7 +246,7 @@ const OrganizationSelector = ({ onOrganizationSelected }) => {
               - Inside Organization
             </li>
           </ul>
-        </div>
+        </div> */}
       </motion.div>
     </div>
   );

@@ -121,23 +121,56 @@ After authentication:
 4. Sets `session.is_admin = (role_code === 'admin' || role_code === 'owner')`
 5. Frontend checks `isAdmin` to show/hide admin features
 
-### Database-Driven Strategic Map Cascading
+### Strategic Map - Production Ready ✅
 
-The strategic map feature uses **PostgreSQL triggers** for cascading logic instead of application code.
+**Status**: Production-ready as of 2025-11-17 (v2.2.0)
+
+The strategic map feature is a **fully database-driven, real-time collaborative goal planning tool** with automatic cascading from yearly to daily views.
+
+**Key Features:**
+- ✅ Full CRUD operations with database persistence
+- ✅ PostgreSQL triggers for automatic cascade creation and updates
+- ✅ Supabase Realtime for multi-user collaboration
+- ✅ Smart deduplication to prevent duplicate items from realtime events
+- ✅ Optimistic updates with automatic rollback on errors
+- ✅ Advanced year management (auto-discovery, hide/show, default 5-year view)
+- ✅ Clickable hyperlinks in goal text
+- ✅ ISO 8601 compliant weekly view
+- ✅ Timezone-aware date formatting
 
 **Cascade Hierarchy:**
-- Yearly goals → Last monthly goal of year (December)
-- Monthly goals → Last weekly goal of month
-- Weekly goals → Last daily goal of week
+- Yearly goals → December monthly goal → Last week of December → Sunday of last week
+- Cascade creates 4 database records automatically via triggers
+- Updates propagate to all descendants recursively
+- Frontend displays pre-cascaded data from database
 
-**Why Database Triggers:**
-- Ensures consistency across all clients
-- Prevents race conditions
-- Simplifies frontend logic (no complex cascade algorithms)
-- Automatic parent-child relationship tracking via `parent_item_id`
+**Real-Time Collaboration:**
+- Supabase Realtime subscription broadcasts INSERT/UPDATE/DELETE events
+- Cell-based mutation tracking prevents duplicates from own actions
+- Changes from other users appear instantly across all clients
+- Optimistic updates provide instant feedback while API processes in background
 
-**Frontend Pattern:**
-After creating/editing strategic map items, silently refresh all related views (yearly, monthly, weekly, daily) to display database-generated cascades.
+**Architecture:**
+```
+User Action
+  ↓
+Frontend (Optimistic Update)
+  ↓
+API Call → Backend Controller
+  ↓
+Database (Trigger Cascade)
+  ↓
+Realtime Broadcast
+  ↓
+All Connected Clients (Update UI)
+```
+
+**Implementation Files:**
+- **Backend**: `server/strategic_map_controller.js` (full CRUD with cascade support)
+- **Frontend**: `src/tools/strategic-map/index.jsx` (1,400+ lines, main orchestrator)
+- **Realtime Hook**: `src/tools/strategic-map/hooks/useRealtimeSync.js`
+- **API Client**: `src/tools/strategic-map/api.js`
+- **Database Triggers**: SQL functions for cascade creation and updates
 
 ### Hybrid Deployment Architecture
 
@@ -159,16 +192,32 @@ Logic is duplicated between `server/server.js` (Koa) and `/api/*.js` (Vercel) to
 ### 1. Organization-Specific App IDs
 Each organization can have different Lark app credentials. The frontend stores the organization-specific `app_id` in localStorage and uses it for JSAPI calls.
 
-### 2. Silent Cascade Refresh
-After CRUD operations on strategic map items:
+### 2. Optimistic Updates with Cascade Support
+Strategic Map uses optimistic updates for instant UX feedback:
 ```javascript
-// Update item
-await axios.put('/api/strategic_map', { ... });
-// Silent refresh to display database-generated cascades
-await fetchYearlyGoals();
-await fetchMonthlyGoals();
-await fetchWeeklyGoals();
-await fetchDailyGoals();
+// Optimistic: Update UI immediately
+setData(prev => ({
+  ...prev,
+  [key]: prev[key].map(item => item.id === id ? { ...item, text: newText } : item)
+}));
+
+// API: Send to backend
+const result = await StrategicMapAPI.updateItem(...);
+
+// Cascade: Update all descendants returned by database trigger
+if (result.data.cascadedItems) {
+  result.data.cascadedItems.forEach(cascadedItem => {
+    updateItemInState(cascadedItem);
+  });
+}
+
+// Rollback: If API fails, revert to old value
+catch (error) {
+  setData(prev => ({
+    ...prev,
+    [key]: prev[key].map(item => item.id === id ? { ...item, text: oldText } : item)
+  }));
+}
 ```
 
 ### 3. User Sync on Login
@@ -268,6 +317,19 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. Key decisions:
 
 - **ADR-001**: Tool-based project structure (`/src/tools/`)
 - **ADR-002**: Tailwind CSS + shadcn/ui (replacing Material-UI)
-- **ADR-003**: Database triggers for strategic map cascading
+- **ADR-003**: Client-side storage first, database sync later (completed in v2.2.0)
 - **ADR-004**: Hybrid deployment (Koa dev + Vercel production)
-- **ADR-005**: Strategic map v2 pattern over component-based
+- **ADR-005**: Auto-expanding textarea with fixed-width columns
+- **ADR-006**: Strategic map cascading - client-side pattern (migrated to database in v2.2.0)
+
+## Recent Major Milestones
+
+### ✅ Strategic Map v2.2.0 - Production Ready (2025-11-17)
+- Full migration from localStorage to database-driven architecture
+- PostgreSQL triggers for automatic cascading
+- Supabase Realtime for multi-user collaboration
+- Smart deduplication system to prevent duplicate items
+- Advanced year management with auto-discovery
+- Enterprise-grade features: hyperlinks, ISO 8601 compliance, timezone handling
+
+For complete details, see [ARCHITECTURE.md - Change Log v2.2.0](ARCHITECTURE.md#220---2025-11-17--strategic-map-production-ready)

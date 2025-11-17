@@ -595,7 +595,32 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         };
       });
     } else if (eventType === 'UPDATE' && newRecord) {
-      // Check if this is our own mutation
+      // Check if this is a soft delete (is_deleted = true)
+      if (newRecord.is_deleted === true) {
+        // Treat soft delete as DELETE event
+        console.log('🗑️  Detected soft delete via UPDATE event:', newRecord.id);
+
+        // Check if this is our own mutation
+        if (isRecentMutation(newRecord.id, 'DELETE')) {
+          console.log('⏭️  Skipping soft delete realtime event (our own mutation):', newRecord.id);
+          return;
+        }
+
+        const item = transformItemToFrontend(newRecord);
+        const key = `${item.timeframe}_${item.rowIndex}_${item.colIndex}`;
+
+        console.log('🗑️  Removing soft-deleted item from realtime:', key, item.id);
+        setData(prev => {
+          const cellItems = prev[key] || [];
+          return {
+            ...prev,
+            [key]: cellItems.filter(i => i.id !== item.id),
+          };
+        });
+        return;
+      }
+
+      // Check if this is our own mutation (normal update)
       if (isRecentMutation(newRecord.id, 'UPDATE')) {
         console.log('⏭️  Skipping UPDATE realtime event (our own mutation):', newRecord.id);
         return;

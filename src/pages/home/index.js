@@ -71,27 +71,33 @@ const DashboardContent = ({ onNavigate }) => (
           战略地图
         </h3>
       </div>
-      <div
-        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
-        // onClick={() => onNavigate && onNavigate('strategic_map')}
-      >
+      <div className="relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm opacity-60">
         <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
           <SheetIcon size={56} />
         </div>
         <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
           工作规格
         </h3>
+        {/* Coming Soon Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-3xl backdrop-blur-[2px]">
+          <div className="bg-gradient-to-r from-primary-500 to-purple-600 text-black px-6 py-3 rounded-full shadow-lg">
+            <p className="text-sm md:text-base font-semibold">Coming Soon</p>
+          </div>
+        </div>
       </div>
-      <div
-        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
-        // onClick={() => onNavigate && onNavigate('strategic_map')}
-      >
+      <div className="relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm opacity-60">
         <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
           <PromotionIcon size={56} />
         </div>
         <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
           晋升机制
         </h3>
+        {/* Coming Soon Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-3xl backdrop-blur-[2px]">
+          <div className="bg-gradient-to-r from-primary-500 to-purple-600 text-black px-6 py-3 rounded-full shadow-lg">
+            <p className="text-sm md:text-base font-semibold">Coming Soon</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
