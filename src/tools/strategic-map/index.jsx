@@ -543,6 +543,29 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
     return data[key] || [];
   };
 
+  // Get weekly items filtered by their parent monthly item (to avoid mixing years)
+  const getWeeklyItemsForMonth = (rowIndex, weekNumber, year, monthIndex) => {
+    // Get all weekly items with this week number
+    const allWeeklyItems = getCellItems('weekly', rowIndex, weekNumber);
+
+    // Get the monthly item for this specific year-month
+    const monthColIndex = parseInt(year) * 12 + monthIndex;
+    const monthlyItems = getCellItems('monthly', rowIndex, monthColIndex);
+
+    if (monthlyItems.length === 0) {
+      // No monthly item exists, show all weekly items (fallback)
+      return allWeeklyItems;
+    }
+
+    // Filter weekly items to only those whose parent is this month's item
+    const monthlyItemIds = monthlyItems.map(item => item.id);
+    const filteredWeeklyItems = allWeeklyItems.filter(item =>
+      monthlyItemIds.includes(item.parentItemId)
+    );
+
+    return filteredWeeklyItems;
+  };
+
   // CASCADE LOGIC: Get cascaded items from parent timeframe
   const getCascadedItems = (timeframe, rowIndex, year, monthIndex, weekNumber) => {
     if (timeframe === 'monthly') {
@@ -1115,7 +1138,8 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                           const weekColIndex = week.weekNumber;
                           const cascadedItems = getCascadedItems('weekly', rowIndex, year, monthIndex, week.weekNumber);
                           const isReadOnly = isCascadedCell('weekly', year, monthIndex, week.weekNumber);
-                          const displayItems = isReadOnly && cascadedItems ? cascadedItems : getCellItems('weekly', rowIndex, weekColIndex);
+                          // Use filtered function to avoid mixing weekly items from different years
+                          const displayItems = isReadOnly && cascadedItems ? cascadedItems : getWeeklyItemsForMonth(rowIndex, weekColIndex, year, monthIndex);
 
                           return (
                             <td key={week.startDate} className={cn(
