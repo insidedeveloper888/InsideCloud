@@ -96,6 +96,56 @@ const getDaysInWeek = (weekStartDate) => {
   return days;
 };
 
+// Helper: Convert URLs in text to clickable links
+const linkifyText = (text) => {
+  if (!text) return text;
+
+  // Regex to match URLs (http://, https://, www., or common TLDs)
+  const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}[^\s]*)/g;
+
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    // Add text before the URL
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+
+    // Add the URL as a link
+    let url = match[0];
+    let href = url;
+
+    // Add https:// if URL doesn't have protocol
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      href = 'https://' + url;
+    }
+
+    parts.push(
+      <a
+        key={match.index}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:text-blue-800 underline"
+        onClick={(e) => e.stopPropagation()} // Prevent double-click event from triggering
+      >
+        {url}
+      </a>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text after last URL
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+};
+
 // Checklist Item Component
 const ChecklistItem = ({ item, onToggle, onRemove, onEdit, readOnly }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -197,9 +247,10 @@ const ChecklistItem = ({ item, onToggle, onRemove, onEdit, readOnly }) => {
           readOnly && "opacity-60"
         )}
         onDoubleClick={handleDoubleClick}
+        style={{ wordBreak: 'break-all' }}
         title={readOnly ? "Cascaded from parent (read-only)" : "Double-click to edit"}
       >
-        {item.text}
+        {linkifyText(item.text)}
       </span>
       {!readOnly && (
         <button
@@ -822,7 +873,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
               <thead>
                 <tr className="bg-blue-600 text-white">
                   <th className="border border-gray-300 p-3 text-left font-semibold w-[150px] sticky left-0 bg-blue-600 z-10">
-                    项目 Category
+                    项目
                   </th>
                   {years.map((year, index) => (
                     <th
@@ -856,11 +907,11 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
               <tbody>
                 {categories.map((category, rowIndex) => (
                   <tr key={rowIndex} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black">
+                    <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black break-words">
                       {category}
                     </td>
                     {years.map((year, yearIndex) => (
-                      <td key={year} className="border border-gray-300 align-top w-[200px] max-w-[200px]">
+                      <td key={year} className="border border-gray-300 align-top w-[200px] max-w-[200px] break-words">
                         <Cell
                           items={getCellItems('yearly', rowIndex, yearIndex)}
                           onAddItem={(text) => handleAddItem('yearly', rowIndex, yearIndex, text)}
@@ -896,7 +947,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <thead>
                     <tr className="bg-blue-600 text-white">
                       <th className="border border-gray-300 p-3 text-left font-semibold w-[150px] sticky left-0 bg-blue-600 z-10">
-                        项目 Category
+                        项目
                       </th>
                       {firstHalfMonths.map((month) => (
                         <th
@@ -919,7 +970,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <tbody>
                     {categories.map((category, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black">
+                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black break-words">
                           {category}
                         </td>
                         {firstHalfMonths.map((month) => {
@@ -930,7 +981,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
                           return (
                             <td key={month.index} className={cn(
-                              "border border-gray-300 align-top w-[200px] max-w-[200px]",
+                              "border border-gray-300 align-top w-[200px] max-w-[200px] break-words",
                               isReadOnly && "bg-blue-50"
                             )}>
                               <Cell
@@ -956,7 +1007,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <thead>
                     <tr className="bg-blue-600 text-white">
                       <th className="border border-gray-300 p-3 text-left font-semibold w-[150px] sticky left-0 bg-blue-600 z-10">
-                        项目 Category
+                        项目
                       </th>
                       {secondHalfMonths.map((month) => (
                         <th
@@ -979,7 +1030,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <tbody>
                     {categories.map((category, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black">
+                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-black break-words">
                           {category}
                         </td>
                         {secondHalfMonths.map((month) => {
@@ -990,7 +1041,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
                           return (
                             <td key={month.index} className={cn(
-                              "border border-gray-300 align-top w-[200px] max-w-[200px]",
+                              "border border-gray-300 align-top w-[200px] max-w-[200px] break-words",
                               isReadOnly && "bg-blue-50"
                             )}>
                               <Cell
@@ -1057,7 +1108,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <tbody>
                     {categories.map((category, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-sm text-black">
+                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-sm text-black break-words">
                           {category}
                         </td>
                         {weeks.map((week) => {
@@ -1068,7 +1119,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
                           return (
                             <td key={week.startDate} className={cn(
-                              "border border-gray-300 align-top w-[200px] max-w-[200px]",
+                              "border border-gray-300 align-top w-[200px] max-w-[200px] break-words",
                               isReadOnly && "bg-green-50"
                             )}>
                               <Cell
@@ -1124,10 +1175,10 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
                   <tbody>
                     {categories.map((category, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-sm text-black">
+                        <td className="border border-gray-300 p-2 font-semibold bg-gray-50 sticky left-0 z-10 text-sm text-black break-words">
                           {category}
                         </td>
-                        {days.map((day, dayIdx) => {
+                        {days.map((day) => {
                           const dayColIndex = parseInt(day.date.replace(/-/g, ''));
                           // With database cascading, daily items are created in DB, so just show them
                           // Sunday items are marked as read-only (cascaded from weekly)
@@ -1137,7 +1188,7 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
                           return (
                             <td key={day.date} className={cn(
-                              "border border-gray-300 align-top w-[200px] max-w-[200px]",
+                              "border border-gray-300 align-top w-[200px] max-w-[200px] break-words",
                               isReadOnly && "bg-purple-50"
                             )}>
                               <Cell

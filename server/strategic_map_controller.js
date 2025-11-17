@@ -196,7 +196,7 @@ class StrategicMapController {
         .update({
           is_deleted: true,
           deleted_at: new Date().toISOString(),
-          deleted_by_individual_id: individualId
+          deleted_by_individual_id: null  // Organization mode - no individual tracking
         })
         .eq('id', itemId)
         .eq('organization_id', org.id)
