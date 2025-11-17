@@ -357,6 +357,12 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [organizationId, setOrganizationId] = useState(null);
 
+  // Get today's date info for auto-expansion
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const currentWeek = getISOWeek(today);
+
   // Load data (from API or localStorage based on config)
   const loadData = useCallback(async () => {
     try {
@@ -539,12 +545,6 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
 
   // Subscribe to realtime updates
   useRealtimeSync(organizationId, handleRealtimeUpdate);
-
-  // Get today's date info for auto-expansion
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-  const currentWeek = getISOWeek(today);
 
   // Calculate the week start date for current week
   const getTodayWeekStart = () => {
