@@ -1,0 +1,56 @@
+/* Document Parser Styles */
+
+.document-parser-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Upload Section Styling */
+.document-parser-container .file-input-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.document-parser-container .file-input-wrapper input[type='file'] {
+  position: absolute;
+  left: -9999px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .document-parser-container {
+    padding: 0 1rem;
+  }
+
+  .document-parser-container h1 {
+    font-size: 1.875rem;
+  }
+
+  .document-parser-container .max-w-md {
+    max-width: 100%;
+  }
+}
+
+/* Animation for loading state */
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgb(59, 130, 246);
+  }
+  50% {
+    border-color: rgb(147, 51, 234);
+  }
+}
+
+.document-parser-container input[type='file']:hover {
+  /* Hover effect already defined in JSX classes */
+}
+
+/* File upload drag and drop styles */
+.document-parser-container label {
+  transition: all 0.2s ease;
+}
+
+.document-parser-container label:active {
+  transform: scale(0.98);
+}

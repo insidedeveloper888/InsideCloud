@@ -101,8 +101,8 @@ function ProtectedLayout({
                 className={cn(
                   "w-full flex items-center space-x-3 px-3 py-2 sm:py-2.5 rounded-lg text-[14px] sm:text-[15px] font-medium transition-colors",
                   isSelected
-                    ? "bg-primary-50 text-primary-700"
-                    : "text-neutral-700 hover:bg-neutral-100"
+                    ? "bg-primary-50 text-gray-900"
+                    : "text-gray-900 hover:bg-neutral-100"
                 )}
               >
                 <Icon size={18} className="flex-shrink-0" />
@@ -147,7 +147,7 @@ function ProtectedLayout({
                 variant="ghost"
                 size="icon"
                 onClick={handleDrawerToggle}
-                className="h-9 w-9 sm:h-10 sm:w-10"
+                className="h-9 w-9 sm:h-10 sm:w-10 "
               >
                 <Menu size={20} />
               </Button>
@@ -164,7 +164,7 @@ function ProtectedLayout({
                     className={cn(
                       "px-3 lg:px-4 py-2 text-xs lg:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap",
                       isSelected
-                        ? "text-primary-600 border-primary-600"
+                        ? "text-gray-900 border-primary-600"
                         : "text-neutral-600 border-transparent hover:text-primary-600"
                     )}
                   >

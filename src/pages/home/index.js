@@ -37,7 +37,8 @@ import { cn } from '../../lib/utils';
 import './index.css';
 // Old StrategicMapView archived - using v2 only
 import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
-import { TargetIcon, PromotionIcon, SheetIcon } from '../../components/ui/icons';
+import DocumentParser from '../../tools/document-parser/index.jsx';
+import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';
 
@@ -62,7 +63,7 @@ const slugify = (value) =>
 
 const DashboardContent = ({ onNavigate }) => (
   <div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
       <div
         className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
         onClick={() => onNavigate && onNavigate('strategic_map')}
@@ -101,6 +102,17 @@ const DashboardContent = ({ onNavigate }) => (
             <p className="text-sm md:text-base font-semibold">Coming Soon</p>
           </div>
         </div>
+      </div>
+      <div
+        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
+        onClick={() => onNavigate && onNavigate('document_parser')}
+      >
+        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
+          <DocumentIcon size={56} />
+        </div>
+        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+          Document Parser
+        </h3>
       </div>
     </div>
   </div>
@@ -676,7 +688,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2') {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
@@ -696,6 +708,7 @@ const Home = () => {
       { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
       { key: 'organization', label: 'Organization', icon: Building2, section: 'System' },
       { key: 'strategic_map_v2', label: 'Strategic Map v2', icon: Map, section: 'Product' },
+      { key: 'document_parser', label: 'Document Parser', icon: DocumentIcon, section: 'Product' },
     ];
   }, [isAdmin]);
 
@@ -923,6 +936,12 @@ const Home = () => {
       case 'strategic_map_v2':
         return (
           <StrategicMapV2Preview
+            organizationSlug={selectedOrganizationSlug}
+          />
+        );
+      case 'document_parser':
+        return (
+          <DocumentParser
             organizationSlug={selectedOrganizationSlug}
           />
         );
