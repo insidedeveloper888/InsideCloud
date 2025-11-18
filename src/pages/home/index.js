@@ -39,6 +39,7 @@ import './index.css';
 import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
 import { TargetIcon, PromotionIcon, SheetIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
+import cloudsAnimation from '../../assets/animations/clouds-animation.json';
 
 const resolveApiOrigin = () =>
   clientConfig.apiOrigin && clientConfig.apiOrigin.length > 0
@@ -576,29 +577,53 @@ const OrganizationView = ({ isAdmin }) => {
 
 const LoadingState = () => (
   <div className="lottie-background-container">
-    <div className="lottie-animation-wrapper">
+    {/* Background: Clouds animation */}
+    <div className="lottie-animation-wrapper" style={{ zIndex: 1 }}>
+      <Lottie
+        animationData={cloudsAnimation}
+        loop={true}
+        autoplay={true}
+      />
+    </div>
+
+    {/* Foreground: Rocket animation */}
+    <div className="lottie-animation-wrapper" style={{ zIndex: 2 }}>
       <Lottie
         animationData={backgroundAnimation}
         loop={true}
         autoplay={true}
       />
     </div>
+
+    {/* Text overlay */}
     <div className="lottie-placeholder">
-      <Loader2 className="w-10 h-10 animate-spin text-white" />
-      <p className="text-base text-white mt-4">Authenticating with Lark…</p>
+      <Loader2 className="w-10 h-10 animate-spin text-black" />
+      <p className="text-base text-white mt-4" style={{ textShadow: '0 0 7px #000000, 0 0 14px #0000FF' }}>Authenticating with Lark…</p>
     </div>
   </div>
 );
 
 const ErrorState = ({ message, onRetry, onChangeOrganization, isOrgError }) => (
   <div className="lottie-background-container lottie-background-error">
-    <div className="lottie-animation-wrapper">
+    {/* Background: Clouds animation */}
+    <div className="lottie-animation-wrapper" style={{ zIndex: 1 }}>
+      <Lottie
+        animationData={cloudsAnimation}
+        loop={true}
+        autoplay={true}
+      />
+    </div>
+
+    {/* Foreground: Rocket animation */}
+    <div className="lottie-animation-wrapper" style={{ zIndex: 2 }}>
       <Lottie
         animationData={backgroundAnimation}
         loop={true}
         autoplay={true}
       />
     </div>
+
+    {/* Error content overlay */}
     <div className="flex items-center justify-center h-screen relative z-10">
       <div className="flex flex-col gap-4 max-w-[420px] text-center text-white px-6">
         <h2 className="text-2xl font-bold">Authentication Failed</h2>
@@ -623,6 +648,9 @@ const ErrorState = ({ message, onRetry, onChangeOrganization, isOrgError }) => (
 );
 
 const Home = () => {
+  // TESTING: Set to true to stay on loading screen and see Lottie animation
+  const DISABLE_AUTO_NAVIGATION = false;
+
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
@@ -813,7 +841,9 @@ const Home = () => {
       if (userData) {
         setUserInfo(userData);
         setAuthError(null);
-        setIsLoading(false);
+        if (!DISABLE_AUTO_NAVIGATION) {
+          setIsLoading(false);
+        }
         setIsAuthenticating(false);
       } else if (!isJSAPIAvailable) {
         // Check if external browser OAuth is allowed
