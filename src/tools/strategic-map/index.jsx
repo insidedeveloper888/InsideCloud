@@ -1268,24 +1268,9 @@ const StrategicMapV2Preview = ({ organizationSlug }) => {
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-black">战略地图 Strategic Map</h1>
-            {currentUser && currentUser.individual_id && (
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                Individual ID: {currentUser.individual_id}
-              </span>
-            )}
-            {currentUser && !currentUser.individual_id && (
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                No Individual ID (Organization Mode)
-              </span>
-            )}
           </div>
           <p className="text-sm text-black mt-1">
             Plan your goals from yearly to daily view
-            {currentUser && currentUser.display_name && (
-              <span className="ml-2 text-gray-600">
-                • {currentUser.display_name}
-              </span>
-            )}
           </p>
         </div>
 

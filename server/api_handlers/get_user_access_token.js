@@ -1,7 +1,7 @@
 const axios = require('axios');
-const { handleCors, okResponse, failResponse, setAuthCookie, getAuthFromCookie } = require('./_utils');
-const { getLarkCredentials, supabase } = require('./supabase_helper');
-const { syncLarkUser } = require('../lib/larkUserSync');
+const { handleCors, okResponse, failResponse, setAuthCookie, getAuthFromCookie } = require('../../api/_utils');
+const { getLarkCredentials, supabase } = require('../../api/_supabase_helper');
+const { syncLarkUser } = require('../../lib/larkUserSync');
 
 module.exports = async function handler(req, res) {
     // Handle CORS
@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
     } else {
         console.log(`⚠️  No organization_slug provided, falling back to default config`);
         // Fallback to default config for backward compatibility
-        const { config } = require('./_utils');
+        const { config } = require('../../api/_utils');
         larkCredentials = {
             lark_app_id: config.appId,
             lark_app_secret: config.appSecret
@@ -99,6 +99,7 @@ module.exports = async function handler(req, res) {
                         union_id: userInfo.union_id,
                         en_name: userInfo.en_name,
                         name: userInfo.name,
+                        email: userInfo.email,
                         avatar_url: userInfo.avatar_url
                     };
                     

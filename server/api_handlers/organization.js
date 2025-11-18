@@ -5,8 +5,8 @@
  * Returns organization details by slug for realtime sync
  */
 
-const { getOrganizationInfo } = require('../server/organization_helper');
-const { handleCors, failResponse } = require('./_utils');
+const { getOrganizationInfo } = require('../organization_helper');
+const { handleCors, failResponse } = require('../../api/_utils');
 
 module.exports = async function handler(req, res) {
   // Handle CORS

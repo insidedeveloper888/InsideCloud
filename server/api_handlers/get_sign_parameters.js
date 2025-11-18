@@ -1,6 +1,6 @@
 const axios = require('axios');
-const { handleCors, okResponse, failResponse } = require('./_utils');
-const { getLarkCredentials } = require('./supabase_helper');
+const { handleCors, okResponse, failResponse } = require('../../api/_utils');
+const { getLarkCredentials } = require('../../api/_supabase_helper');
 const CryptoJS = require('crypto-js');
 
 // Calculate sign parameters for JSAPI (with dynamic appId and noncestr)
@@ -59,7 +59,7 @@ module.exports = async function handler(req, res) {
     } else {
         console.log(`⚠️  No organization_slug provided, falling back to default config`);
         // Fallback to default config for backward compatibility
-        const { config } = require('./_utils');
+        const { config } = require('../../api/_utils');
         larkCredentials = {
             lark_app_id: config.appId,
             lark_app_secret: config.appSecret,

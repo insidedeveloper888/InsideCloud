@@ -1,5 +1,5 @@
-const { handleCors, okResponse, failResponse, getAuthFromCookie } = require('../_utils');
-const { supabase } = require('../supabase_helper');
+const { handleCors, okResponse, failResponse, getAuthFromCookie } = require('../../api/_utils');
+const { supabase } = require('../../api/_supabase_helper');
 
 const slugify = (value) =>
   (value || '')

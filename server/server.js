@@ -1196,7 +1196,7 @@ router.post('/api/admin/organizations', createOrganizationAdmin)
 
 // Strategic Map API routes
 router.get('/api/strategic_map', async (ctx) => {
-    const strategicMapHandler = require('../api/strategic_map')
+    const strategicMapHandler = require('./api_handlers/strategic_map_v2')
     await strategicMapHandler({ 
         method: ctx.method, 
         query: ctx.query, 
@@ -1210,7 +1210,7 @@ router.get('/api/strategic_map', async (ctx) => {
 })
 
 router.post('/api/strategic_map', async (ctx) => {
-    const strategicMapHandler = require('../api/strategic_map')
+    const strategicMapHandler = require('./api_handlers/strategic_map_v2')
     
     // Body is now automatically parsed by koa-bodyparser middleware
     console.log('🔍 Koa POST /api/strategic_map');
@@ -1256,7 +1256,7 @@ router.delete('/api/strategic_map', async (ctx) => {
         return
     }
 
-    const strategicMapHandler = require('../api/strategic_map')
+    const strategicMapHandler = require('./api_handlers/strategic_map_v2')
 
     console.log('🔍 Koa DELETE /api/strategic_map');
     console.log('  - Method:', ctx.method);
@@ -1291,7 +1291,7 @@ router.delete('/api/strategic_map', async (ctx) => {
 
 // Organization API route (for realtime sync)
 router.get('/api/organization', async (ctx) => {
-    const organizationHandler = require('../api/organization')
+    const organizationHandler = require('./api_handlers/organization')
     await organizationHandler(ctx)
 })
 
@@ -1331,7 +1331,7 @@ router.get('/api/strategic_map_v2', async (ctx) => {
     const serverUtil = require('./server_util');
     serverUtil.configAccessControl(ctx);
 
-    const strategicMapV2Handler = require('../api/strategic_map_v2')
+    const strategicMapV2Handler = require('./api_handlers/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
         query: ctx.query,
@@ -1349,7 +1349,7 @@ router.post('/api/strategic_map_v2', async (ctx) => {
     const serverUtil = require('./server_util');
     serverUtil.configAccessControl(ctx);
 
-    const strategicMapV2Handler = require('../api/strategic_map_v2')
+    const strategicMapV2Handler = require('./api_handlers/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
         query: ctx.query,
@@ -1367,7 +1367,7 @@ router.put('/api/strategic_map_v2', async (ctx) => {
     const serverUtil = require('./server_util');
     serverUtil.configAccessControl(ctx);
 
-    const strategicMapV2Handler = require('../api/strategic_map_v2')
+    const strategicMapV2Handler = require('./api_handlers/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
         query: ctx.query,
@@ -1385,7 +1385,7 @@ router.delete('/api/strategic_map_v2', async (ctx) => {
     const serverUtil = require('./server_util');
     serverUtil.configAccessControl(ctx);
 
-    const strategicMapV2Handler = require('../api/strategic_map_v2')
+    const strategicMapV2Handler = require('./api_handlers/strategic_map_v2')
     await strategicMapV2Handler({
         method: ctx.method,
         query: ctx.query,
@@ -1410,7 +1410,7 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
     const serverUtil = require('./server_util');
     serverUtil.configAccessControl(ctx);
 
-    const strategicMapV2BatchHandler = require('../api/strategic_map_v2_batch')
+    const strategicMapV2BatchHandler = require('./api_handlers/strategic_map_v2_batch')
     await strategicMapV2BatchHandler({
         method: ctx.method,
         query: ctx.query,

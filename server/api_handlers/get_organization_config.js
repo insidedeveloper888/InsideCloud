@@ -1,5 +1,5 @@
-const { handleCors, okResponse, failResponse } = require('./_utils');
-const { supabase, getLarkCredentials } = require('./supabase_helper');
+const { handleCors, okResponse, failResponse } = require('../../api/_utils');
+const { supabase, getLarkCredentials } = require('../../api/_supabase_helper');
 
 /**
  * Validate that an organization exists and is active

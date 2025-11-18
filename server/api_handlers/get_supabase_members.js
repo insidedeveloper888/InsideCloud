@@ -1,5 +1,5 @@
-const { handleCors, okResponse, failResponse, getAuthFromCookie } = require('./_utils');
-const { getLarkCredentials, supabase } = require('./supabase_helper');
+const { handleCors, okResponse, failResponse, getAuthFromCookie } = require('../../api/_utils');
+const { getLarkCredentials, supabase } = require('../../api/_supabase_helper');
 
 module.exports = async function handler(req, res) {
   if (handleCors(req, res)) return;

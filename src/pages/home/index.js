@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
+import Lottie from 'lottie-react';
 import clientConfig from '../../config/client_config.js';
 import { handleJSAPIAccess, handleUserAuth } from '../../utils/auth_access_util.js';
 import OrganizationSelector, { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector/index.js';
@@ -37,6 +38,7 @@ import './index.css';
 // Old StrategicMapView archived - using v2 only
 import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
 import { TargetIcon, PromotionIcon, SheetIcon } from '../../components/ui/icons';
+import backgroundAnimation from '../../assets/animations/background-animation.json';
 
 const resolveApiOrigin = () =>
   clientConfig.apiOrigin && clientConfig.apiOrigin.length > 0
@@ -573,30 +575,48 @@ const OrganizationView = ({ isAdmin }) => {
 };
 
 const LoadingState = () => (
-  <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-[#1f4fff] to-[#7c3aed] text-white gap-4">
-    <Loader2 className="w-10 h-10 animate-spin" />
-    <p className="text-base">Authenticating with Lark…</p>
+  <div className="lottie-background-container">
+    <div className="lottie-animation-wrapper">
+      <Lottie
+        animationData={backgroundAnimation}
+        loop={true}
+        autoplay={true}
+      />
+    </div>
+    <div className="lottie-placeholder">
+      <Loader2 className="w-10 h-10 animate-spin text-white" />
+      <p className="text-base text-white mt-4">Authenticating with Lark…</p>
+    </div>
   </div>
 );
 
 const ErrorState = ({ message, onRetry, onChangeOrganization, isOrgError }) => (
-  <div className="flex items-center justify-center h-screen bg-gradient-to-br from-[#ff6b6b] to-[#ee5a24] text-white text-center px-6">
-    <div className="flex flex-col gap-4 max-w-[420px]">
-      <h2 className="text-2xl font-bold">Authentication Failed</h2>
-      <p className="text-base">{message}</p>
-      <div className="flex flex-col sm:flex-row gap-2 justify-center">
-        {isOrgError && (
-          <Button variant="default" onClick={onChangeOrganization}>
-            Change Organisation
+  <div className="lottie-background-container lottie-background-error">
+    <div className="lottie-animation-wrapper">
+      <Lottie
+        animationData={backgroundAnimation}
+        loop={true}
+        autoplay={true}
+      />
+    </div>
+    <div className="flex items-center justify-center h-screen relative z-10">
+      <div className="flex flex-col gap-4 max-w-[420px] text-center text-white px-6">
+        <h2 className="text-2xl font-bold">Authentication Failed</h2>
+        <p className="text-base">{message}</p>
+        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+          {isOrgError && (
+            <Button variant="default" onClick={onChangeOrganization}>
+              Change Organisation
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={onRetry}
+            className="text-white border-white/60 hover:bg-white/10 hover:text-white"
+          >
+            Retry
           </Button>
-        )}
-        <Button
-          variant="outline"
-          onClick={onRetry}
-          className="text-white border-white/60 hover:bg-white/10 hover:text-white"
-        >
-          Retry
-        </Button>
+        </div>
       </div>
     </div>
   </div>

@@ -1,0 +1,106 @@
+/**
+ * Unified API Handler for Vercel Deployment
+ *
+ * This single serverless function handles ALL API routes to stay within Vercel's Hobby plan limit (12 functions).
+ * Individual handler files (get_user_access_token.js, etc.) remain as modular code but are imported here
+ * rather than being deployed as separate functions.
+ *
+ * How it works:
+ * 1. All /api/* requests are routed to this single function by vercel.json
+ * 2. This function looks up the path in the routes map
+ * 3. Dispatches to the appropriate handler module
+ *
+ * This counts as only 1 serverless function instead of 11+
+ */
+
+const { handleCors } = require('./_utils');
+
+// Import all API handlers from handlers subdirectory
+const getUserAccessToken = require('../server/api_handlers/get_user_access_token');
+const getSignParameters = require('../server/api_handlers/get_sign_parameters');
+const getOrganizationConfig = require('../server/api_handlers/get_organization_config');
+const getOrganizationMembers = require('../server/api_handlers/get_organization_members');
+const getBitableTables = require('../server/api_handlers/get_bitable_tables');
+const getAuditLogs = require('../server/api_handlers/get_audit_logs');
+const getSupabaseMembers = require('../server/api_handlers/get_supabase_members');
+const organization = require('../server/api_handlers/organization');
+const currentUser = require('../server/api_handlers/current_user');
+const strategicMapV2 = require('../server/api_handlers/strategic_map_v2');
+const strategicMapV2Batch = require('../server/api_handlers/strategic_map_v2_batch');
+const adminOrganizations = require('../server/api_handlers/admin_organizations');
+
+/**
+ * Route mapping: path -> handler
+ */
+const routes = {
+  '/api/get_user_access_token': getUserAccessToken,
+  '/api/get_sign_parameters': getSignParameters,
+  '/api/get_organization_config': getOrganizationConfig,
+  '/api/get_organization_members': getOrganizationMembers,
+  '/api/get_bitable_tables': getBitableTables,
+  '/api/get_audit_logs': getAuditLogs,
+  '/api/get_supabase_members': getSupabaseMembers,
+  '/api/organization': organization,
+  '/api/current_user': currentUser,
+  '/api/strategic_map_v2': strategicMapV2,
+  '/api/strategic_map_v2/batch': strategicMapV2Batch,
+  '/api/admin/organizations': adminOrganizations,
+};
+
+/**
+ * Main handler - dispatches to appropriate route handler
+ */
+module.exports = async function handler(req, res) {
+  // Handle CORS preflight
+  if (handleCors(req, res)) return;
+
+  // Get the full path from the request (remove query string)
+  let path = req.url.split('?')[0];
+
+  // Normalize path: ensure it starts with /api
+  if (!path.startsWith('/api/')) {
+    path = '/api' + (path.startsWith('/') ? path : '/' + path);
+  }
+
+  console.log('🔀 Unified API Router - Path:', path, 'Method:', req.method);
+
+  // Find matching route handler
+  let routeHandler = routes[path];
+
+  // If exact match not found, try without trailing slash
+  if (!routeHandler && path.endsWith('/')) {
+    routeHandler = routes[path.slice(0, -1)];
+  }
+
+  // If still not found, try with trailing slash
+  if (!routeHandler && !path.endsWith('/')) {
+    routeHandler = routes[path + '/'];
+  }
+
+  if (!routeHandler) {
+    console.warn('❌ No route handler found for:', path);
+    return res.status(404).json({
+      success: false,
+      error: 'API endpoint not found',
+      path,
+      method: req.method,
+      hint: 'Available routes listed below',
+      availableRoutes: Object.keys(routes),
+    });
+  }
+
+  // Dispatch to the appropriate handler
+  try {
+    console.log('✅ Dispatching to handler:', path);
+    return await routeHandler(req, res);
+  } catch (error) {
+    console.error('❌ Error in route handler:', path, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      path,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+};

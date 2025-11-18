@@ -1,7 +1,7 @@
-const { handleCors, failResponse } = require('./_utils');
-const StrategicMapController = require('../server/strategic_map_controller');
-const { getAuthFromCookie } = require('./_utils');
-const { supabase } = require('./supabase_helper');
+const { handleCors, failResponse } = require('../../api/_utils');
+const StrategicMapController = require('../strategic_map_controller');
+const { getAuthFromCookie } = require('../../api/_utils');
+const { supabase } = require('../../api/_supabase_helper');
 const cookie = require('cookie');
 
 /**

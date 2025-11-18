@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { config, handleCors, okResponse, failResponse, getAuthFromCookie } = require('./_utils');
+const { config, handleCors, okResponse, failResponse, getAuthFromCookie } = require('../../api/_utils');
 
 module.exports = async function handler(req, res) {
     // Handle CORS
