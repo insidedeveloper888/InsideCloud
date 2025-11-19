@@ -2,26 +2,78 @@
  * Kanban View - Pipeline Board
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function KanbanView({ contacts = [], stages = [], onUpdateContact }) {
+  // Filter to show only customers
+  const customers = contacts.filter((c) => c.contact_type === 'customer');
+  const [draggedContact, setDraggedContact] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+
+  const handleDragStart = (e, contact) => {
+    setDraggedContact(contact);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedContact(null);
+    setDragOverStage(null);
+  };
+
+  const handleDragOver = (e, stageId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStage(stageId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStage(null);
+  };
+
+  const handleDrop = (e, targetStageId) => {
+    e.preventDefault();
+    setDragOverStage(null);
+
+    if (!draggedContact || draggedContact.current_stage_id === targetStageId) {
+      setDraggedContact(null);
+      return;
+    }
+
+    // Update contact stage
+    onUpdateContact(draggedContact.id, { current_stage_id: targetStageId });
+    setDraggedContact(null);
+  };
+
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">📋 流程看板</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">📋 Pipeline</h2>
+        <span className="text-sm text-gray-600">
+          Showing {customers.length} customer{customers.length !== 1 ? 's' : ''}
+        </span>
+      </div>
 
       {stages.length > 0 ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => {
-            const stageContacts = contacts.filter(
+            const stageContacts = customers.filter(
               (c) => c.current_stage_id === stage.id
             );
+            const isDropTarget = dragOverStage === stage.id;
 
             return (
               <div
                 key={stage.id}
                 className="flex-shrink-0 w-80"
+                onDragOver={(e) => handleDragOver(e, stage.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, stage.id)}
               >
-                <div className="border border-gray-200 rounded-lg bg-white">
+                <div className={`border rounded-lg bg-white transition-all ${
+                  isDropTarget
+                    ? 'border-blue-500 border-2 bg-blue-50'
+                    : 'border-gray-200'
+                }`}>
                   {/* Column Header */}
                   <div
                     className="flex justify-between items-center p-4 border-b-2"
@@ -45,23 +97,32 @@ export default function KanbanView({ contacts = [], stages = [], onUpdateContact
                       stageContacts.map((contact) => (
                         <div
                           key={contact.id}
-                          className="border border-gray-200 rounded-lg p-3 bg-white hover:shadow-md transition-shadow cursor-pointer"
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, contact)}
+                          onDragEnd={handleDragEnd}
+                          className={`border border-gray-200 rounded-lg p-3 bg-white hover:shadow-md transition-all cursor-move ${
+                            draggedContact?.id === contact.id
+                              ? 'opacity-50 rotate-2 scale-105'
+                              : ''
+                          }`}
                         >
                           <h4 className="font-semibold text-gray-900 text-sm">
                             {contact.first_name} {contact.last_name}
                           </h4>
                           <p className="text-xs text-gray-600 mt-1">
                             {contact.contact_type === 'customer'
-                              ? '客户'
+                              ? 'Customer'
                               : contact.contact_type === 'supplier'
-                              ? '供应商'
+                              ? 'Supplier'
                               : 'COI'}
                           </p>
                         </div>
                       ))
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-sm text-gray-500">无联系人</p>
+                        <p className="text-sm text-gray-500">
+                          {isDropTarget ? 'Drop here' : 'No contacts'}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -75,8 +136,8 @@ export default function KanbanView({ contacts = [], stages = [], onUpdateContact
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
             <span className="text-3xl">📋</span>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无自定义阶段</h3>
-          <p className="text-gray-600">请在设置中创建阶段</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No custom stages</h3>
+          <p className="text-gray-600">Please create stages in settings</p>
         </div>
       )}
     </div>

@@ -9,6 +9,8 @@ import ContactAvatar from './ContactAvatar';
 import FilterPanel from './FilterPanel';
 import TagBadge from './TagBadge';
 import ContactImportDialog from './ContactImportDialog';
+import DataQualityAlerts from './DataQualityAlerts';
+import StarRating from './StarRating';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const ITEMS_PER_PAGE = 10;
@@ -24,6 +26,7 @@ export default function ContactListView({
   onRefresh,
   onCreateTag,
   organizationSlug,
+  maxRatingScale = 10,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -31,6 +34,7 @@ export default function ContactListView({
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [dataQualityFilter, setDataQualityFilter] = useState(null);
 
   // Get current user for import
   const { individualId } = useCurrentUser();
@@ -41,6 +45,7 @@ export default function ContactListView({
     stages: [],
     channels: [],
     tags: [],
+    ratings: [],
   });
 
   // View mode: 'card' or 'table'
@@ -71,6 +76,53 @@ export default function ContactListView({
   };
 
   const filteredContacts = contacts.filter((contact) => {
+    // Data quality filter (takes precedence)
+    if (dataQualityFilter) {
+      switch (dataQualityFilter) {
+        case 'companies-no-name':
+          if (contact.entity_type !== 'company' || contact.company_name?.trim()) {
+            return false;
+          }
+          break;
+        case 'companies-no-industry':
+          if (contact.entity_type !== 'company' || contact.industry?.trim()) {
+            return false;
+          }
+          break;
+        case 'companies-incomplete-address':
+          if (contact.entity_type !== 'company') {
+            return false;
+          }
+          const hasCompleteAddress =
+            contact.address_line_1?.trim() &&
+            contact.address_line_2?.trim() &&
+            contact.postal_code?.trim() &&
+            contact.city?.trim() &&
+            contact.state?.trim();
+          if (hasCompleteAddress) {
+            return false;
+          }
+          break;
+        case 'customers-no-sales':
+          if (contact.contact_type !== 'customer' || contact.assigned_to_individual_id) {
+            return false;
+          }
+          break;
+        case 'customers-no-service':
+          if (contact.contact_type !== 'customer' || contact.assigned_department?.trim()) {
+            return false;
+          }
+          break;
+        case 'customers-no-channel':
+          if (contact.contact_type !== 'customer' || contact.traffic_source_id) {
+            return false;
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
     // Search query filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -101,6 +153,39 @@ export default function ContactListView({
     if (filters.tags?.length > 0) {
       const hasSelectedTag = contact.tags?.some(tag => filters.tags.includes(tag.id));
       if (!hasSelectedTag) return false;
+    }
+
+    // Rating filter - only applies to customers with ratings
+    if (filters.ratings?.length > 0) {
+      if (contact.contact_type !== 'customer' || !contact.rating) {
+        return false;
+      }
+
+      // Define rating ranges (same logic as FilterPanel)
+      const getRatingRange = (rating) => {
+        const max = maxRatingScale;
+        if (max <= 3) {
+          if (rating === 1) return 'low';
+          if (rating === 2) return 'medium';
+          if (rating === 3) return 'high';
+        } else if (max <= 5) {
+          if (rating <= 2) return 'low';
+          if (rating === 3) return 'medium';
+          if (rating >= 4) return 'high';
+        } else {
+          const lowMax = Math.floor(max / 3);
+          const mediumMax = Math.floor((2 * max) / 3);
+          if (rating <= lowMax) return 'low';
+          if (rating <= mediumMax) return 'medium';
+          return 'high';
+        }
+        return null;
+      };
+
+      const contactRatingRange = getRatingRange(contact.rating);
+      if (!filters.ratings.includes(contactRatingRange)) {
+        return false;
+      }
     }
 
     return true;
@@ -175,6 +260,7 @@ export default function ContactListView({
         availableTags={tags}
         onCreateTag={onCreateTag}
         organizationSlug={organizationSlug}
+        maxRatingScale={maxRatingScale}
       />
 
       <ContactImportDialog
@@ -194,11 +280,45 @@ export default function ContactListView({
           stages={stages}
           channels={channels}
           tags={tags}
+          maxRatingScale={maxRatingScale}
         />
       )}
 
       {/* Main Content */}
       <div className="flex-1 space-y-6">
+        {/* Data Quality Alerts */}
+        <DataQualityAlerts
+          organizationSlug={organizationSlug}
+          onAlertClick={(filterType) => {
+            setDataQualityFilter(filterType);
+            setCurrentPage(1);
+          }}
+        />
+
+        {/* Active Data Quality Filter Badge */}
+        {dataQualityFilter && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-blue-900 font-medium">
+                {dataQualityFilter === 'companies-no-name' && 'Missing Company Name'}
+                {dataQualityFilter === 'companies-no-industry' && 'Missing Industry'}
+                {dataQualityFilter === 'companies-incomplete-address' && 'Incomplete Address'}
+                {dataQualityFilter === 'customers-no-sales' && 'No Sales Person'}
+                {dataQualityFilter === 'customers-no-service' && 'No Customer Service'}
+              </span>
+              <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-bold rounded-full">
+                {filteredContacts.length}
+              </span>
+            </div>
+            <button
+              onClick={() => setDataQualityFilter(null)}
+              className="px-2 py-1 text-xs text-blue-700 hover:bg-blue-100 rounded transition-colors font-medium"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
         {/* Search Bar and Actions */}
         <div className="flex gap-3 items-center">
           <div className="flex-1 relative">
@@ -312,6 +432,9 @@ export default function ContactListView({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Tags
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Rating
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Actions
                   </th>
@@ -390,6 +513,19 @@ export default function ContactListView({
                               </span>
                             )}
                           </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {contact.contact_type === 'customer' && contact.rating ? (
+                          <StarRating
+                            rating={contact.rating}
+                            maxRating={maxRatingScale}
+                            size={16}
+                            readonly={true}
+                            showLabel={false}
+                          />
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
                         )}
@@ -518,6 +654,18 @@ export default function ContactListView({
                       <div className="flex items-center gap-2">
                         <span>🏢</span>
                         <span>{contact.company_name}</span>
+                      </div>
+                    )}
+                    {contact.contact_type === 'customer' && contact.rating && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <span>⭐</span>
+                        <StarRating
+                          rating={contact.rating}
+                          maxRating={maxRatingScale}
+                          size={18}
+                          readonly={true}
+                          showLabel={true}
+                        />
                       </div>
                     )}
                   </div>

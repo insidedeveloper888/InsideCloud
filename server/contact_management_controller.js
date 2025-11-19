@@ -178,6 +178,8 @@ async function createContact(ctx) {
       // Avatar
       avatar_url: contactData.avatar_url || null,
       avatar_color: generateRandomAvatarColor(), // Always generate random color
+      // Rating (for customers only)
+      rating: contactData.rating || null,
       // Notes
       notes: contactData.notes || null,
       // Audit
@@ -281,6 +283,8 @@ async function updateContact(ctx) {
       avatar_url: contactData.avatar_url || null,
       // Only update avatar_color if explicitly provided (don't regenerate on update)
       ...(contactData.avatar_color && { avatar_color: contactData.avatar_color }),
+      // Rating (for customers only)
+      rating: contactData.rating || null,
       // Notes
       notes: contactData.notes || null,
       // Audit
@@ -454,6 +458,53 @@ async function createContactStage(ctx) {
     ctx.status = 201;
   } catch (error) {
     console.error('Error creating stage:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * PUT /api/contact-stages/:id
+ * Update a contact stage
+ */
+async function updateContactStage(ctx) {
+  serverUtil.configAccessControl(ctx);
+  try {
+    const { id } = ctx.params;
+    const { organization_slug, ...updateData } = ctx.request.body;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Update stage
+    const { data: stage, error } = await supabase
+      .from('contact_stages')
+      .update({
+        ...updateData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    ctx.body = stage;
+  } catch (error) {
+    console.error('Error updating stage:', error);
     ctx.status = 500;
     ctx.body = { error: error.message };
   }
@@ -962,6 +1013,113 @@ async function assignTagsToContact(ctx) {
     ctx.body = { success: true };
   } catch (error) {
     console.error('Error assigning tags to contact:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+// ============================================================================
+// DATA QUALITY ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/contacts/data-quality
+ * Get data quality metrics for contact housekeeping
+ */
+async function getDataQualityMetrics(ctx) {
+  serverUtil.configAccessControl(ctx);
+  try {
+    const { organization_slug } = ctx.query;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Fetch all contacts for analysis
+    const { data: contacts } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('organization_id', org.id)
+      .eq('is_deleted', false);
+
+    if (!contacts) {
+      return ctx.body = {
+        companiesWithoutName: 0,
+        companiesWithoutIndustry: 0,
+        companiesWithIncompleteAddress: 0,
+        customersWithoutSalesPerson: 0,
+        customersWithoutCustomerService: 0,
+        customersWithoutTrafficSource: 0,
+      };
+    }
+
+    // Calculate metrics
+    const metrics = {
+      companiesWithoutName: 0,
+      companiesWithoutIndustry: 0,
+      companiesWithIncompleteAddress: 0,
+      customersWithoutSalesPerson: 0,
+      customersWithoutCustomerService: 0,
+      customersWithoutTrafficSource: 0,
+    };
+
+    contacts.forEach(contact => {
+      // 1. Companies without company name
+      if (contact.entity_type === 'company' && !contact.company_name?.trim()) {
+        metrics.companiesWithoutName++;
+      }
+
+      // 2. Companies without industry
+      if (contact.entity_type === 'company' && !contact.industry?.trim()) {
+        metrics.companiesWithoutIndustry++;
+      }
+
+      // 3. Companies without complete address (any field missing)
+      if (contact.entity_type === 'company') {
+        const hasCompleteAddress =
+          contact.address_line_1?.trim() &&
+          contact.address_line_2?.trim() &&
+          contact.postal_code?.trim() &&
+          contact.city?.trim() &&
+          contact.state?.trim();
+
+        if (!hasCompleteAddress) {
+          metrics.companiesWithIncompleteAddress++;
+        }
+      }
+
+      // 4. Customers without sales person assigned
+      // Note: Assuming assigned_to_individual_id represents sales person
+      if (contact.contact_type === 'customer' && !contact.assigned_to_individual_id) {
+        metrics.customersWithoutSalesPerson++;
+      }
+
+      // 5. Customers without customer service assigned
+      // Note: Using assigned_department for customer service
+      if (contact.contact_type === 'customer' && !contact.assigned_department?.trim()) {
+        metrics.customersWithoutCustomerService++;
+      }
+
+      // 6. Customers without traffic source
+      if (contact.contact_type === 'customer' && !contact.traffic_source_id) {
+        metrics.customersWithoutTrafficSource++;
+      }
+    });
+
+    ctx.body = metrics;
+  } catch (error) {
+    console.error('Error fetching data quality metrics:', error);
     ctx.status = 500;
     ctx.body = { error: error.message };
   }
@@ -1478,6 +1636,121 @@ async function executeImport(ctx) {
 }
 
 // ============================================================================
+// CONTACT SETTINGS ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/contact-settings
+ * Fetch contact management settings for an organization
+ */
+async function getContactSettings(ctx) {
+  try {
+    const { organization_slug } = ctx.query;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Fetch settings
+    let { data: settings, error } = await supabase
+      .from('contact_settings')
+      .select('*')
+      .eq('organization_id', org.id)
+      .single();
+
+    // If settings don't exist, create default settings
+    if (!settings) {
+      const { data: newSettings, error: createError } = await supabase
+        .from('contact_settings')
+        .insert([{
+          organization_id: org.id,
+          max_rating_scale: 10, // Default to 10-star rating
+        }])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating default settings:', createError);
+        throw createError;
+      }
+
+      settings = newSettings;
+    }
+
+    ctx.body = settings;
+  } catch (error) {
+    console.error('Error fetching contact settings:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * PUT /api/contact-settings
+ * Update contact management settings
+ */
+async function updateContactSettings(ctx) {
+  try {
+    const { organization_slug, max_rating_scale } = ctx.request.body;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Validate max_rating_scale
+    if (max_rating_scale && (max_rating_scale < 3 || max_rating_scale > 10)) {
+      return (ctx.status = 400), (ctx.body = { error: 'max_rating_scale must be between 3 and 10' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Update or insert settings
+    const { data: settings, error } = await supabase
+      .from('contact_settings')
+      .upsert({
+        organization_id: org.id,
+        max_rating_scale: max_rating_scale || 10,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'organization_id'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating contact settings:', error);
+      throw error;
+    }
+
+    ctx.body = settings;
+  } catch (error) {
+    console.error('Error updating contact settings:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1490,6 +1763,7 @@ module.exports = {
   // Contact Stages
   getContactStages,
   createContactStage,
+  updateContactStage,
   deleteContactStage,
   // Traffic Channels
   getTrafficChannels,
@@ -1504,8 +1778,13 @@ module.exports = {
   deleteContactTag,
   getContactTagsForContact,
   assignTagsToContact,
+  // Data Quality
+  getDataQualityMetrics,
   // Import
   getImportTemplate,
   validateImportData,
   executeImport,
+  // Contact Settings
+  getContactSettings,
+  updateContactSettings,
 };

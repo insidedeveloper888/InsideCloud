@@ -2,13 +2,15 @@
  * Contact Form Dialog - Add/Edit Contact
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Upload, Loader2 } from 'lucide-react';
 import { useOrganizationMembers } from '../hooks/useOrganizationMembers';
 import MemberSelect from './MemberSelect';
 import TagInput from './TagInput';
+import StarRating from './StarRating';
 import { createClient } from '@supabase/supabase-js';
 import { tagAPI } from '../api';
+import { MALAYSIA_CITIES, getCitiesByState, getCityCoordinates } from '../utils/malaysiaCities';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -28,6 +30,7 @@ export default function ContactFormDialog({
   availableTags = [],
   onCreateTag,
   organizationSlug,
+  maxRatingScale = 10,
 }) {
   // Fetch organization members for assignment dropdowns
   const { members } = useOrganizationMembers(organizationSlug);
@@ -39,6 +42,10 @@ export default function ContactFormDialog({
 
   // Tag state
   const [selectedTags, setSelectedTags] = useState([]);
+
+  // City autocomplete state
+  const [citySearchText, setCitySearchText] = useState('');
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     // Personal Information
@@ -82,6 +89,9 @@ export default function ContactFormDialog({
 
     // Avatar
     avatar_url: '',
+
+    // Rating (for customers only)
+    rating: null,
 
     // Notes
     notes: '',
@@ -152,6 +162,8 @@ export default function ContactFormDialog({
         current_stage_id: contact.current_stage_id || '',
         // Avatar
         avatar_url: contact.avatar_url || '',
+        // Rating
+        rating: contact.rating || null,
         // Notes
         notes: contact.notes || '',
       });
@@ -182,10 +194,28 @@ export default function ContactFormDialog({
         referred_by_contact_id: '',
         current_stage_id: stages[0]?.id || '',
         avatar_url: '',
+        rating: null,
         notes: '',
       });
     }
   }, [contact, isOpen, stages, channels]);
+
+  // Filter cities based on selected state and search text
+  const filteredCities = useMemo(() => {
+    let cities = formData.state
+      ? getCitiesByState(formData.state)
+      : MALAYSIA_CITIES;
+
+    // Further filter by search text
+    if (citySearchText) {
+      const search = citySearchText.toLowerCase();
+      cities = cities.filter(c =>
+        c.city.toLowerCase().includes(search)
+      );
+    }
+
+    return cities;
+  }, [formData.state, citySearchText]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -193,6 +223,49 @@ export default function ContactFormDialog({
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Handle state change - clear city if it doesn't belong to new state
+  const handleStateChange = (e) => {
+    const newState = e.target.value;
+    setFormData((prev) => {
+      // Check if current city belongs to the new state
+      if (prev.city && newState) {
+        const cityData = getCityCoordinates(prev.city);
+        if (cityData && cityData.state !== newState) {
+          // Clear city if it doesn't match new state
+          return { ...prev, state: newState, city: '' };
+        }
+      }
+      return { ...prev, state: newState };
+    });
+  };
+
+  // Handle city selection - auto-fill state
+  const handleCitySelect = (cityName) => {
+    const cityData = getCityCoordinates(cityName);
+
+    setFormData((prev) => ({
+      ...prev,
+      city: cityName,
+      state: cityData ? cityData.state : prev.state,
+    }));
+
+    setCitySearchText('');
+    setShowCityDropdown(false);
+  };
+
+  // Handle city search input
+  const handleCitySearchChange = (e) => {
+    const value = e.target.value;
+    setCitySearchText(value);
+    setFormData((prev) => ({ ...prev, city: value }));
+    setShowCityDropdown(true);
+  };
+
+  // Handle rating change
+  const handleRatingChange = (rating) => {
+    setFormData((prev) => ({ ...prev, rating }));
   };
 
   const handleAvatarUpload = async (e) => {
@@ -599,29 +672,120 @@ export default function ContactFormDialog({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      City
+                      State
                     </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
-                      placeholder="Kuala Lumpur"
-                    />
+                    <select
+                      name="state"
+                      value={formData.state}
+                      onChange={handleStateChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    >
+                      <option value="">Select state...</option>
+                      <optgroup label="States">
+                        <option value="Johor">Johor</option>
+                        <option value="Kedah">Kedah</option>
+                        <option value="Kelantan">Kelantan</option>
+                        <option value="Melaka">Melaka</option>
+                        <option value="Negeri Sembilan">Negeri Sembilan</option>
+                        <option value="Pahang">Pahang</option>
+                        <option value="Penang">Penang</option>
+                        <option value="Perak">Perak</option>
+                        <option value="Perlis">Perlis</option>
+                        <option value="Sabah">Sabah</option>
+                        <option value="Sarawak">Sarawak</option>
+                        <option value="Selangor">Selangor</option>
+                        <option value="Terengganu">Terengganu</option>
+                      </optgroup>
+                      <optgroup label="Federal Territories">
+                        <option value="Kuala Lumpur">Kuala Lumpur</option>
+                        <option value="Labuan">Labuan</option>
+                        <option value="Putrajaya">Putrajaya</option>
+                      </optgroup>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      State/Province
+                      City
                     </label>
-                    <input
-                      type="text"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
-                      placeholder="Selangor"
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        value={formData.city || citySearchText}
+                        onChange={handleCitySearchChange}
+                        onFocus={() => setShowCityDropdown(true)}
+                        placeholder={formData.state ? `Search cities in ${formData.state}...` : "Search city or select state first..."}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
+                        autoComplete="off"
+                      />
+
+                      {/* City Dropdown */}
+                      {showCityDropdown && filteredCities.length > 0 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            backgroundColor: 'white',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            marginTop: '4px',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                          }}
+                        >
+                          {filteredCities.slice(0, 20).map((city) => (
+                            <div
+                              key={city.city}
+                              onClick={() => handleCitySelect(city.city)}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #f0f0f0',
+                                fontSize: '14px',
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                            >
+                              <div style={{ fontWeight: '500', color: '#333' }}>
+                                {city.city}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666' }}>
+                                {city.state}
+                              </div>
+                            </div>
+                          ))}
+                          {filteredCities.length > 20 && (
+                            <div style={{ padding: '8px 12px', fontSize: '12px', color: '#999', textAlign: 'center' }}>
+                              ... and {filteredCities.length - 20} more (keep typing to filter)
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Click outside to close dropdown */}
+                      {showCityDropdown && (
+                        <div
+                          onClick={() => setShowCityDropdown(false)}
+                          style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 999,
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {formData.city && (
+                      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        ✓ Selected: {formData.city} {getCityCoordinates(formData.city) && `(${getCityCoordinates(formData.city)?.state})`}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -716,6 +880,29 @@ export default function ContactFormDialog({
                 </div>
               </div>
             </div>
+
+            {/* Customer Rating Section - Only for customers */}
+            {formData.contact_type === 'customer' && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer conversion rating</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Rate the probability of converting this customer to sales (1-{maxRatingScale})
+                  </label>
+                  <StarRating
+                    rating={formData.rating || 0}
+                    onChange={handleRatingChange}
+                    maxRating={maxRatingScale}
+                    size={24}
+                    readonly={false}
+                    showLabel={true}
+                  />
+                  <p className="text-xs text-gray-600 mt-3">
+                    Higher rating = Higher probability of conversion
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Avatar Section */}
             <div>

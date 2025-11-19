@@ -1429,7 +1429,8 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
 
 const contactController = require('./contact_management_controller')
 
-// Contacts
+// Contacts (specific routes before parameterized routes)
+router.get('/api/contacts/data-quality', contactController.getDataQualityMetrics)
 router.get('/api/contacts', contactController.getContacts)
 router.post('/api/contacts', contactController.createContact)
 router.put('/api/contacts/:id', contactController.updateContact)
@@ -1438,6 +1439,7 @@ router.delete('/api/contacts/:id', contactController.deleteContact)
 // Contact Stages
 router.get('/api/contact-stages', contactController.getContactStages)
 router.post('/api/contact-stages', contactController.createContactStage)
+router.put('/api/contact-stages/:id', contactController.updateContactStage)
 router.delete('/api/contact-stages/:id', contactController.deleteContactStage)
 
 // Traffic Channels
@@ -1472,6 +1474,10 @@ router.options('/api/contacts/import/execute', async (ctx) => {
 router.get('/api/contacts/import/template', contactController.getImportTemplate)
 router.post('/api/contacts/import/validate', contactController.validateImportData)
 router.post('/api/contacts/import/execute', contactController.executeImport)
+
+// Contact Settings
+router.get('/api/contact-settings', contactController.getContactSettings)
+router.put('/api/contact-settings', contactController.updateContactSettings)
 
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());

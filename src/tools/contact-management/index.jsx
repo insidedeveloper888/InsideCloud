@@ -3,23 +3,26 @@
  */
 
 import React, { useState } from 'react';
-import { Users, BarChart3, Kanban, Settings } from 'lucide-react';
+import { Users, BarChart3, Kanban, Settings, MapPin } from 'lucide-react';
 import { useContacts } from './hooks/useContacts';
 import { useStages } from './hooks/useStages';
 import { useChannels } from './hooks/useChannels';
 import { useTags } from './hooks/useTags';
 import { useRealtimeSync } from './hooks/useRealtimeSync';
 import { useCurrentUser } from './hooks/useCurrentUser';
+import { useContactSettings } from './hooks/useContactSettings';
 import ContactListView from './components/ContactListView';
 import DashboardView from './components/DashboardView';
 import KanbanView from './components/KanbanView';
 import SettingsView from './components/SettingsView';
+import MapViewLeaflet from './components/MapViewLeaflet';
 
 const TABS = {
   LIST: 0,
   DASHBOARD: 1,
   KANBAN: 2,
-  SETTINGS: 3,
+  MAP: 3,
+  SETTINGS: 4,
 };
 
 export default function ContactManagementApp({ organizationSlug }) {
@@ -80,10 +83,19 @@ export default function ContactManagementApp({ organizationSlug }) {
     await refreshContacts();
   };
 
+  // Fetch contact settings (rating scale, etc.)
+  const {
+    settings: contactSettings,
+    loading: settingsLoading,
+    updateSettings: updateContactSettings,
+  } = useContactSettings(organizationSlug);
+
+  const maxRatingScale = contactSettings?.max_rating_scale || 10;
+
   // Setup real-time sync
   useRealtimeSync(organizationSlug);
 
-  const isLoading = contactsLoading || stagesLoading || channelsLoading;
+  const isLoading = contactsLoading || stagesLoading || channelsLoading || settingsLoading;
   const error = contactsError;
 
   if (error) {
@@ -127,10 +139,11 @@ export default function ContactManagementApp({ organizationSlug }) {
             onRefresh={refreshContacts}
             onCreateTag={addTag}
             organizationSlug={organizationSlug}
+            maxRatingScale={maxRatingScale}
           />
         );
       case TABS.DASHBOARD:
-        return <DashboardView contacts={contacts} stages={stages} />;
+        return <DashboardView contacts={contacts} stages={stages} channels={channels} />;
       case TABS.KANBAN:
         return (
           <KanbanView
@@ -139,6 +152,8 @@ export default function ContactManagementApp({ organizationSlug }) {
             onUpdateContact={updateContact}
           />
         );
+      case TABS.MAP:
+        return <MapViewLeaflet contacts={contacts} />;
       case TABS.SETTINGS:
         return (
           <SettingsView
@@ -154,6 +169,8 @@ export default function ContactManagementApp({ organizationSlug }) {
             onAddTag={addTag}
             onUpdateTag={updateTag}
             onDeleteTag={deleteTag}
+            contactSettings={contactSettings}
+            onUpdateContactSettings={updateContactSettings}
           />
         );
       default:
@@ -165,6 +182,7 @@ export default function ContactManagementApp({ organizationSlug }) {
     { id: TABS.LIST, label: 'Contacts', icon: Users },
     { id: TABS.DASHBOARD, label: 'Analytics', icon: BarChart3 },
     { id: TABS.KANBAN, label: 'Kanban', icon: Kanban },
+    { id: TABS.MAP, label: 'Map', icon: MapPin },
     { id: TABS.SETTINGS, label: 'Settings', icon: Settings },
   ];
 

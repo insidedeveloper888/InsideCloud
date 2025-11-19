@@ -15,13 +15,43 @@ const CONTACT_TYPES = [
   { id: 'internal', label: 'Internal' },
 ];
 
-export default function FilterPanel({ filters, onFiltersChange, stages = [], channels = [], tags = [] }) {
+export default function FilterPanel({ filters, onFiltersChange, stages = [], channels = [], tags = [], maxRatingScale = 10 }) {
   const [expandedSections, setExpandedSections] = useState({
     contactType: true,
     stage: true,
     channel: true,
     tags: true,
+    rating: true,
   });
+
+  // Generate rating ranges dynamically based on maxRatingScale
+  const getRatingRanges = () => {
+    const max = maxRatingScale;
+    if (max <= 3) {
+      return [
+        { id: 'low', label: 'Low (1)', min: 1, max: 1 },
+        { id: 'medium', label: 'Medium (2)', min: 2, max: 2 },
+        { id: 'high', label: 'High (3)', min: 3, max: 3 },
+      ];
+    } else if (max <= 5) {
+      return [
+        { id: 'low', label: 'Low (1-2)', min: 1, max: 2 },
+        { id: 'medium', label: 'Medium (3)', min: 3, max: 3 },
+        { id: 'high', label: 'High (4-5)', min: 4, max: 5 },
+      ];
+    } else {
+      // For 6-10 stars, divide into thirds
+      const lowMax = Math.floor(max / 3);
+      const mediumMax = Math.floor((2 * max) / 3);
+      return [
+        { id: 'low', label: `Low (1-${lowMax})`, min: 1, max: lowMax },
+        { id: 'medium', label: `Medium (${lowMax + 1}-${mediumMax})`, min: lowMax + 1, max: mediumMax },
+        { id: 'high', label: `High (${mediumMax + 1}-${max})`, min: mediumMax + 1, max: max },
+      ];
+    }
+  };
+
+  const ratingRanges = getRatingRanges();
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({
@@ -40,12 +70,24 @@ export default function FilterPanel({ filters, onFiltersChange, stages = [], cha
     onFiltersChange(newFilters);
   };
 
+  const handleToggleRatingFilter = (rangeId) => {
+    const newRatings = filters.ratings?.includes(rangeId)
+      ? filters.ratings.filter((r) => r !== rangeId)
+      : [...(filters.ratings || []), rangeId];
+
+    onFiltersChange({
+      ...filters,
+      ratings: newRatings,
+    });
+  };
+
   const handleClearFilters = () => {
     onFiltersChange({
       contactTypes: [],
       stages: [],
       channels: [],
       tags: [],
+      ratings: [],
     });
   };
 
@@ -53,7 +95,8 @@ export default function FilterPanel({ filters, onFiltersChange, stages = [], cha
     filters.contactTypes.length > 0 ||
     filters.stages.length > 0 ||
     filters.channels.length > 0 ||
-    filters.tags?.length > 0;
+    filters.tags?.length > 0 ||
+    filters.ratings?.length > 0;
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -173,6 +216,47 @@ export default function FilterPanel({ filters, onFiltersChange, stages = [], cha
             )}
           </div>
         )}
+
+        {/* Rating Filter - Only for customers */}
+        <div className="border-b border-gray-200">
+          <button
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            onClick={() => toggleSection('rating')}
+          >
+            <span className="text-sm font-medium text-gray-900">Customer Rating</span>
+            {expandedSections.rating ? (
+              <ChevronDown size={16} className="text-gray-500" />
+            ) : (
+              <ChevronRight size={16} className="text-gray-500" />
+            )}
+          </button>
+          {expandedSections.rating && (
+            <div className="px-4 pb-3 space-y-2">
+              <p className="text-xs text-gray-500 mb-2">
+                Filter customers by conversion probability rating
+              </p>
+              {ratingRanges.map((range) => (
+                <label key={range.id} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.ratings?.includes(range.id)}
+                    onChange={() => handleToggleRatingFilter(range.id)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-lg"
+                      title={`${range.min}-${range.max} stars`}
+                    >
+                      ⭐
+                    </span>
+                    <span className="text-sm text-gray-700">{range.label}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Tags Filter */}
         {tags.length > 0 && (

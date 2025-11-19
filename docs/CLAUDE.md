@@ -156,6 +156,50 @@ The document parser is a **pure frontend tool for parsing and formatting account
 - **Components**: `src/tools/document-parser/components/` (SoftwareSelector, DocumentTypeSelector, FileUploader, DataPreviewTable, DownloadButton)
 - **Utilities**: `src/tools/document-parser/utils/constants.js`, `parsers/common/excelReader.js`, `parsers/common/csvReader.js`
 
+### Contact Management (名单管理) - Production Ready ✅
+
+**Status**: Production-ready as of 2025-11-19 (v1.0.0)
+
+The Contact Management tool is a **full-featured CRM system for managing customer, supplier, COI (Center of Influence), and internal contacts** with configurable rating scales and comprehensive filtering.
+
+**Key Features:**
+- ✅ Full CRUD operations for contacts with multi-field forms
+- ✅ Configurable customer rating system (3-10 star scale)
+- ✅ Advanced filtering by type, stage, traffic source, tags, and ratings
+- ✅ Custom pipeline stages with color-coding
+- ✅ Traffic channel (marketing source) management
+- ✅ Tag system for flexible categorization
+- ✅ Sales and customer service assignment
+- ✅ Referral tracking (referred_by_contact_id)
+- ✅ Malaysian address validation (state dropdown)
+- ✅ Avatar support with color backgrounds
+- ✅ Search functionality across all fields
+- ✅ List view (table and card modes)
+- ✅ Dashboard with key metrics
+- ✅ Settings panel for rating scale configuration
+
+**Unique Features:**
+- **Configurable Rating Scale**: Organizations can set rating scale from 3-10 stars via settings
+- **Dynamic Filters**: Rating filters adapt automatically to configured scale (Low/Medium/High ranges)
+- **Percentage-Based Colors**: Star colors calculate dynamically (70%+ green, 40-69% amber, <40% red)
+- **Multi-Entity Support**: Handle both individuals and companies with company-specific fields
+- **Referral Network**: Track referral relationships between contacts
+- **Assignment System**: Assign contacts to sales and customer service teams
+
+**Data Model:**
+- **Contacts**: Personal info, business info, contact details, address, assignments, ratings
+- **Contact Stages**: Custom pipeline stages (Lead → Qualified → Won, etc.)
+- **Traffic Channels**: Marketing sources (Website, Referral, Social Media, etc.)
+- **Contact Tags**: Flexible categorization with many-to-many relationships
+- **Contact Settings**: Organization-level configuration (rating scale)
+
+**Implementation Files:**
+- **Main Component**: `src/tools/contact-management/index.jsx`
+- **Backend Controller**: `server/contact_management_controller.js`
+- **Components**: `src/tools/contact-management/components/` (ContactListView, ContactFormDialog, FilterPanel, SettingsView, StarRating, etc.)
+- **Hooks**: `src/tools/contact-management/hooks/` (useContacts, useContactStages, useTrafficChannels, useContactTags, useContactSettings)
+- **Complete Schema**: `docs/contact-management-complete-schema.sql`
+
 ### Strategic Map - Production Ready ✅
 
 **Status**: Production-ready as of 2025-11-17 (v2.2.0)
@@ -358,6 +402,19 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. Key decisions:
 - **ADR-006**: Strategic map cascading - client-side pattern (migrated to database in v2.2.0)
 
 ## Recent Major Milestones
+
+### ✅ Contact Management v1.0.0 - Production Ready (2025-11-19)
+- Full CRM system with customer, supplier, COI, and internal contact types
+- Configurable rating system (3-10 stars) at organization level
+- Dynamic rating filters that adapt to configured scale
+- Comprehensive contact forms with all fields (personal, business, address)
+- Advanced filtering by type, stage, traffic source, tags, and ratings
+- Custom pipeline stages and traffic channels management
+- Tag system for flexible categorization
+- Sales and customer service assignment tracking
+- Malaysian address validation with state dropdown
+- Search functionality across all contact fields
+- Professional UI with table and card view modes
 
 ### ✅ Strategic Map v2.2.0 - Production Ready (2025-11-17)
 - Full migration from localStorage to database-driven architecture
