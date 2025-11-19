@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { X, Download, Upload, AlertCircle, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { X, Download, Upload, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8989';
 
@@ -17,7 +17,6 @@ const STEPS = {
 export default function ContactImportDialog({ isOpen, onClose, organizationSlug, individualId, onSuccess }) {
   const [currentStep, setCurrentStep] = useState(STEPS.UPLOAD);
   const [file, setFile] = useState(null);
-  const [parsedData, setParsedData] = useState([]);
   const [validationResults, setValidationResults] = useState(null);
   const [importResults, setImportResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +27,6 @@ export default function ContactImportDialog({ isOpen, onClose, organizationSlug,
   const handleClose = () => {
     setCurrentStep(STEPS.UPLOAD);
     setFile(null);
-    setParsedData([]);
     setValidationResults(null);
     setImportResults(null);
     setError(null);
@@ -112,8 +110,6 @@ export default function ContactImportDialog({ isOpen, onClose, organizationSlug,
       if (rows.length === 0) {
         throw new Error('CSV file is empty or invalid');
       }
-
-      setParsedData(rows);
 
       // Validate data
       const response = await fetch(`${API_BASE}/api/contacts/import/validate`, {

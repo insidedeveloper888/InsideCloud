@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Plus, Tag as TagIcon } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 
 export default function TagInput({
   selectedTags = [], // Array of tag objects { id, name, color }

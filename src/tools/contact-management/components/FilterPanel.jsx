@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import TagBadge from './TagBadge';
 
 const CONTACT_TYPES = [

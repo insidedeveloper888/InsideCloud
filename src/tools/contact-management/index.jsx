@@ -63,7 +63,6 @@ export default function ContactManagementApp({ organizationSlug }) {
 
   const {
     tags,
-    loading: tagsLoading,
     createTag: addTag,
     updateTag: updateTagOriginal,
     deleteTag: deleteTagOriginal,
