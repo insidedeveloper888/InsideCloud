@@ -1,0 +1,84 @@
+/**
+ * Kanban View - Pipeline Board
+ */
+
+import React from 'react';
+
+export default function KanbanView({ contacts = [], stages = [], onUpdateContact }) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-semibold text-gray-900">📋 流程看板</h2>
+
+      {stages.length > 0 ? (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {stages.map((stage) => {
+            const stageContacts = contacts.filter(
+              (c) => c.current_stage_id === stage.id
+            );
+
+            return (
+              <div
+                key={stage.id}
+                className="flex-shrink-0 w-80"
+              >
+                <div className="border border-gray-200 rounded-lg bg-white">
+                  {/* Column Header */}
+                  <div
+                    className="flex justify-between items-center p-4 border-b-2"
+                    style={{ borderBottomColor: stage.color }}
+                  >
+                    <h3 className="font-semibold text-gray-900">{stage.name}</h3>
+                    <span
+                      className="px-2.5 py-1 rounded-full text-sm font-medium"
+                      style={{
+                        backgroundColor: `${stage.color}20`,
+                        color: stage.color,
+                      }}
+                    >
+                      {stageContacts.length}
+                    </span>
+                  </div>
+
+                  {/* Contact Cards */}
+                  <div className="p-3 space-y-3 min-h-[200px]">
+                    {stageContacts.length > 0 ? (
+                      stageContacts.map((contact) => (
+                        <div
+                          key={contact.id}
+                          className="border border-gray-200 rounded-lg p-3 bg-white hover:shadow-md transition-shadow cursor-pointer"
+                        >
+                          <h4 className="font-semibold text-gray-900 text-sm">
+                            {contact.first_name} {contact.last_name}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {contact.contact_type === 'customer'
+                              ? '客户'
+                              : contact.contact_type === 'supplier'
+                              ? '供应商'
+                              : 'COI'}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-sm text-gray-500">无联系人</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-16">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+            <span className="text-3xl">📋</span>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无自定义阶段</h3>
+          <p className="text-gray-600">请在设置中创建阶段</p>
+        </div>
+      )}
+    </div>
+  );
+}

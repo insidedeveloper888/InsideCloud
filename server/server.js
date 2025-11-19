@@ -1422,6 +1422,57 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
         setHeader: (name, value) => { ctx.set(name, value) },
     })
 })
+
+// ============================================================================
+// Contact Management Routes
+// ============================================================================
+
+const contactController = require('./contact_management_controller')
+
+// Contacts
+router.get('/api/contacts', contactController.getContacts)
+router.post('/api/contacts', contactController.createContact)
+router.put('/api/contacts/:id', contactController.updateContact)
+router.delete('/api/contacts/:id', contactController.deleteContact)
+
+// Contact Stages
+router.get('/api/contact-stages', contactController.getContactStages)
+router.post('/api/contact-stages', contactController.createContactStage)
+router.delete('/api/contact-stages/:id', contactController.deleteContactStage)
+
+// Traffic Channels
+router.get('/api/traffic-channels', contactController.getTrafficChannels)
+router.post('/api/traffic-channels', contactController.createTrafficChannel)
+router.delete('/api/traffic-channels/:id', contactController.deleteTrafficChannel)
+
+// Organization Members
+router.get('/api/organization-members', contactController.getOrganizationMembers)
+
+// Contact Tags
+router.get('/api/contact-tags', contactController.getContactTags)
+router.post('/api/contact-tags', contactController.createContactTag)
+router.put('/api/contact-tags/:id', contactController.updateContactTag)
+router.delete('/api/contact-tags/:id', contactController.deleteContactTag)
+
+// Contact Tag Assignments
+router.get('/api/contacts/:id/tags', contactController.getContactTagsForContact)
+router.post('/api/contacts/:id/tags', contactController.assignTagsToContact)
+
+// Contact Import
+router.options('/api/contacts/import/validate', async (ctx) => {
+  const serverUtil = require('./server_util');
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+router.options('/api/contacts/import/execute', async (ctx) => {
+  const serverUtil = require('./server_util');
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+router.get('/api/contacts/import/template', contactController.getImportTemplate)
+router.post('/api/contacts/import/validate', contactController.validateImportData)
+router.post('/api/contacts/import/execute', contactController.executeImport)
+
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());
 app.listen(port, () => {

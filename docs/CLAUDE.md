@@ -121,6 +121,41 @@ After authentication:
 4. Sets `session.is_admin = (role_code === 'admin' || role_code === 'owner')`
 5. Frontend checks `isAdmin` to show/hide admin features
 
+### Document Parser - Production Ready ✅
+
+**Status**: Production-ready as of 2025-11-18 (v1.0.0)
+
+The document parser is a **pure frontend tool for parsing and formatting accounting software exports** with no database or API dependencies.
+
+**Key Features:**
+- ✅ Pure frontend implementation (no database, no API, no file storage)
+- ✅ Multi-software support (SQL Accounting, Autocount ready for future)
+- ✅ Excel (.xlsx, .xls) and CSV file format support
+- ✅ Custom parsers for each document type with invoice+item combination
+- ✅ Live preview table with metadata display
+- ✅ CSV export with timestamped filenames
+- ✅ Proper number formatting (2 decimal places), date standardization (YYYY-MM-DD)
+- ✅ Automatic handling of totals rows and count summary rows
+
+**Supported Document Types (SQL Accounting):**
+1. Customer Document Listing - Invoice with Item
+2. Supplier Document Listing
+3. GL Document Listing - OR
+4. GL Document Listing - PV
+
+**Data Transformation:**
+- Combines invoice rows with multiple item rows (one output row per item)
+- Inserts item columns at specified positions in output
+- Cleans placeholder values ("----")
+- Handles Excel date formatting and custom cell formats
+- Skips summary/totals rows automatically
+
+**Implementation Files:**
+- **Main Component**: `src/tools/document-parser/index.jsx`
+- **Parsers**: `src/tools/document-parser/parsers/sql-accounting/` (separate file per document type)
+- **Components**: `src/tools/document-parser/components/` (SoftwareSelector, DocumentTypeSelector, FileUploader, DataPreviewTable, DownloadButton)
+- **Utilities**: `src/tools/document-parser/utils/constants.js`, `parsers/common/excelReader.js`, `parsers/common/csvReader.js`
+
 ### Strategic Map - Production Ready ✅
 
 **Status**: Production-ready as of 2025-11-17 (v2.2.0)

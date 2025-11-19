@@ -421,13 +421,6 @@ body {
   }
 }
 
-/* Focus states for accessibility */
-.glass-card:focus,
-button:focus {
-  outline: 2px solid var(--cyan-400);
-  outline-offset: 2px;
-}
-
 /* Print styles */
 @media print {
   .glass-header,
