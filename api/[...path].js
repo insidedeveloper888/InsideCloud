@@ -28,6 +28,12 @@ const currentUser = require('../server/api_handlers/current_user');
 const strategicMapV2 = require('../server/api_handlers/strategic_map_v2');
 const strategicMapV2Batch = require('../server/api_handlers/strategic_map_v2_batch');
 const adminOrganizations = require('../server/api_handlers/admin_organizations');
+const contacts = require('../server/api_handlers/contacts');
+const contactStages = require('../server/api_handlers/contact_stages');
+const trafficChannels = require('../server/api_handlers/traffic_channels');
+const contactTags = require('../server/api_handlers/contact_tags');
+const contactSettings = require('../server/api_handlers/contact_settings');
+const organizationMembers = require('../server/api_handlers/organization_members');
 
 /**
  * Route mapping: path -> handler
@@ -45,6 +51,12 @@ const routes = {
   '/api/strategic_map_v2': strategicMapV2,
   '/api/strategic_map_v2/batch': strategicMapV2Batch,
   '/api/admin/organizations': adminOrganizations,
+  '/api/contacts': contacts,
+  '/api/contact-stages': contactStages,
+  '/api/traffic-channels': trafficChannels,
+  '/api/contact-tags': contactTags,
+  '/api/contact-settings': contactSettings,
+  '/api/organization-members': organizationMembers,
 };
 
 /**
@@ -75,6 +87,17 @@ module.exports = async function handler(req, res) {
   // If still not found, try with trailing slash
   if (!routeHandler && !path.endsWith('/')) {
     routeHandler = routes[path + '/'];
+  }
+
+  // If still not found, try prefix matching for routes with path parameters
+  // e.g., /api/contacts/123 should match /api/contacts handler
+  if (!routeHandler) {
+    for (const [routePath, handler] of Object.entries(routes)) {
+      if (path.startsWith(routePath + '/') || path.startsWith(routePath + '?')) {
+        routeHandler = handler;
+        break;
+      }
+    }
   }
 
   if (!routeHandler) {
