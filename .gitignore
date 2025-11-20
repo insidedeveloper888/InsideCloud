@@ -21,5 +21,9 @@
 
 npm-debug.log*
 
+# MCP configuration (contains secrets)
+.mcp.json
+.claude/mcp.json
+.env.mcp
 
 .vercel
