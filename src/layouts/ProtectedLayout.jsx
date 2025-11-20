@@ -220,7 +220,7 @@ function ProtectedLayout({
       <main className="flex-grow bg-gray-50 min-h-[calc(100vh-44px)] sm:min-h-[calc(100vh-48px)]">
         <div
           className={cn(
-            activeView === "strategic_map" || activeView === "strategic_map_v2"
+            activeView === "strategic_map" || activeView === "strategic_map_v2" || activeView === "inventory"
               ? "p-0"
               : "px-4 sm:px-6 md:px-8 py-5 md:py-7"
           )}

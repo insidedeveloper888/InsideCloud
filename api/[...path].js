@@ -28,6 +28,7 @@ const currentUser = require('../server/api_handlers/current_user');
 const strategicMapV2 = require('../server/api_handlers/strategic_map_v2');
 const strategicMapV2Batch = require('../server/api_handlers/strategic_map_v2_batch');
 const adminOrganizations = require('../server/api_handlers/admin_organizations');
+<<<<<<< Updated upstream
 const contacts = require('../server/api_handlers/contacts');
 const contactStages = require('../server/api_handlers/contact_stages');
 const trafficChannels = require('../server/api_handlers/traffic_channels');
@@ -36,6 +37,9 @@ const contactSettings = require('../server/api_handlers/contact_settings');
 const organizationMembers = require('../server/api_handlers/organization_members');
 const products = require('../server/api_handlers/products');
 const productsDashboard = require('../server/api_handlers/products_dashboard');
+=======
+const inventory = require('../server/api_handlers/inventory');
+>>>>>>> Stashed changes
 
 /**
  * Route mapping: path -> handler
@@ -55,6 +59,7 @@ const routes = {
   '/api/strategic_map_v2': strategicMapV2,
   '/api/strategic_map_v2/batch': strategicMapV2Batch,
   '/api/admin/organizations': adminOrganizations,
+<<<<<<< Updated upstream
   '/api/contacts': contacts,
   '/api/contact-stages': contactStages,
   '/api/traffic-channels': trafficChannels,
@@ -63,6 +68,9 @@ const routes = {
   '/api/organization-members': organizationMembers,
   '/api/products/dashboard': productsDashboard, // More specific route first!
   '/api/products': products,
+=======
+  '/api/inventory': inventory,
+>>>>>>> Stashed changes
 };
 
 /**

@@ -1426,6 +1426,7 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
 })
 
 // ============================================================================
+<<<<<<< Updated upstream
 // Contact Management Routes
 // ============================================================================
 
@@ -1584,6 +1585,103 @@ router.get('/api/products', async (ctx) => {
     ctx.status = error.status || 500
     ctx.body = serverUtil.failResponse(error.message || 'Internal server error')
   }
+=======
+// Inventory Management Routes
+// ============================================================================
+// OPTIONS handler for CORS preflight
+router.options('/api/inventory', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+
+router.get('/api/inventory', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    const inventoryHandler = require('./api_handlers/inventory')
+    await inventoryHandler({
+        method: ctx.method,
+        query: ctx.query,
+        body: ctx.request.body || {},
+        headers: ctx.headers,
+        url: ctx.url
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: (name, value) => { ctx.set(name, value) },
+    })
+})
+
+router.post('/api/inventory', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    const inventoryHandler = require('./api_handlers/inventory')
+    await inventoryHandler({
+        method: ctx.method,
+        query: ctx.query,
+        body: ctx.request.body || {},
+        headers: ctx.headers,
+        url: ctx.url
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: (name, value) => { ctx.set(name, value) },
+    })
+})
+
+// OPTIONS handler for CORS preflight on dynamic inventory route
+router.options('/api/inventory/:id', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+
+router.put('/api/inventory/:id', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    const inventoryHandler = require('./api_handlers/inventory')
+
+    // Pass the full URL so the handler can extract the ID
+    await inventoryHandler({
+        method: ctx.method,
+        query: ctx.query,
+        body: ctx.request.body || {},
+        headers: ctx.headers,
+        url: ctx.url // Pass the full URL with the ID
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: (name, value) => { ctx.set(name, value) },
+    })
+})
+
+// OPTIONS handler for upload-do endpoint
+router.options('/api/inventory/upload-do', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+
+router.post('/api/inventory/upload-do', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    const inventoryHandler = require('./api_handlers/inventory')
+    await inventoryHandler({
+        method: ctx.method,
+        query: ctx.query,
+        body: ctx.request.body || {},
+        headers: ctx.headers,
+        url: '/api/inventory/upload-do'
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: (name, value) => { ctx.set(name, value) },
+    })
+>>>>>>> Stashed changes
 })
 
 var port = process.env.PORT || serverConfig.config.apiPort;
