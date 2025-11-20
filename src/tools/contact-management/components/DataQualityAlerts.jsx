@@ -127,35 +127,35 @@ export default function DataQualityAlerts({ organizationSlug, onAlertClick }) {
 
   const colorStyles = {
     red: {
-      bg: 'bg-red-50',
-      border: 'border-red-200',
-      text: 'text-red-900',
-      icon: 'text-red-600',
-      hover: 'hover:bg-red-100',
-      badge: 'bg-red-600',
+      bg: 'bg-white',
+      border: 'border-gray-200 border-l-4 border-l-red-500',
+      text: 'text-gray-900',
+      icon: 'text-red-500',
+      hover: 'hover:bg-gray-50 hover:border-l-red-600',
+      badge: 'bg-gray-100 text-gray-700',
     },
     orange: {
-      bg: 'bg-orange-50',
-      border: 'border-orange-200',
-      text: 'text-orange-900',
-      icon: 'text-orange-600',
-      hover: 'hover:bg-orange-100',
-      badge: 'bg-orange-600',
+      bg: 'bg-white',
+      border: 'border-gray-200 border-l-4 border-l-orange-500',
+      text: 'text-gray-900',
+      icon: 'text-orange-500',
+      hover: 'hover:bg-gray-50 hover:border-l-orange-600',
+      badge: 'bg-gray-100 text-gray-700',
     },
     yellow: {
-      bg: 'bg-yellow-50',
-      border: 'border-yellow-200',
-      text: 'text-yellow-900',
-      icon: 'text-yellow-600',
-      hover: 'hover:bg-yellow-100',
-      badge: 'bg-yellow-600',
+      bg: 'bg-white',
+      border: 'border-gray-200 border-l-4 border-l-amber-500',
+      text: 'text-gray-900',
+      icon: 'text-amber-500',
+      hover: 'hover:bg-gray-50 hover:border-l-amber-600',
+      badge: 'bg-gray-100 text-gray-700',
     },
   };
 
   return (
-    <div className="mb-4">
-      {/* Alert Cards */}
-      <div className="flex flex-wrap gap-2">
+    <div className="mb-6">
+      {/* Alert Cards - Grid layout for consistent width */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {alerts.map((alert) => {
           const Icon = alert.icon;
           const styles = colorStyles[alert.color];
@@ -164,15 +164,20 @@ export default function DataQualityAlerts({ organizationSlug, onAlertClick }) {
             <button
               key={alert.id}
               onClick={() => onAlertClick && onAlertClick(alert.filterType)}
-              className={`${styles.bg} ${styles.border} ${styles.hover} border rounded-lg px-3 py-2 text-left transition-all hover:shadow-sm flex items-center gap-2`}
+              className={`${styles.bg} ${styles.border} ${styles.hover} border rounded-lg px-4 py-3 text-left transition-all shadow-sm hover:shadow-md active:shadow-lg flex items-center gap-3 w-full touch-manipulation`}
             >
-              <div className={styles.icon}>
-                <Icon size={16} />
+              <div className={`${styles.icon} shrink-0`}>
+                <Icon size={20} />
               </div>
-              <span className={`text-sm font-medium ${styles.text}`}>
-                {alert.title}
-              </span>
-              <span className={`${styles.badge} text-white text-xs font-bold px-2 py-0.5 rounded-full`}>
+              <div className="flex-1 min-w-0">
+                <span className={`text-sm font-medium ${styles.text} block truncate`}>
+                  {alert.title}
+                </span>
+                <span className="text-xs text-gray-500 mt-0.5 block">
+                  Click to filter
+                </span>
+              </div>
+              <span className={`${styles.badge} text-xs font-semibold px-2.5 py-1 rounded-md shrink-0 min-w-[32px] text-center`}>
                 {alert.count}
               </span>
             </button>

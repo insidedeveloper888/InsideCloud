@@ -20,10 +20,10 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
     totalCustomers > 0 ? ((wonCustomers / totalCustomers) * 100).toFixed(1) : 0;
 
   const metrics = [
-    { label: 'Total customers', value: totalCustomers, color: '#2196F3' },
-    { label: 'Won customers', value: wonCustomers, color: '#4CAF50' },
-    { label: 'Conversion rate', value: `${conversionRate}%`, color: '#FF9800' },
-    { label: 'Active contacts', value: totalCustomers - wonCustomers, color: '#9C27B0' },
+    { label: 'Total customers', value: totalCustomers, icon: '👥', trend: null },
+    { label: 'Won customers', value: wonCustomers, icon: '✓', trend: null },
+    { label: 'Conversion rate', value: `${conversionRate}%`, icon: '📈', trend: null },
+    { label: 'Active contacts', value: totalCustomers - wonCustomers, icon: '⚡', trend: null },
   ];
 
   // Filter customers by channel for funnel
@@ -117,21 +117,21 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">📊 Analytics</h2>
+    <div className="space-y-4 md:space-y-6">
+      <h2 className="text-lg md:text-xl font-semibold text-gray-900">📊 Analytics</h2>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {metrics.map((metric, index) => (
           <div
             key={index}
-            className="border border-gray-200 rounded-lg p-6 bg-white hover:shadow-md transition-shadow"
+            className="border border-gray-200 rounded-lg p-4 md:p-6 bg-white hover:shadow-sm hover:border-gray-300 transition-all"
           >
-            <p className="text-sm text-gray-600 mb-2">{metric.label}</p>
-            <p
-              className="text-4xl font-bold"
-              style={{ color: metric.color }}
-            >
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <p className="text-xs md:text-sm text-gray-600 font-medium">{metric.label}</p>
+              <span className="text-lg md:text-xl">{metric.icon}</span>
+            </div>
+            <p className="text-2xl md:text-4xl font-bold text-gray-900">
               {metric.value}
             </p>
           </div>
@@ -139,24 +139,21 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
       </div>
 
       {/* Customer Conversion Funnel and Channel Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Customer Conversion Funnel */}
-        <div className="lg:col-span-2 border border-gray-200 rounded-lg p-6 bg-white">
-          <div className="flex items-center justify-between mb-4">
+        <div className="lg:col-span-2 border border-gray-200 rounded-lg p-4 md:p-6 bg-white overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Customer conversion funnel</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Progression of customers through sales stages
-              </p>
+              <h3 className="text-base md:text-lg font-semibold text-gray-900">Customer conversion funnel</h3>
             </div>
 
             {/* Channel Filter */}
             <div className="flex items-center gap-2">
-              <Filter size={16} className="text-gray-500" />
+              <Filter size={16} className="text-gray-500 shrink-0" />
               <select
                 value={selectedChannelId || ''}
                 onChange={(e) => setSelectedChannelId(e.target.value || null)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                className="px-2 md:px-3 py-1.5 md:py-2 border border-gray-300 rounded-lg text-xs md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white w-full sm:w-auto"
               >
                 <option value="" className="text-gray-900">All channels</option>
                 {channels.map((channel) => (
@@ -168,7 +165,7 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
             </div>
           </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 md:space-y-4">
           {funnelData.map((item, index) => {
             const widthPercentage = maxCustomerCount > 0
               ? (item.count / maxCustomerCount) * 100
@@ -178,9 +175,9 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
               <div key={item.stage.id}>
                 {/* Conversion Rate Indicator */}
                 {index > 0 && (
-                  <div className="flex items-center justify-center py-2">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <div className="h-8 w-px bg-gray-300" />
+                  <div className="flex items-center justify-center py-1.5 md:py-2">
+                    <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
+                      <div className="h-6 md:h-8 w-px bg-gray-300" />
                       <span className="font-semibold">
                         {item.conversionFromPrevious}% conversion
                       </span>
@@ -191,32 +188,35 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
                 {/* Funnel Stage Bar */}
                 <div className="relative">
                   <div
-                    className="rounded-lg p-4 transition-all hover:shadow-md"
+                    className="rounded-lg p-3 md:p-4 transition-all hover:shadow-md"
                     style={{
                       backgroundColor: `${item.stage.color}20`,
-                      width: `${Math.max(widthPercentage, 15)}%`,
+                      width: `${Math.max(widthPercentage, 25)}%`,
                       marginLeft: 'auto',
                       marginRight: 'auto',
+                      minWidth: '200px',
                     }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      {/* Stage Name */}
+                      <div className="flex items-center gap-2 md:gap-3">
                         <div
-                          className="w-3 h-3 rounded-full"
+                          className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0"
                           style={{ backgroundColor: item.stage.color }}
                         />
-                        <span className="text-sm font-semibold text-gray-900">
+                        <span className="text-xs md:text-sm font-semibold text-gray-900 truncate">
                           {item.stage.name}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl font-bold text-gray-900">
+                      {/* Count and Percentage */}
+                      <div className="flex items-baseline gap-2 md:gap-3">
+                        <span className="text-xl md:text-2xl font-bold text-gray-900">
                           {item.count}
                         </span>
-                        <span className="text-sm text-gray-500 font-medium">
+                        <span className="text-xs md:text-sm text-gray-500 font-medium whitespace-nowrap">
                           ({filteredCustomers.length > 0
                             ? ((item.count / filteredCustomers.length) * 100).toFixed(0)
-                            : 0}% of total)
+                            : 0}%)
                         </span>
                       </div>
                     </div>
@@ -235,17 +235,20 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
         </div>
 
         {/* Customer Distribution by Channel - Pie Chart */}
-        <div className="border border-gray-200 rounded-lg p-6 bg-white">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer by channel</h3>
-          <p className="text-sm text-gray-600 mb-6">
+        <div className="border border-gray-200 rounded-lg p-4 md:p-6 bg-white">
+          <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">Customer by channel</h3>
+          <p className="text-xs md:text-sm text-gray-600 mb-4 md:mb-6">
             Distribution of customers across traffic sources
           </p>
 
           {channelDistribution.length > 0 ? (
             <>
-              {/* Pie Chart SVG */}
-              <div className="flex justify-center mb-6">
-                <svg width="200" height="200" viewBox="0 0 200 200">
+              {/* Pie Chart SVG - Responsive size */}
+              <div className="flex justify-center mb-4 md:mb-6">
+                <svg
+                  className="w-40 h-40 md:w-52 md:h-52"
+                  viewBox="0 0 200 200"
+                >
                   {pieSlices.map((slice, index) => (
                     <path
                       key={index}
@@ -262,7 +265,7 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
                     x="100"
                     y="95"
                     textAnchor="middle"
-                    className="text-2xl font-bold fill-gray-900"
+                    className="text-xl md:text-2xl font-bold fill-gray-900"
                   >
                     {customers.length}
                   </text>
@@ -278,27 +281,27 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
               </div>
 
               {/* Legend */}
-              <div className="space-y-2">
+              <div className="space-y-1.5 md:space-y-2">
                 {channelDistribution.map((item, index) => (
                   <div
                     key={item.channel.id}
                     className="flex items-center justify-between p-2 rounded hover:bg-gray-50"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0"
                         style={{
                           backgroundColor: item.channel.id === 'none'
                             ? item.channel.color
                             : colors[index % colors.length]
                         }}
                       />
-                      <span className="text-sm text-gray-900 font-medium">
+                      <span className="text-xs md:text-sm text-gray-900 font-medium truncate">
                         {item.channel.name}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-gray-900">
+                    <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                      <span className="text-xs md:text-sm font-bold text-gray-900">
                         {item.count}
                       </span>
                       <span className="text-xs text-gray-500">
@@ -311,7 +314,7 @@ export default function DashboardView({ contacts = [], stages = [], channels = [
             </>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No customer data available</p>
+              <p className="text-sm">No customer data available</p>
             </div>
           )}
         </div>

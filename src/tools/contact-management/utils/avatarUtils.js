@@ -10,37 +10,56 @@ export function getInitials(firstName, lastName) {
 }
 
 export function getRandomColor() {
+  // Softer, more professional pastel palette
   const colors = [
-    '#FF6B6B', // Red
-    '#4ECDC4', // Teal
-    '#45B7D1', // Blue
-    '#FFA07A', // Salmon
-    '#98D8C8', // Mint
-    '#F7DC6F', // Yellow
-    '#BB8FCE', // Purple
-    '#85C1E2', // Sky Blue
-    '#F8B88B', // Orange
-    '#90EE90', // Light Green
+    '#DBEAFE', // Light Blue
+    '#E0E7FF', // Light Indigo
+    '#FCE7F3', // Light Pink
+    '#FEF3C7', // Light Amber
+    '#D1FAE5', // Light Emerald
+    '#DDD6FE', // Light Violet
+    '#FBCFE8', // Light Rose
+    '#BAE6FD', // Light Sky
+    '#FED7AA', // Light Orange
+    '#BBF7D0', // Light Green
   ];
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-export function getInitialsAvatar(initials, color = '#1976D2', size = 48) {
+// Text color mapping for each background color
+const getTextColorForBackground = (bgColor) => {
+  const textColorMap = {
+    '#DBEAFE': '#1E40AF', // Blue 800
+    '#E0E7FF': '#4338CA', // Indigo 700
+    '#FCE7F3': '#9F1239', // Rose 800
+    '#FEF3C7': '#92400E', // Amber 800
+    '#D1FAE5': '#065F46', // Emerald 800
+    '#DDD6FE': '#5B21B6', // Violet 800
+    '#FBCFE8': '#9F1239', // Rose 800
+    '#BAE6FD': '#075985', // Sky 800
+    '#FED7AA': '#9A3412', // Orange 800
+    '#BBF7D0': '#166534', // Green 800
+  };
+  return textColorMap[bgColor] || '#374151'; // Gray 700 as fallback
+};
+
+export function getInitialsAvatar(initials, color = '#DBEAFE', size = 48) {
   const fontSize = Math.floor(size / 2.5);
   const textX = size / 2;
   const textY = size / 2 + fontSize / 3;
+  const textColor = getTextColorForBackground(color);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-    <rect width="${size}" height="${size}" fill="${color}"/>
+    <rect width="${size}" height="${size}" fill="${color}" rx="${size / 8}"/>
     <text
       x="${textX}"
       y="${textY}"
       font-size="${fontSize}"
-      font-weight="bold"
-      font-family="Arial, sans-serif"
+      font-weight="600"
+      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
       text-anchor="middle"
       dominant-baseline="middle"
-      fill="white"
+      fill="${textColor}"
     >
       ${initials}
     </text>

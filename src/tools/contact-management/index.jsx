@@ -190,13 +190,13 @@ export default function ContactManagementApp({ organizationSlug }) {
       <div className="space-y-4">
         {/* Header */}
         <div className="border-b border-gray-200">
-          <div className="px-6 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">名单管理</h1>
+          <div className="px-4 md:px-6 py-3 md:py-4">
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">名单管理</h1>
           </div>
 
-          {/* Tabs */}
-          <div className="px-6">
-            <div className="flex gap-1 border-b border-gray-200">
+          {/* Tabs - Mobile: Icon only, Desktop: Icon + Text */}
+          <div className="px-2 md:px-6">
+            <div className="flex gap-0.5 md:gap-1 border-b border-gray-200 overflow-x-auto no-scrollbar">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -205,17 +205,18 @@ export default function ContactManagementApp({ organizationSlug }) {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      flex items-center gap-2 px-4 py-3 font-medium text-sm transition-colors
-                      border-b-2 -mb-px
+                      flex items-center justify-center gap-1 md:gap-2 px-3 md:px-4 py-2.5 md:py-3
+                      font-medium text-sm transition-colors whitespace-nowrap
+                      border-b-2 -mb-px min-w-[60px] md:min-w-0
                       ${
                         isActive
-                          ? 'text-blue-600'
+                          ? 'text-blue-600 border-blue-600'
                           : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
                       }
                     `}
                   >
-                    <Icon size={18} />
-                    <span>{tab.label}</span>
+                    <Icon size={18} className="shrink-0" />
+                    <span className="hidden md:inline">{tab.label}</span>
                   </button>
                 );
               })}
@@ -224,7 +225,7 @@ export default function ContactManagementApp({ organizationSlug }) {
         </div>
 
         {/* Content */}
-        <div className="px-6 pb-6">{renderContent()}</div>
+        <div className="px-4 md:px-6 pb-6">{renderContent()}</div>
       </div>
     </div>
   );

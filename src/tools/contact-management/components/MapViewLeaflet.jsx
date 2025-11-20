@@ -183,38 +183,44 @@ export default function MapViewLeaflet({ contacts = [] }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">🗺️ Customer Distribution Map</h2>
-        <div className="flex items-center gap-4">
+    <div className="space-y-4 md:space-y-6">
+      {/* Header Section - Responsive layout */}
+      <div className="space-y-3">
+        <h2 className="text-lg md:text-xl font-semibold text-gray-900">🗺️ Customer Distribution Map</h2>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
             <button
               onClick={() => setViewMode('state')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
                 viewMode === 'state'
                   ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900 active:bg-gray-50'
               }`}
             >
-              <MapIcon size={16} />
+              <MapIcon size={16} className="shrink-0" />
               <span>By State</span>
             </button>
             <button
               onClick={() => setViewMode('city')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
                 viewMode === 'city'
                   ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900 active:bg-gray-50'
               }`}
             >
-              <MapPin size={16} />
+              <MapPin size={16} className="shrink-0" />
               <span>By City</span>
             </button>
           </div>
 
-          <div className="text-sm text-gray-600">
-            {viewMode === 'city' ? customersWithCity : customersWithState} customers with location ({customersWithoutLocation} without)
+          {/* Customer count */}
+          <div className="text-xs md:text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+            <span className="font-semibold text-blue-900">
+              {viewMode === 'city' ? customersWithCity : customersWithState}
+            </span> customers with location
+            <span className="text-blue-700"> ({customersWithoutLocation} without)</span>
           </div>
         </div>
       </div>

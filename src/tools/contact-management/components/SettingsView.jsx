@@ -145,13 +145,13 @@ export default function SettingsView({
   ];
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">⚙️ Settings</h2>
+    <div className="space-y-4 md:space-y-6">
+      <h2 className="text-lg md:text-xl font-semibold text-gray-900">⚙️ Settings</h2>
 
       {/* General Settings */}
-      <div className="border border-gray-200 rounded-lg p-6 bg-white">
-        <h3 className="font-semibold text-gray-900 mb-2">General Settings</h3>
-        <p className="text-sm text-gray-600 mb-4">Configure general contact management settings</p>
+      <div className="border border-gray-200 rounded-lg p-4 md:p-6 bg-white">
+        <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">General Settings</h3>
+        <p className="text-xs md:text-sm text-gray-600 mb-4">Configure general contact management settings</p>
 
         <div className="space-y-4">
           {/* Rating Scale Configuration */}
@@ -162,11 +162,11 @@ export default function SettingsView({
             <p className="text-xs text-gray-500 mb-3">
               Choose how many stars you want to use for customer conversion probability ratings (3-10 stars)
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <select
                 value={selectedRatingScale}
                 onChange={(e) => handleRatingScaleChange(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                className="w-full sm:flex-1 px-3 py-2.5 md:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-sm"
               >
                 <option value="3">3-star rating (Low, Medium, High)</option>
                 <option value="4">4-star rating</option>
@@ -177,23 +177,25 @@ export default function SettingsView({
                 <option value="9">9-star rating</option>
                 <option value="10">10-star rating (Detailed)</option>
               </select>
-              <span className="text-sm text-gray-600">
-                Current: {selectedRatingScale} stars
-              </span>
+              <div className="flex items-center justify-center px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg sm:shrink-0">
+                <span className="text-xs md:text-sm text-blue-900 font-medium whitespace-nowrap">
+                  Current: <span className="font-bold">{selectedRatingScale}</span> stars
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Responsive with horizontal scroll on mobile */}
       <div className="border-b border-gray-200">
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`
-                px-4 py-2 font-medium text-sm transition-colors
+                px-3 md:px-4 py-2 md:py-3 font-medium text-xs md:text-sm transition-colors whitespace-nowrap
                 border-b-2 -mb-px
                 ${
                   activeTab === tab.id

@@ -2,10 +2,11 @@
  * FilterPanel Component
  * Advanced filter options for contacts
  * Styled with Tailwind CSS
+ * Responsive: Drawer on mobile, sidebar on desktop
  */
 
-import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import TagBadge from './TagBadge';
 
 const CONTACT_TYPES = [
@@ -15,7 +16,16 @@ const CONTACT_TYPES = [
   { id: 'internal', label: 'Internal' },
 ];
 
-export default function FilterPanel({ filters, onFiltersChange, stages = [], channels = [], tags = [], maxRatingScale = 10 }) {
+export default function FilterPanel({
+  filters,
+  onFiltersChange,
+  stages = [],
+  channels = [],
+  tags = [],
+  maxRatingScale = 10,
+  isOpen = true,
+  onClose = () => {}
+}) {
   const [expandedSections, setExpandedSections] = useState({
     contactType: true,
     stage: true,
@@ -98,22 +108,68 @@ export default function FilterPanel({ filters, onFiltersChange, stages = [], cha
     filters.tags?.length > 0 ||
     filters.ratings?.length > 0;
 
+  // Prevent body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isOpen && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // Don't render if not open on mobile
+  if (!isOpen) {
+    return null;
+  }
+
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
-          {hasActiveFilters && (
-            <button
-              onClick={handleClearFilters}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Clear all
-            </button>
-          )}
+    <>
+      {/* Mobile: Overlay backdrop */}
+      <div
+        className={`fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
+      />
+
+      {/* Filter Panel - Mobile: Drawer, Desktop: Sidebar */}
+      <div
+        className={`
+          fixed md:relative top-0 right-0 h-full w-[85%] max-w-sm md:max-w-none md:w-64
+          bg-white md:border-r border-gray-200 flex flex-col
+          z-50 md:z-auto
+          transform transition-transform duration-300 ease-in-out
+          ${isOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
+          shadow-2xl md:shadow-none
+        `}
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearFilters}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Clear all
+                </button>
+              )}
+              {/* Close button - Mobile only */}
+              <button
+                onClick={onClose}
+                className="md:hidden p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                aria-label="Close filters"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
       {/* Filter Sections */}
       <div className="flex-1 overflow-y-auto">
@@ -290,6 +346,7 @@ export default function FilterPanel({ filters, onFiltersChange, stages = [], cha
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
