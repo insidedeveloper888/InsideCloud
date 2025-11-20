@@ -1294,7 +1294,33 @@ router.delete('/api/strategic_map', requireProductAccess('strategic_map'), async
 // Organization API route (for realtime sync)
 router.get('/api/organization', async (ctx) => {
     const organizationHandler = require('./api_handlers/organization')
-    await organizationHandler(ctx)
+
+    // Wrap Express-style handler for Koa
+    // Create mock req/res objects from Koa ctx
+    const req = {
+        query: ctx.query,
+        body: ctx.request.body,
+        headers: ctx.headers,
+        method: ctx.method,
+        url: ctx.url,
+    };
+
+    const res = {
+        status: (code) => {
+            ctx.status = code;
+            return res;
+        },
+        json: (data) => {
+            ctx.body = data;
+            return res;
+        },
+        setHeader: (key, value) => {
+            ctx.set(key, value);
+        },
+        end: () => {},
+    };
+
+    await organizationHandler(req, res);
 })
 
 // Current user API route
