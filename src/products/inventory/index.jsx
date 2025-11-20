@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector';
 import { InventoryAPI } from './api/inventory';
-import { Package, Plus, Warehouse, Activity, Search, Filter, Minus, FileText, Truck, CheckCircle, Settings, Users, Trash2, X, Upload, Clock, Eye } from 'lucide-react';
+import { Package, Plus, Warehouse, Activity, Search, Filter, Minus, FileText, Truck, CheckCircle, Settings, Users, X, Upload, Clock, Eye } from 'lucide-react';
 
 /**
  * Inventory Management Product
@@ -24,7 +24,7 @@ export default function InventoryProduct({ onBack }) {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryFilter] = useState(''); // eslint-disable-line no-unused-vars
 
   // Search states for each tab
   const [poSearchTerm, setPoSearchTerm] = useState('');
@@ -174,6 +174,7 @@ export default function InventoryProduct({ onBack }) {
   useEffect(() => {
     if (!organizationSlug) return;
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationSlug, tab]);
 
   const fetchData = async () => {
