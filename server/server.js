@@ -1426,7 +1426,6 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
 })
 
 // ============================================================================
-<<<<<<< Updated upstream
 // Contact Management Routes
 // ============================================================================
 
@@ -1585,7 +1584,9 @@ router.get('/api/products', async (ctx) => {
     ctx.status = error.status || 500
     ctx.body = serverUtil.failResponse(error.message || 'Internal server error')
   }
-=======
+})
+
+// ============================================================================
 // Inventory Management Routes
 // ============================================================================
 // OPTIONS handler for CORS preflight
@@ -1681,7 +1682,6 @@ router.post('/api/inventory/upload-do', async (ctx) => {
         json: (data) => { ctx.body = data },
         setHeader: (name, value) => { ctx.set(name, value) },
     })
->>>>>>> Stashed changes
 })
 
 var port = process.env.PORT || serverConfig.config.apiPort;

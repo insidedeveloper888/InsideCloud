@@ -39,7 +39,8 @@ import './index.css';
 import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
 import DocumentParser from '../../tools/document-parser/index.jsx';
 import ContactManagementApp from '../../tools/contact-management/index.jsx';
-import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon } from '../../components/ui/icons';
+import InventoryProduct from '../../products/inventory/index.jsx';
+import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';
 import { useOrganizationProducts } from '../../hooks/useOrganizationProducts';
@@ -76,6 +77,7 @@ const DashboardContent = ({ onNavigate, organizationSlug }) => {
     'ContactBookIcon': ContactBookIcon,
     'SheetIcon': SheetIcon,
     'PromotionIcon': PromotionIcon,
+    'InventoryIcon': InventoryIcon,
   };
 
   if (loading) {
@@ -135,7 +137,7 @@ const DashboardContent = ({ onNavigate, organizationSlug }) => {
               <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
                 <IconComponent size={56} />
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+              <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 whitespace-nowrap">
                 {product.name}
               </h3>
 
@@ -776,7 +778,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management') {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
@@ -1069,6 +1071,12 @@ const Home = () => {
       case 'contact_management':
         return (
           <ContactManagementApp
+            organizationSlug={selectedOrganizationSlug}
+          />
+        );
+      case 'inventory':
+        return (
+          <InventoryProduct
             organizationSlug={selectedOrganizationSlug}
           />
         );
