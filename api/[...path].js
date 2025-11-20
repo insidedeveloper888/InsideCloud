@@ -35,9 +35,12 @@ const contactTags = require('../server/api_handlers/contact_tags');
 const contactSettings = require('../server/api_handlers/contact_settings');
 const organizationMembers = require('../server/api_handlers/organization_members');
 const products = require('../server/api_handlers/products');
+const productsDashboard = require('../server/api_handlers/products_dashboard');
 
 /**
  * Route mapping: path -> handler
+ * IMPORTANT: Order matters! More specific routes must come before generic ones.
+ * Example: '/api/products/dashboard' must come before '/api/products'
  */
 const routes = {
   '/api/get_user_access_token': getUserAccessToken,
@@ -58,6 +61,7 @@ const routes = {
   '/api/contact-tags': contactTags,
   '/api/contact-settings': contactSettings,
   '/api/organization-members': organizationMembers,
+  '/api/products/dashboard': productsDashboard, // More specific route first!
   '/api/products': products,
 };
 

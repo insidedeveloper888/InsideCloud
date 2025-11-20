@@ -724,8 +724,8 @@ const Home = () => {
   const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
   const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false); // Prevent multiple auth attempts
   const hasInitialized = useRef(false); // Prevent double initialization in React Strict Mode
+  const authInProgress = useRef(false); // Ref-based guard for authentication (more reliable than state)
 
   // Fetch products for navigation (admin only)
   const { products: navProducts } = useOrganizationProducts(
@@ -849,9 +849,16 @@ const Home = () => {
     }
   };
 
+  // Helper to reset authentication state
+  const resetAuthState = () => {
+    authInProgress.current = false;
+  };
+
   const handleOrganizationSelected = (slug, orgInfo) => {
     // Reset initialization flag when manually changing organizations
     hasInitialized.current = false;
+    // Also reset authentication state
+    resetAuthState();
 
     if (slug) {
       setSelectedOrganizationSlug(slug);
@@ -871,9 +878,9 @@ const Home = () => {
   };
 
   const initializeAuth = async (orgSlug) => {
-    // Prevent multiple simultaneous authentication attempts
-    if (isAuthenticating) {
-      console.log('⏳ Authentication already in progress, skipping...');
+    // Prevent multiple simultaneous authentication attempts (ref-based guard)
+    if (authInProgress.current) {
+      console.log('⏳ Authentication already in progress (ref guard), skipping...');
       return;
     }
 
@@ -885,7 +892,8 @@ const Home = () => {
       return;
     }
 
-    setIsAuthenticating(true);
+    // Set authentication guard
+    authInProgress.current = true;
 
     const AUTH_TIMEOUT_MS = 8000;
     const withTimeout = (promise, ms) => {
@@ -916,9 +924,9 @@ const Home = () => {
     };
 
     try {
-      if (orgSlug) {
-        setSelectedOrganizationSlug(orgSlug);
-      }
+      // NOTE: selectedOrganizationSlug should already be set by the caller
+      // (either in initial useEffect line 767 or in handleOrganizationSelected line 857)
+      // Removing redundant setSelectedOrganizationSlug call to prevent unnecessary re-renders
 
       // Check if JSAPI is available (production environment inside Lark)
       const isJSAPIAvailable = typeof window.h5sdk !== 'undefined';
@@ -936,7 +944,7 @@ const Home = () => {
             setShowOrganizationSelector(true);
             setIsLoading(false);
             setAuthError('JSAPI authentication failed. Please select organisation again.');
-            setIsAuthenticating(false);
+            resetAuthState();
             return;
           }
           throw new Error('JSAPI authentication failed');
@@ -948,7 +956,7 @@ const Home = () => {
           console.log('🔐 JSAPI not available and external browser OAuth is disabled');
           setAuthError('This application must be opened within Lark. Please open it from the Lark app.');
           setIsLoading(false);
-          setIsAuthenticating(false);
+          resetAuthState();
           return;
         }
         console.log('🔐 JSAPI not available, using OAuth redirect flow (local development)');
@@ -965,7 +973,7 @@ const Home = () => {
         if (!DISABLE_AUTO_NAVIGATION) {
           setIsLoading(false);
         }
-        setIsAuthenticating(false);
+        resetAuthState();
       } else if (!isJSAPIAvailable) {
         // Check if external browser OAuth is allowed
         const allowExternalBrowser = process.env.REACT_APP_ALLOW_EXTERNAL_BROWSER === 'true';
@@ -973,7 +981,7 @@ const Home = () => {
           // External browser OAuth is disabled and JSAPI not available
           setAuthError('This application must be opened within Lark. Please open it from the Lark app.');
           setIsLoading(false);
-          setIsAuthenticating(false);
+          resetAuthState();
           return;
         }
         // OAuth redirect is happening, page will reload
@@ -998,28 +1006,30 @@ const Home = () => {
             setUserInfo(userData);
             setAuthError(null);
             setIsLoading(false);
-            setIsAuthenticating(false);
+            resetAuthState();
           } else {
             setAuthError('No user information returned from authentication.');
             setIsLoading(false);
-            setIsAuthenticating(false);
+            resetAuthState();
           }
         } else {
           setAuthError('JSAPI authentication failed. Please select organisation again.');
           setIsLoading(false);
-          setIsAuthenticating(false);
+          resetAuthState();
         }
       }
     } catch (error) {
       setAuthError(error.message || 'Authentication error');
       setIsLoading(false);
-      setIsAuthenticating(false);
+      resetAuthState();
     }
   };
 
   const handleResetOrganization = () => {
     // Reset initialization flag when logging out
     hasInitialized.current = false;
+    // Also reset authentication state
+    resetAuthState();
 
     Cookies.remove('lk_token');
     localStorage.removeItem('lk_token');
