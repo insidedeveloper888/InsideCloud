@@ -4,14 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-
 export default function KanbanView({ contacts = [], stages = [], onUpdateContact }) {
   // Filter to show only customers
   const customers = contacts.filter((c) => c.contact_type === 'customer');
   const [draggedContact, setDraggedContact] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
-  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'accordion'
 
   const handleDragStart = (e, contact) => {
     setDraggedContact(contact);
