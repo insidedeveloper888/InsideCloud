@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import Cookies from 'js-cookie';
 import Lottie from 'lottie-react';
 import clientConfig from '../../config/client_config.js';
@@ -42,6 +42,8 @@ import ContactManagementApp from '../../tools/contact-management/index.jsx';
 import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';
+import { useOrganizationProducts } from '../../hooks/useOrganizationProducts';
+import { onProductAccessDenied } from '../../utils/api_client';
 
 const resolveApiOrigin = () =>
   clientConfig.apiOrigin && clientConfig.apiOrigin.length > 0
@@ -62,73 +64,112 @@ const slugify = (value) =>
     .replace(/(^-|-$)+/g, '')
     .substring(0, 60);
 
-const DashboardContent = ({ onNavigate }) => (
-  <div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
-      <div
-        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
-        onClick={() => onNavigate && onNavigate('strategic_map')}
-      >
-        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
-          <TargetIcon size={56} />
-        </div>
-        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-          战略地图
-        </h3>
+const DashboardContent = ({ onNavigate, organizationSlug }) => {
+  const { products, loading, error } = useOrganizationProducts(organizationSlug);
+
+  // Icon mapping: database icon name (string) -> React component
+  // Database stores component names like "TargetIcon", "DocumentIcon", "ContactBookIcon"
+  // These map directly to components in src/components/ui/icons/
+  const iconMap = {
+    'TargetIcon': TargetIcon,
+    'DocumentIcon': DocumentIcon,
+    'ContactBookIcon': ContactBookIcon,
+    'SheetIcon': SheetIcon,
+    'PromotionIcon': PromotionIcon,
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
+        <p className="text-base text-gray-600">Loading products...</p>
       </div>
-      <div className="relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm opacity-60">
-        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
-          <SheetIcon size={56} />
-        </div>
-        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-          工作规格
-        </h3>
-        {/* Coming Soon Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-3xl backdrop-blur-[2px]">
-          <div className="bg-gradient-to-r from-primary-500 to-purple-600 text-black px-6 py-3 rounded-full shadow-lg">
-            <p className="text-sm md:text-base font-semibold">Coming Soon</p>
-          </div>
-        </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 border border-red-200 p-6">
+        <p className="text-sm text-red-800">Failed to load products: {error}</p>
       </div>
-      <div className="relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm opacity-60">
-        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
-          <PromotionIcon size={56} />
-        </div>
-        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-          晋升机制
-        </h3>
-        {/* Coming Soon Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-3xl backdrop-blur-[2px]">
-          <div className="bg-gradient-to-r from-primary-500 to-purple-600 text-black px-6 py-3 rounded-full shadow-lg">
-            <p className="text-sm md:text-base font-semibold">Coming Soon</p>
-          </div>
-        </div>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-base text-gray-600">No products available for this organization.</p>
       </div>
-      <div
-        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
-        onClick={() => onNavigate && onNavigate('document_parser')}
-      >
-        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
-          <DocumentIcon size={56} />
-        </div>
-        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-          Document Parser
-        </h3>
-      </div>
-      <div
-        className="bg-white rounded-3xl min-h-[200px] transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-xl flex flex-col justify-center items-center p-8 shadow-sm"
-        onClick={() => onNavigate && onNavigate('contact_management')}
-      >
-        <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
-          <ContactBookIcon size={56} />
-        </div>
-        <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-          名单管理
-        </h3>
+    );
+  }
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
+        {products.map((product) => {
+          // Get icon component by name from database
+          // Falls back to TargetIcon if icon not found
+          const IconComponent = iconMap[product.icon] || TargetIcon;
+
+          // Check if product is coming soon
+          const isComingSoon = product.status === 'coming_soon';
+          const isBeta = product.status === 'beta';
+          const isDeprecated = product.status === 'deprecated';
+          const isActive = product.status === 'active';
+
+          return (
+            <div
+              key={product.key}
+              className={`relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm ${
+                isComingSoon || isDeprecated
+                  ? 'opacity-60'
+                  : 'cursor-pointer hover:-translate-y-2 hover:shadow-xl'
+              }`}
+              onClick={() => {
+                // Only allow navigation for active and beta products
+                if ((isActive || isBeta) && onNavigate) {
+                  onNavigate(product.key);
+                }
+              }}
+            >
+              <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
+                <IconComponent size={56} />
+              </div>
+              <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+                {product.name}
+              </h3>
+
+              {/* Beta Badge */}
+              {isBeta && (
+                <div className="mt-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                  Beta
+                </div>
+              )}
+
+              {/* Coming Soon Overlay */}
+              {isComingSoon && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-3xl backdrop-blur-[2px]">
+                  <div className="bg-gradient-to-r from-primary-500 to-purple-600 text-black px-6 py-3 rounded-full shadow-lg">
+                    <p className="text-sm md:text-base font-semibold">Coming Soon</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Deprecated Badge */}
+              {isDeprecated && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-3xl backdrop-blur-[2px]">
+                  <div className="bg-gray-500 text-white px-6 py-3 rounded-full shadow-lg">
+                    <p className="text-sm md:text-base font-semibold">Deprecated</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const SupabaseMembers = ({ organizationSlug }) => {
   const [members, setMembers] = useState([]);
@@ -684,8 +725,43 @@ const Home = () => {
   const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false); // Prevent multiple auth attempts
+  const hasInitialized = useRef(false); // Prevent double initialization in React Strict Mode
+
+  // Fetch products for navigation (admin only)
+  const { products: navProducts } = useOrganizationProducts(
+    isAdmin ? selectedOrganizationSlug : null
+  );
+
+  // Handle 403 product access denied errors globally
+  useEffect(() => {
+    const unsubscribe = onProductAccessDenied((error) => {
+      console.error('🚫 Product access denied:', error);
+
+      // Show error message
+      const message = `Access to "${error.product}" has been denied. Your organization may no longer have access to this feature.`;
+      alert(message);
+
+      // Redirect to dashboard
+      setActiveView('dashboard');
+
+      // Refetch products to update UI
+      if (selectedOrganizationSlug) {
+        // The products cache has already been cleared by the api_client
+        // The hooks will refetch automatically
+      }
+    });
+
+    return unsubscribe;
+  }, [selectedOrganizationSlug]);
 
   useEffect(() => {
+    // Prevent double initialization in React Strict Mode (development)
+    if (hasInitialized.current) {
+      console.log('⏭️ Skipping duplicate initialization (React Strict Mode)');
+      return;
+    }
+    hasInitialized.current = true;
+
     const savedOrgSlug = localStorage.getItem(ORGANIZATION_SLUG_KEY);
     if (savedOrgSlug) {
       setSelectedOrganizationSlug(savedOrgSlug);
@@ -712,18 +788,34 @@ const Home = () => {
         { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
       ];
     }
-    // Admin users see all tabs
-    return [
+
+    // Admin users see system tabs + dynamic products
+    const systemTabs = [
       { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
       { key: 'account', label: 'Account', icon: UserCircle2, section: 'General' },
       { key: 'users', label: 'Users', icon: Users, section: 'Team' },
       { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
       { key: 'organization', label: 'Organization', icon: Building2, section: 'System' },
-      { key: 'strategic_map_v2', label: 'Strategic Map v2', icon: Map, section: 'Product' },
-      { key: 'document_parser', label: 'Document Parser', icon: DocumentIcon, section: 'Product' },
-      { key: 'contact_management', label: '名单管理', icon: Users, section: 'Product' },
     ];
-  }, [isAdmin]);
+
+    // Icon mapping for products in navigation
+    // Maps custom icon component names to lucide-react icons for navigation sidebar
+    const productIconMap = {
+      'TargetIcon': Map,          // Strategic Map uses Map icon in nav
+      'DocumentIcon': FileText,   // Document Parser uses FileText in nav
+      'ContactBookIcon': Users,   // Contact Management uses Users in nav
+    };
+
+    // Add product tabs dynamically
+    const productTabs = (navProducts || []).map(product => ({
+      key: product.key,
+      label: product.name,  // Use the name field directly
+      icon: productIconMap[product.icon] || LayoutDashboard,
+      section: 'Product',
+    }));
+
+    return [...systemTabs, ...productTabs];
+  }, [isAdmin, navProducts]);
 
   const fetchOrganizationDetails = async (slug) => {
     try {
@@ -758,6 +850,9 @@ const Home = () => {
   };
 
   const handleOrganizationSelected = (slug, orgInfo) => {
+    // Reset initialization flag when manually changing organizations
+    hasInitialized.current = false;
+
     if (slug) {
       setSelectedOrganizationSlug(slug);
       setSelectedOrganizationName(orgInfo?.organization_name || null);
@@ -923,6 +1018,9 @@ const Home = () => {
   };
 
   const handleResetOrganization = () => {
+    // Reset initialization flag when logging out
+    hasInitialized.current = false;
+
     Cookies.remove('lk_token');
     localStorage.removeItem('lk_token');
     localStorage.removeItem(ORGANIZATION_SLUG_KEY);
@@ -983,7 +1081,7 @@ const Home = () => {
         return <OrganizationView isAdmin={isAdmin} />;
       case 'dashboard':
       default:
-        return <DashboardContent onNavigate={setActiveView} />;
+        return <DashboardContent onNavigate={setActiveView} organizationSlug={selectedOrganizationSlug} />;
     }
   };
 

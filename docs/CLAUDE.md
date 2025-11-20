@@ -266,6 +266,64 @@ All Connected Clients (Update UI)
 **Code Sharing:**
 Logic is duplicated between `server/server.js` (Koa) and `/api/*.js` (Vercel) to maintain consistency across environments.
 
+**⚠️ CRITICAL: When Adding New API Endpoints**
+
+When implementing a new API endpoint, you **MUST** implement it in **BOTH** places:
+
+1. **Koa Development Server** (`server/server.js`):
+   ```javascript
+   // STEP 1: Add OPTIONS handler for CORS preflight (REQUIRED!)
+   router.options('/api/new-endpoint', async (ctx) => {
+     serverUtil.configAccessControl(ctx);
+     ctx.status = 200;
+   })
+
+   // STEP 2: Add route with Koa syntax
+   router.get('/api/new-endpoint', async (ctx) => {
+     serverUtil.configAccessControl(ctx)  // CORS handling
+     const param = ctx.query.param
+     // ... implementation
+     ctx.body = { code: 0, data: result }
+   })
+   ```
+
+2. **Vercel Production** (`api/[...path].js` + handler):
+   ```javascript
+   // Create handler: server/api_handlers/new_endpoint.js
+   module.exports = async function handler(req, res) {
+     if (handleCors(req, res)) return;  // CORS handling
+     const param = req.query.param
+     // ... implementation
+     res.status(200).json({ code: 0, data: result })
+   }
+
+   // Register in api/[...path].js
+   const newEndpoint = require('../server/api_handlers/new_endpoint');
+   const routes = {
+     '/api/new-endpoint': newEndpoint,
+     // ...
+   };
+   ```
+
+**Common Mistakes:**
+1. ❌ Creating only the Vercel handler and forgetting the Koa route
+   - Symptom: Endpoint works in production but **fails in development** (localhost:8989)
+   - Symptom: API requests stuck at "Pending" status during local development
+
+2. ❌ Forgetting the OPTIONS handler for CORS preflight
+   - Symptom: CORS error: "No 'Access-Control-Allow-Origin' header is present"
+   - Symptom: Browser shows preflight request failed
+   - Root cause: Browser sends OPTIONS request before GET/POST, needs handler
+
+**Mandatory Checklist for New API Endpoints:**
+- [ ] Add **OPTIONS handler** to `server/server.js` for CORS preflight
+- [ ] Add route (GET/POST/etc) to `server/server.js` (Koa)
+- [ ] Create handler in `server/api_handlers/` (Vercel)
+- [ ] Register route in `api/[...path].js` (Vercel unified router)
+- [ ] Test in both dev (`npm run start:server`) and prod (Vercel deploy)
+- [ ] Verify no CORS errors in browser console
+- [ ] Apply product access middleware if needed (`requireProductAccess()`)
+
 ## Key Implementation Patterns
 
 ### 1. Organization-Specific App IDs

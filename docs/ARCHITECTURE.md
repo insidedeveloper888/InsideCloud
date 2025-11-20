@@ -222,6 +222,101 @@ Production Mode (Vercel):
 - ⚠️ Code duplication (mitigated by shared `/lib` utilities)
 - ⚠️ Must update both Koa and Vercel handlers when adding new APIs
 
+**🚨 CRITICAL: Dual Implementation Required for All New API Endpoints**
+
+Every new API endpoint **MUST** be implemented in **BOTH** places or it will fail in one environment:
+
+**1. Koa Development Server** (`server/server.js`):
+```javascript
+// Import helper if needed
+const { getOrganizationProducts } = require('./product_helper')
+
+// CRITICAL: Add OPTIONS handler for CORS preflight
+router.options('/api/products', async (ctx) => {
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+
+// Add route with Koa syntax
+router.get('/api/products', async (ctx) => {
+  serverUtil.configAccessControl(ctx)  // CORS
+  const slug = ctx.query.organization_slug
+  const products = await getOrganizationProducts(slug)
+  ctx.body = { code: 0, data: products }
+})
+```
+
+**2. Vercel Production** (handler + unified router):
+```javascript
+// Create: server/api_handlers/products.js
+const { handleCors } = require('../../api/_utils');
+const { getOrganizationProducts } = require('../product_helper');
+
+module.exports = async function handler(req, res) {
+  if (handleCors(req, res)) return;
+  const slug = req.query.organization_slug;
+  const products = await getOrganizationProducts(slug);
+  res.status(200).json({ code: 0, data: products });
+};
+
+// Register in: api/[...path].js
+const products = require('../server/api_handlers/products');
+const routes = {
+  '/api/products': products,
+  // ...
+};
+```
+
+**Common Failure Patterns:**
+
+**Pattern 1: Missing Koa Route**
+- Developer creates Vercel handler only
+- Production works ✅
+- Local development fails ❌ (endpoint stuck "Pending")
+- Incorrect diagnosis: "Must be a CORS issue"
+- Root cause: Missing Koa route in `server/server.js`
+
+**Pattern 2: Missing OPTIONS Handler**
+- Developer adds GET/POST route but forgets OPTIONS
+- Direct server requests work (curl, Postman) ✅
+- Browser requests fail ❌ with CORS error
+- Error: "No 'Access-Control-Allow-Origin' header"
+- Root cause: Browser sends OPTIONS preflight, no handler exists
+
+**Why OPTIONS Handler is Required:**
+- Modern browsers use CORS preflight for cross-origin requests
+- Preflight = OPTIONS request sent before actual GET/POST
+- Must return 200 + CORS headers or browser blocks the request
+- **Every API route needs both OPTIONS + GET/POST handlers**
+
+**Mandatory Checklist for Every New API Endpoint:**
+- [ ] Add **OPTIONS handler** to `server/server.js` (CORS preflight - CRITICAL!)
+- [ ] Add route (GET/POST/etc) to `server/server.js` (Koa dev server)
+- [ ] Create handler in `server/api_handlers/` (Vercel)
+- [ ] Register in `api/[...path].js` (Vercel unified router)
+- [ ] Test locally: `npm run start:server` → verify endpoint responds
+- [ ] Test in browser: Check Network tab → verify no CORS errors
+- [ ] Test production: Deploy to Vercel → verify endpoint responds
+- [ ] Apply middleware if needed: `requireProductAccess()`, authentication, etc.
+
+**Template for New Endpoints:**
+```javascript
+// In server/server.js
+
+// 1. OPTIONS for CORS (always comes first!)
+router.options('/api/your-endpoint', async (ctx) => {
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+
+// 2. Actual route handler
+router.get('/api/your-endpoint', async (ctx) => {
+  serverUtil.configAccessControl(ctx);
+  // ... your logic
+  ctx.body = { code: 0, data: result };
+})
+```
+
 ---
 
 ### ADR-005: Strategic Map v2 - Auto-Expanding Textarea with Fixed-Width Columns

@@ -12,6 +12,8 @@ const serverUtil = require('./server_util')
 const { getLarkCredentials, validateOrganization, getOrganizationInfo } = require('./organization_helper')
 const { supabase } = require('./supabase_client')
 const { syncLarkUser } = require('../lib/larkUserSync')
+const { requireProductAccess } = require('./middleware/product_access')
+const { getOrganizationProducts, getAllProducts, getDashboardProducts } = require('./product_helper')
 
 const LJ_JSTICKET_KEY = 'lk_jsticket'
 const LJ_TOKEN_KEY = 'lk_token'
@@ -1195,7 +1197,7 @@ router.get('/api/admin/organizations', getOrganizationsAdmin)
 router.post('/api/admin/organizations', createOrganizationAdmin)
 
 // Strategic Map API routes
-router.get('/api/strategic_map', async (ctx) => {
+router.get('/api/strategic_map', requireProductAccess('strategic_map'), async (ctx) => {
     const strategicMapHandler = require('./api_handlers/strategic_map_v2')
     await strategicMapHandler({ 
         method: ctx.method, 
@@ -1209,7 +1211,7 @@ router.get('/api/strategic_map', async (ctx) => {
     })
 })
 
-router.post('/api/strategic_map', async (ctx) => {
+router.post('/api/strategic_map', requireProductAccess('strategic_map'), async (ctx) => {
     const strategicMapHandler = require('./api_handlers/strategic_map_v2')
     
     // Body is now automatically parsed by koa-bodyparser middleware
@@ -1247,7 +1249,7 @@ router.post('/api/strategic_map', async (ctx) => {
     })
 })
 
-router.delete('/api/strategic_map', async (ctx) => {
+router.delete('/api/strategic_map', requireProductAccess('strategic_map'), async (ctx) => {
     serverUtil.configAccessControl(ctx)
 
     // Handle OPTIONS preflight request
@@ -1430,35 +1432,35 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
 const contactController = require('./contact_management_controller')
 
 // Contacts (specific routes before parameterized routes)
-router.get('/api/contacts/data-quality', contactController.getDataQualityMetrics)
-router.get('/api/contacts', contactController.getContacts)
-router.post('/api/contacts', contactController.createContact)
-router.put('/api/contacts/:id', contactController.updateContact)
-router.delete('/api/contacts/:id', contactController.deleteContact)
+router.get('/api/contacts/data-quality', requireProductAccess('contact_management'), contactController.getDataQualityMetrics)
+router.get('/api/contacts', requireProductAccess('contact_management'), contactController.getContacts)
+router.post('/api/contacts', requireProductAccess('contact_management'), contactController.createContact)
+router.put('/api/contacts/:id', requireProductAccess('contact_management'), contactController.updateContact)
+router.delete('/api/contacts/:id', requireProductAccess('contact_management'), contactController.deleteContact)
 
 // Contact Stages
-router.get('/api/contact-stages', contactController.getContactStages)
-router.post('/api/contact-stages', contactController.createContactStage)
-router.put('/api/contact-stages/:id', contactController.updateContactStage)
-router.delete('/api/contact-stages/:id', contactController.deleteContactStage)
+router.get('/api/contact-stages', requireProductAccess('contact_management'), contactController.getContactStages)
+router.post('/api/contact-stages', requireProductAccess('contact_management'), contactController.createContactStage)
+router.put('/api/contact-stages/:id', requireProductAccess('contact_management'), contactController.updateContactStage)
+router.delete('/api/contact-stages/:id', requireProductAccess('contact_management'), contactController.deleteContactStage)
 
 // Traffic Channels
-router.get('/api/traffic-channels', contactController.getTrafficChannels)
-router.post('/api/traffic-channels', contactController.createTrafficChannel)
-router.delete('/api/traffic-channels/:id', contactController.deleteTrafficChannel)
+router.get('/api/traffic-channels', requireProductAccess('contact_management'), contactController.getTrafficChannels)
+router.post('/api/traffic-channels', requireProductAccess('contact_management'), contactController.createTrafficChannel)
+router.delete('/api/traffic-channels/:id', requireProductAccess('contact_management'), contactController.deleteTrafficChannel)
 
 // Organization Members
-router.get('/api/organization-members', contactController.getOrganizationMembers)
+router.get('/api/organization-members', requireProductAccess('contact_management'), contactController.getOrganizationMembers)
 
 // Contact Tags
-router.get('/api/contact-tags', contactController.getContactTags)
-router.post('/api/contact-tags', contactController.createContactTag)
-router.put('/api/contact-tags/:id', contactController.updateContactTag)
-router.delete('/api/contact-tags/:id', contactController.deleteContactTag)
+router.get('/api/contact-tags', requireProductAccess('contact_management'), contactController.getContactTags)
+router.post('/api/contact-tags', requireProductAccess('contact_management'), contactController.createContactTag)
+router.put('/api/contact-tags/:id', requireProductAccess('contact_management'), contactController.updateContactTag)
+router.delete('/api/contact-tags/:id', requireProductAccess('contact_management'), contactController.deleteContactTag)
 
 // Contact Tag Assignments
-router.get('/api/contacts/:id/tags', contactController.getContactTagsForContact)
-router.post('/api/contacts/:id/tags', contactController.assignTagsToContact)
+router.get('/api/contacts/:id/tags', requireProductAccess('contact_management'), contactController.getContactTagsForContact)
+router.post('/api/contacts/:id/tags', requireProductAccess('contact_management'), contactController.assignTagsToContact)
 
 // Contact Import
 router.options('/api/contacts/import/validate', async (ctx) => {
@@ -1471,13 +1473,118 @@ router.options('/api/contacts/import/execute', async (ctx) => {
   serverUtil.configAccessControl(ctx);
   ctx.status = 200;
 })
-router.get('/api/contacts/import/template', contactController.getImportTemplate)
-router.post('/api/contacts/import/validate', contactController.validateImportData)
-router.post('/api/contacts/import/execute', contactController.executeImport)
+router.get('/api/contacts/import/template', requireProductAccess('contact_management'), contactController.getImportTemplate)
+router.post('/api/contacts/import/validate', requireProductAccess('contact_management'), contactController.validateImportData)
+router.post('/api/contacts/import/execute', requireProductAccess('contact_management'), contactController.executeImport)
 
 // Contact Settings
-router.get('/api/contact-settings', contactController.getContactSettings)
-router.put('/api/contact-settings', contactController.updateContactSettings)
+router.get('/api/contact-settings', requireProductAccess('contact_management'), contactController.getContactSettings)
+router.put('/api/contact-settings', requireProductAccess('contact_management'), contactController.updateContactSettings)
+
+// =============================================================================
+// Products API - Organization Product Access
+// =============================================================================
+
+// OPTIONS handler for CORS preflight
+router.options('/api/products', async (ctx) => {
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+
+// OPTIONS handler for dashboard endpoint
+router.options('/api/products/dashboard', async (ctx) => {
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+
+// Route: GET /api/products/dashboard?organization_slug={slug}
+// Returns products for dashboard display (includes coming_soon products)
+// Coming soon products are shown to all orgs without access check
+router.get('/api/products/dashboard', async (ctx) => {
+  serverUtil.configAccessControl(ctx)
+
+  const organizationSlug = ctx.query.organization_slug
+
+  if (!organizationSlug) {
+    ctx.status = 400
+    ctx.body = serverUtil.failResponse('Missing required parameter: organization_slug')
+    return
+  }
+
+  try {
+    console.log(`📋 Fetching dashboard products for organization: ${organizationSlug}`)
+    const products = await getDashboardProducts(organizationSlug)
+
+    if (products === null) {
+      ctx.status = 500
+      ctx.body = serverUtil.failResponse('Failed to fetch dashboard products')
+      return
+    }
+
+    ctx.body = {
+      code: 0,
+      msg: 'Success',
+      data: products
+    }
+  } catch (error) {
+    console.error('❌ Dashboard products API error:', error)
+    ctx.status = error.status || 500
+    ctx.body = serverUtil.failResponse(error.message || 'Internal server error')
+  }
+})
+
+// Route: GET /api/products?organization_slug={slug}
+// Returns list of products accessible to an organization (for access control)
+router.get('/api/products', async (ctx) => {
+  serverUtil.configAccessControl(ctx)
+
+  const organizationSlug = ctx.query.organization_slug
+
+  try {
+    // If no organization_slug provided, return all products (admin use)
+    if (!organizationSlug) {
+      console.log('📋 Fetching all products (admin mode)')
+      const products = await getAllProducts()
+
+      if (products === null) {
+        ctx.status = 500
+        ctx.body = serverUtil.failResponse('Failed to fetch products')
+        return
+      }
+
+      ctx.body = {
+        code: 0,
+        msg: 'Success',
+        data: products
+      }
+      return
+    }
+
+    // Fetch products accessible to the organization
+    console.log(`📋 Fetching products for organization: ${organizationSlug}`)
+    const products = await getOrganizationProducts(organizationSlug)
+
+    if (products === null) {
+      ctx.status = 500
+      ctx.body = serverUtil.failResponse('Failed to fetch organization products')
+      return
+    }
+
+    if (products.length === 0) {
+      console.warn(`⚠️  No products enabled for organization: ${organizationSlug}`)
+    }
+
+    ctx.body = {
+      code: 0,
+      msg: 'Success',
+      data: products
+    }
+  } catch (error) {
+    console.error('❌ Products API error:', error)
+    ctx.status = error.status || 500
+    ctx.body = serverUtil.failResponse(error.message || 'Internal server error')
+  }
+})
 
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());

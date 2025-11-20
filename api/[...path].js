@@ -34,6 +34,7 @@ const trafficChannels = require('../server/api_handlers/traffic_channels');
 const contactTags = require('../server/api_handlers/contact_tags');
 const contactSettings = require('../server/api_handlers/contact_settings');
 const organizationMembers = require('../server/api_handlers/organization_members');
+const products = require('../server/api_handlers/products');
 
 /**
  * Route mapping: path -> handler
@@ -57,6 +58,7 @@ const routes = {
   '/api/contact-tags': contactTags,
   '/api/contact-settings': contactSettings,
   '/api/organization-members': organizationMembers,
+  '/api/products': products,
 };
 
 /**
