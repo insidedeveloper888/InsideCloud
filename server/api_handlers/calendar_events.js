@@ -29,7 +29,7 @@ module.exports = async function handler(req, res) {
     const accessToken = userInfo.access_token;
 
     // 1. Get primary calendar
-    const calendarListRes = await axios.get('https://open.feishu.cn/open-apis/calendar/v4/calendars', {
+    const calendarListRes = await axios.get('https://open.larksuite.com/open-apis/calendar/v4/calendars', {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       },
@@ -60,7 +60,7 @@ module.exports = async function handler(req, res) {
     console.log(`📅 Fetching events for calendar ${calendarId}`);
     console.log(`   Time range: ${startOfDay.toISOString()} - ${endOfDay.toISOString()}`);
 
-    const eventsRes = await axios.get(`https://open.feishu.cn/open-apis/calendar/v4/calendars/${calendarId}/events`, {
+    const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendarId}/events`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       },
