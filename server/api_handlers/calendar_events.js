@@ -18,105 +18,89 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Get user_access_token from Authorization header
-    const authHeader = req.headers.authorization || req.headers.Authorization;
-    const userAccessToken = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.replace('Bearer ', '')
-      : null;
+    // Get user info from cookie
+    const { getAuthFromCookie } = require('../../api/_utils');
+    const userInfo = getAuthFromCookie(req);
 
-    if (!userAccessToken) {
-      return res.status(401).json(failResponse('User access token required'));
+    if (!userInfo || !userInfo.access_token) {
+      return res.status(401).json(failResponse('User not logged in or missing access token'));
     }
 
-    // Calculate today's start and end timestamps
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    const accessToken = userInfo.access_token;
 
-    const startTime = Math.floor(startOfDay.getTime() / 1000).toString();
-    const endTime = Math.floor(endOfDay.getTime() / 1000).toString();
-
-    // First, get the user's primary calendar
-    const calendarListResponse = await axios.get(
-      'https://open.larksuite.com/open-apis/calendar/v4/calendars',
-      {
-        headers: {
-          'Authorization': `Bearer ${userAccessToken}`,
-          'Content-Type': 'application/json'
-        }
+    // 1. Get primary calendar
+    const calendarListRes = await axios.get('https://open.feishu.cn/open-apis/calendar/v4/calendars', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      },
+      params: {
+        page_size: 20 // We just need the primary one
       }
-    );
+    });
 
-    if (calendarListResponse.data.code !== 0) {
-      console.error('Failed to get calendar list:', calendarListResponse.data);
-      return res.status(500).json(failResponse(`Failed to get calendar: ${calendarListResponse.data.msg}`));
+    if (calendarListRes.data.code !== 0) {
+      console.error('Failed to fetch calendars:', calendarListRes.data);
+      return res.status(500).json(failResponse(`Lark API error: ${calendarListRes.data.msg}`));
     }
 
-    const calendars = calendarListResponse.data.data?.calendar_list || [];
-
-    // Find primary calendar (type = 'primary') or use first one
-    const primaryCalendar = calendars.find(c => c.type === 'primary') || calendars[0];
+    const calendars = calendarListRes.data.data.calendar_list || [];
+    const primaryCalendar = calendars.find(c => c.summary === 'primary' || c.type === 'primary') || calendars[0];
 
     if (!primaryCalendar) {
-      return res.status(200).json(okResponse({ events: [], message: 'No calendar found' }));
+      return res.status(200).json(okResponse([]));
     }
 
     const calendarId = primaryCalendar.calendar_id;
 
-    // Get events for today
-    const eventsResponse = await axios.get(
-      `https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendarId}/events`,
-      {
-        params: {
-          start_time: startTime,
-          end_time: endTime,
-          page_size: 50
-        },
-        headers: {
-          'Authorization': `Bearer ${userAccessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // 2. Get events for today
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-    if (eventsResponse.data.code !== 0) {
-      console.error('Failed to get events:', eventsResponse.data);
-      return res.status(500).json(failResponse(`Failed to get events: ${eventsResponse.data.msg}`));
+    console.log(`📅 Fetching events for calendar ${calendarId}`);
+    console.log(`   Time range: ${startOfDay.toISOString()} - ${endOfDay.toISOString()}`);
+
+    const eventsRes = await axios.get(`https://open.feishu.cn/open-apis/calendar/v4/calendars/${calendarId}/events`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      },
+      params: {
+        start_time: startOfDay.toISOString(),
+        end_time: endOfDay.toISOString(),
+        page_size: 50
+      }
+    });
+
+    if (eventsRes.data.code !== 0) {
+      const errorDetails = JSON.stringify(eventsRes.data);
+      console.error('❌ Failed to fetch events:', errorDetails);
+      return res.status(500).json({
+        code: -1,
+        msg: `Calendar API Error: ${errorDetails}`,
+        data: null
+      });
     }
 
-    const events = eventsResponse.data.data?.items || [];
-
-    // Format events for frontend
-    const formattedEvents = events.map(event => ({
-      id: event.event_id,
-      summary: event.summary || 'No title',
-      description: event.description || '',
-      start_time: event.start_time?.timestamp ? parseInt(event.start_time.timestamp) : null,
-      end_time: event.end_time?.timestamp ? parseInt(event.end_time.timestamp) : null,
-      is_all_day: !event.start_time?.timestamp,
-      location: event.location?.name || '',
-      status: event.status,
-      color: event.color || null,
-      visibility: event.visibility
-    }));
+    const events = eventsRes.data.data.items || [];
+    console.log(`✅ Found ${events.length} events`);
 
     // Sort by start time
-    formattedEvents.sort((a, b) => (a.start_time || 0) - (b.start_time || 0));
+    events.sort((a, b) => {
+      const startA = parseInt(a.start_time.timestamp);
+      const startB = parseInt(b.start_time.timestamp);
+      return startA - startB;
+    });
 
-    return res.status(200).json(okResponse({
-      events: formattedEvents,
-      calendar_name: primaryCalendar.summary || 'Calendar',
-      date: now.toISOString().split('T')[0]
-    }));
+    // Return raw events to match frontend expectation
+    return res.status(200).json(okResponse(events));
 
   } catch (error) {
-    console.error('Error getting calendar events:', error.response?.data || error.message);
-
-    // Check for permission error
-    if (error.response?.data?.code === 99991663 || error.response?.status === 403) {
-      return res.status(403).json(failResponse('Calendar permission not granted. Please authorize calendar access.'));
-    }
-
-    return res.status(500).json(failResponse('Failed to get calendar events'));
+    const errorDetails = error.response ? JSON.stringify(error.response.data) : error.message;
+    console.error('❌ Calendar API Error:', errorDetails);
+    return res.status(500).json({
+      code: -1,
+      msg: `Calendar API Error: ${errorDetails}`,
+      data: null
+    });
   }
 };

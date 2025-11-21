@@ -70,7 +70,7 @@ const routes = {
   '/api/inventory': inventory,
   '/api/user_department': userDepartment,
   '/api/tenant_info': tenantInfo,
-  '/api/calendar_events': calendarEvents,
+  '/api/calendar/events': calendarEvents,
 };
 
 /**
