@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules
 /.pnp
 .pnp.js
 
@@ -20,10 +21,20 @@
 .env.production.local
 
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # MCP configuration (contains secrets)
 .mcp.json
 .claude/mcp.json
 .env.mcp
+
+# Temporary files
+temp_*.txt
+*.tmp
+
+# Scripts temporary data
+scripts/map-gen/node_modules
+scripts/map-gen/map_data.txt
 
 .vercel

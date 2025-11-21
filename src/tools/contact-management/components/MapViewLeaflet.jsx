@@ -10,7 +10,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, Map as MapIcon } from 'lucide-react';
 import { MALAYSIA_STATES } from '../utils/malaysiaStates';
-import { MALAYSIA_GEOJSON } from '../utils/malaysiaGeoJSON';
+import MALAYSIA_GEOJSON from '../../../assets/map/malaysia-states-simplified.json';
 import { getCityCoordinates } from '../utils/malaysiaCities';
 
 // Fix default marker icon issue with Webpack
@@ -24,6 +24,13 @@ L.Icon.Default.mergeOptions({
 export default function MapViewLeaflet({ contacts = [] }) {
   const [hoveredState, setHoveredState] = useState(null);
   const [viewMode, setViewMode] = useState('city'); // 'state' or 'city'
+
+  // Debug: Log GeoJSON data
+  console.log('MALAYSIA_GEOJSON loaded:', {
+    type: MALAYSIA_GEOJSON?.type,
+    featuresCount: MALAYSIA_GEOJSON?.features?.length,
+    firstFeature: MALAYSIA_GEOJSON?.features?.[0]?.properties
+  });
 
   // Filter to customers only
   const customers = contacts.filter((c) => c.contact_type === 'customer');
@@ -64,9 +71,19 @@ export default function MapViewLeaflet({ contacts = [] }) {
     return '#93C5FD'; // blue-300
   };
 
+  // Map GeoJSON state names to app state names
+  const mapGeoJSONStateName = (geoName) => {
+    const mapping = {
+      'Malacca': 'Melaka',
+      'Penang': 'Penang',
+    };
+    return mapping[geoName] || geoName;
+  };
+
   // Style function for GeoJSON features
   const style = (feature) => {
-    const stateName = feature.properties.name;
+    const geoStateName = feature.properties.shapeName;
+    const stateName = mapGeoJSONStateName(geoStateName);
     const data = stateData[stateName];
     const count = data ? data.count : 0;
 
@@ -81,7 +98,8 @@ export default function MapViewLeaflet({ contacts = [] }) {
 
   // Interaction handlers
   const onEachFeature = (feature, layer) => {
-    const stateName = feature.properties.name;
+    const geoStateName = feature.properties.shapeName;
+    const stateName = mapGeoJSONStateName(geoStateName);
     const data = stateData[stateName];
 
     layer.on({

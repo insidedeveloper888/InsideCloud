@@ -39,13 +39,20 @@ export default function KanbanView({ contacts = [], stages = [], onUpdateContact
       return;
     }
 
-    // Update contact stage
-    onUpdateContact(draggedContact.id, { current_stage_id: targetStageId });
+    // Update contact stage - send full contact object to preserve all fields
+    onUpdateContact(draggedContact.id, {
+      ...draggedContact,
+      current_stage_id: targetStageId,
+    });
     setDraggedContact(null);
   };
 
-  const handleStageChange = async (contactId, newStageId) => {
-    await onUpdateContact(contactId, { current_stage_id: newStageId });
+  const handleStageChange = async (contact, newStageId) => {
+    // Send full contact object to preserve all fields
+    await onUpdateContact(contact.id, {
+      ...contact,
+      current_stage_id: newStageId,
+    });
   };
 
   return (
@@ -188,7 +195,7 @@ export default function KanbanView({ contacts = [], stages = [], onUpdateContact
                             <label className="text-xs text-gray-500 shrink-0">Move to:</label>
                             <select
                               value={contact.current_stage_id || ''}
-                              onChange={(e) => handleStageChange(contact.id, e.target.value)}
+                              onChange={(e) => handleStageChange(contact, e.target.value)}
                               className="flex-1 text-xs px-2 py-1.5 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                               {stages.map((s) => (

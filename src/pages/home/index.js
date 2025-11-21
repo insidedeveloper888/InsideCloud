@@ -729,6 +729,29 @@ const Home = () => {
   const hasInitialized = useRef(false); // Prevent double initialization in React Strict Mode
   const authInProgress = useRef(false); // Ref-based guard for authentication (more reliable than state)
 
+  // Navigation helper: Update both state and URL for proper back button support
+  const navigateToView = useCallback((view) => {
+    const path = view === 'dashboard' ? '/' : `/${view}`;
+    window.history.pushState({ view }, '', path);
+    setActiveView(view);
+  }, []);
+
+  // Handle browser back/forward button
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const view = event.state?.view || 'dashboard';
+      setActiveView(view);
+    };
+
+    // Initialize URL state on mount
+    const initialView = activeView || 'dashboard';
+    const initialPath = initialView === 'dashboard' ? '/' : `/${initialView}`;
+    window.history.replaceState({ view: initialView }, '', initialPath);
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch products for navigation (admin only)
   const { products: navProducts } = useOrganizationProducts(
     isAdmin ? selectedOrganizationSlug : null
@@ -1099,7 +1122,7 @@ const Home = () => {
         return <OrganizationView isAdmin={isAdmin} />;
       case 'dashboard':
       default:
-        return <DashboardContent onNavigate={setActiveView} organizationSlug={selectedOrganizationSlug} />;
+        return <DashboardContent onNavigate={navigateToView} organizationSlug={selectedOrganizationSlug} />;
     }
   };
 
@@ -1132,7 +1155,7 @@ const Home = () => {
       organizationName={selectedOrganizationName}
       organizationSlug={selectedOrganizationSlug || undefined}
       activeView={activeView}
-      onNavigate={setActiveView}
+      onNavigate={navigateToView}
       navItems={navItems}
     >
       {renderActiveView()}
