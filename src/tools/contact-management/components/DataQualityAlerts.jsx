@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Building2, TrendingDown, Users, Route } from 'lucide-react';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8989';
+const API_BASE = process.env.REACT_APP_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8989');
 
 export default function DataQualityAlerts({ organizationSlug, onAlertClick }) {
   const [metrics, setMetrics] = useState(null);

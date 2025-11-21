@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { X, Download, Upload, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8989';
+const API_BASE = process.env.REACT_APP_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8989');
 
 const STEPS = {
   UPLOAD: 0,
