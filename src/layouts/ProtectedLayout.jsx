@@ -122,6 +122,9 @@ function ProtectedLayout({
     </div>
   );
 
+  // Check if we should show the header (only when there are nav items)
+  const showHeader = navItems.length > 0;
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hide scrollbars globally */}
@@ -137,7 +140,8 @@ function ProtectedLayout({
         `}
       </style>
 
-      {/* Top Navigation Bar */}
+      {/* Top Navigation Bar - only show when there are nav items */}
+      {showHeader && (
       <header className="sticky top-0 z-50 bg-white border-b border-neutral-200">
         <div className="px-2 sm:px-3 md:px-4">
           <div className="flex items-center justify-between h-11 sm:h-12 md:h-12">
@@ -199,9 +203,10 @@ function ProtectedLayout({
           </div>
         </div>
       </header>
+      )}
 
-      {/* Mobile Drawer Overlay */}
-      {mobileOpen && (
+      {/* Mobile Drawer Overlay - only show when there are nav items */}
+      {showHeader && mobileOpen && (
         <>
           {/* Backdrop */}
           <div
@@ -217,7 +222,10 @@ function ProtectedLayout({
       )}
 
       {/* Main Content */}
-      <main className="flex-grow bg-gray-50 min-h-[calc(100vh-44px)] sm:min-h-[calc(100vh-48px)]">
+      <main className={cn(
+        "flex-grow bg-gray-50",
+        showHeader ? "min-h-[calc(100vh-44px)] sm:min-h-[calc(100vh-48px)]" : "min-h-screen"
+      )}>
         <div
           className={cn(
             activeView === "strategic_map" || activeView === "strategic_map_v2" || activeView === "inventory"

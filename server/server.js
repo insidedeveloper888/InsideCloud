@@ -118,6 +118,7 @@ async function getUserAccessToken(ctx) {
                 if (userInfoRes.data && userInfoRes.data.code === 0) {
                     const userInfo = userInfoRes.data.data;
                     // Create auth object similar to what we get from access_token endpoint
+                    // Include all available user info fields
                     const authData = {
                         access_token: token,
                         token_type: "Bearer",
@@ -127,7 +128,14 @@ async function getUserAccessToken(ctx) {
                         union_id: userInfo.union_id,
                         en_name: userInfo.en_name,
                         name: userInfo.name,
-                        avatar_url: userInfo.avatar_url
+                        avatar_url: userInfo.avatar_url,
+                        avatar_thumb: userInfo.avatar_thumb,
+                        avatar_middle: userInfo.avatar_middle,
+                        avatar_big: userInfo.avatar_big,
+                        email: userInfo.email,
+                        enterprise_email: userInfo.enterprise_email,
+                        mobile: userInfo.mobile,
+                        tenant_key: userInfo.tenant_key
                     };
                     
                     // Store in session and cookie
@@ -1342,6 +1350,198 @@ router.get('/api/current_user', async (ctx) => {
     } catch (error) {
         console.error('Error getting current user:', error);
         ctx.body = serverUtil.failResponse('Failed to get current user info');
+    }
+})
+
+// Get user department info from Lark Contact API
+router.get('/api/user_department', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    try {
+        const userId = ctx.query.user_id;
+        const organizationSlug = ctx.query.organization_slug || ctx.session.organization_slug;
+
+        if (!userId) {
+            ctx.body = serverUtil.failResponse('user_id is required');
+            return;
+        }
+
+        // Get Lark credentials for this organization
+        let appId, appSecret;
+        if (organizationSlug) {
+            const larkCredentials = await getLarkCredentials(organizationSlug);
+            if (!larkCredentials) {
+                ctx.body = serverUtil.failResponse(`Organization '${organizationSlug}' not found`);
+                return;
+            }
+            appId = larkCredentials.lark_app_id;
+            appSecret = larkCredentials.lark_app_secret;
+        } else {
+            appId = serverConfig.config.appId;
+            appSecret = serverConfig.config.appSecret;
+        }
+
+        // Get tenant_access_token
+        const tenantTokenResponse = await axios.post(
+            'https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal',
+            { app_id: appId, app_secret: appSecret },
+            { headers: { 'Content-Type': 'application/json' } }
+        );
+
+        if (tenantTokenResponse.data.code !== 0) {
+            console.error('Failed to get tenant_access_token:', tenantTokenResponse.data);
+            ctx.body = serverUtil.failResponse('Failed to get access token');
+            return;
+        }
+
+        const tenantAccessToken = tenantTokenResponse.data.tenant_access_token;
+
+        // Get user info including department_ids, leader, dotted_line_leader
+        const userResponse = await axios.get(
+            `https://open.larksuite.com/open-apis/contact/v3/users/${userId}?user_id_type=user_id&department_id_type=open_department_id`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${tenantAccessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (userResponse.data.code !== 0) {
+            console.error('Failed to get user info:', userResponse.data);
+            ctx.body = serverUtil.failResponse(`Failed to get user info: ${userResponse.data.msg}`);
+            return;
+        }
+
+        const user = userResponse.data.data?.user || {};
+        const departmentIds = user.department_ids || [];
+
+        // Get department names for each department_id (skip root "0")
+        const departments = [];
+        for (const deptId of departmentIds) {
+            if (deptId === '0') continue; // Skip root department
+            try {
+                const deptResponse = await axios.get(
+                    `https://open.larksuite.com/open-apis/contact/v3/departments/${deptId}?department_id_type=open_department_id`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${tenantAccessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                if (deptResponse.data.code === 0 && deptResponse.data.data?.department) {
+                    departments.push({
+                        id: deptId,
+                        name: deptResponse.data.data.department.name,
+                        en_name: deptResponse.data.data.department.i18n_name?.en_us
+                    });
+                }
+            } catch (e) {
+                console.error(`Failed to get department ${deptId}:`, e.message);
+            }
+        }
+
+        // Get leader name if leader_user_id exists
+        let leaderName = '';
+        if (user.leader_user_id) {
+            try {
+                const leaderResponse = await axios.get(
+                    `https://open.larksuite.com/open-apis/contact/v3/users/${user.leader_user_id}?user_id_type=user_id`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${tenantAccessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                if (leaderResponse.data.code === 0 && leaderResponse.data.data?.user) {
+                    const leader = leaderResponse.data.data.user;
+                    leaderName = leader.en_name || leader.name || '';
+                }
+            } catch (e) {
+                console.error('Failed to get leader info:', e.message);
+            }
+        }
+
+        ctx.body = serverUtil.okResponse({
+            user_id: userId,
+            department_ids: departmentIds,
+            departments: departments,
+            job_title: user.job_title || '',
+            join_time: user.join_time || null,
+            leader_name: leaderName
+        });
+    } catch (error) {
+        console.error('Error getting user department:', error);
+        ctx.body = serverUtil.failResponse('Failed to get user department info');
+    }
+})
+
+// Get tenant/organization info including logo
+router.get('/api/tenant_info', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    try {
+        const organizationSlug = ctx.query.organization_slug || ctx.session.organization_slug;
+
+        // Get Lark credentials for this organization
+        let appId, appSecret;
+        if (organizationSlug) {
+            const larkCredentials = await getLarkCredentials(organizationSlug);
+            if (!larkCredentials) {
+                ctx.body = serverUtil.failResponse(`Organization '${organizationSlug}' not found`);
+                return;
+            }
+            appId = larkCredentials.lark_app_id;
+            appSecret = larkCredentials.lark_app_secret;
+        } else {
+            appId = serverConfig.config.appId;
+            appSecret = serverConfig.config.appSecret;
+        }
+
+        // Get tenant_access_token
+        const tenantTokenResponse = await axios.post(
+            'https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal',
+            { app_id: appId, app_secret: appSecret },
+            { headers: { 'Content-Type': 'application/json' } }
+        );
+
+        if (tenantTokenResponse.data.code !== 0) {
+            ctx.body = serverUtil.failResponse('Failed to get access token');
+            return;
+        }
+
+        const tenantAccessToken = tenantTokenResponse.data.tenant_access_token;
+
+        // Get tenant info
+        const tenantResponse = await axios.get(
+            'https://open.larksuite.com/open-apis/tenant/v2/tenant/query',
+            {
+                headers: {
+                    'Authorization': `Bearer ${tenantAccessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (tenantResponse.data.code !== 0) {
+            ctx.body = serverUtil.failResponse(`Failed to get tenant info: ${tenantResponse.data.msg}`);
+            return;
+        }
+
+        const tenant = tenantResponse.data.data?.tenant || {};
+        ctx.body = serverUtil.okResponse({
+            name: tenant.name || '',
+            display_id: tenant.display_id || '',
+            tenant_tag: tenant.tenant_tag || '',
+            avatar: tenant.avatar || {}
+        });
+    } catch (error) {
+        console.error('Error getting tenant info:', error);
+        ctx.body = serverUtil.failResponse('Failed to get tenant info');
     }
 })
 

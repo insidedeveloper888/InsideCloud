@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import Cookies from 'js-cookie';
 import Lottie from 'lottie-react';
 import clientConfig from '../../config/client_config.js';
@@ -30,6 +31,8 @@ import {
   UserCircle2,
   Map,
   Loader2,
+  Mail,
+  Phone,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
@@ -65,41 +68,206 @@ const slugify = (value) =>
     .replace(/(^-|-$)+/g, '')
     .substring(0, 60);
 
+// Calculate tenure from join_time (unix timestamp)
+const calculateTenure = (joinTime) => {
+  if (!joinTime) return null;
+  const joinDate = new Date(joinTime * 1000);
+  const now = new Date();
+  let years = now.getFullYear() - joinDate.getFullYear();
+  let months = now.getMonth() - joinDate.getMonth();
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  if (years > 0 && months > 0) return `${years}y ${months}m`;
+  if (years > 0) return `${years}y`;
+  if (months > 0) return `${months}m`;
+  return 'New';
+};
+
 // User Profile Card Component
-const UserProfileCard = ({ user, organizationName }) => {
+const UserProfileCard = ({ user, organizationName, organizationSlug }) => {
+  const [departments, setDepartments] = useState([]);
+  const [jobTitle, setJobTitle] = useState('');
+  const [joinTime, setJoinTime] = useState(null);
+  const [leaderName, setLeaderName] = useState('');
+  const [orgLogo, setOrgLogo] = useState('');
+
+  useEffect(() => {
+    if (!user?.user_id || !organizationSlug) return;
+
+    const fetchDepartment = async () => {
+      try {
+        const response = await fetch(
+          `${resolveApiOrigin()}/api/user_department?user_id=${user.user_id}&organization_slug=${organizationSlug}`,
+          { credentials: 'include' }
+        );
+        const data = await response.json();
+        if (data.code === 0) {
+          if (data.data?.departments) setDepartments(data.data.departments);
+          if (data.data?.job_title) setJobTitle(data.data.job_title);
+          if (data.data?.join_time) setJoinTime(data.data.join_time);
+          if (data.data?.leader_name) setLeaderName(data.data.leader_name);
+        }
+      } catch (e) {
+        console.error('Failed to fetch department:', e);
+      }
+    };
+
+    const fetchTenantInfo = async () => {
+      try {
+        const response = await fetch(
+          `${resolveApiOrigin()}/api/tenant_info?organization_slug=${organizationSlug}`,
+          { credentials: 'include' }
+        );
+        const data = await response.json();
+        if (data.code === 0 && data.data?.avatar) {
+          setOrgLogo(data.data.avatar.avatar_640 || data.data.avatar.avatar_origin || '');
+        }
+      } catch (e) {
+        console.error('Failed to fetch tenant info:', e);
+      }
+    };
+
+    fetchDepartment();
+    fetchTenantInfo();
+  }, [user?.user_id, organizationSlug]);
+
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  // Use department name if available, otherwise null (will just show org name)
+  const departmentName = departments.length > 0
+    ? (departments[0].en_name || departments[0].name)
+    : null;
+
+  const tenure = calculateTenure(joinTime);
+
+  // Generate vCard data for QR code
+  const vCardData = useMemo(() => {
+    if (!user) return '';
+    const name = user.en_name || user.name || 'User';
+    const nameParts = name.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    return `BEGIN:VCARD
+VERSION:3.0
+N:${lastName};${firstName};;;
+FN:${name}
+${jobTitle ? `TITLE:${jobTitle}` : ''}
+${departmentName ? `ORG:${organizationName || ''};${departmentName}` : organizationName ? `ORG:${organizationName}` : ''}
+${user.email ? `EMAIL:${user.email}` : ''}
+${user.mobile ? `TEL;TYPE=CELL:${user.mobile}` : ''}
+END:VCARD`.replace(/\n+/g, '\n').trim();
+  }, [user, jobTitle, departmentName, organizationName]);
+
   if (!user) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center gap-4">
-      {/* Avatar */}
-      <div className="shrink-0">
-        {user.avatar_url || user.avatar_middle ? (
-          <img
-            src={user.avatar_middle || user.avatar_url}
-            alt={user.en_name || user.name}
-            className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
-            <UserCircle2 className="w-8 h-8 text-primary-600" />
-          </div>
-        )}
-      </div>
+    <div
+      className="relative h-[200px] cursor-pointer"
+      style={{ perspective: '1000px' }}
+      onClick={() => setIsFlipped(!isFlipped)}
+    >
+      <div
+        className="relative w-full h-full transition-transform duration-500"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
+        }}
+      >
+        {/* Front Side */}
+        <div
+          className="absolute inset-0 bg-white rounded-2xl shadow-sm p-5"
+          style={{ backfaceVisibility: 'hidden' }}
+        >
+          <div className="flex items-center gap-4 h-full">
+            {/* Avatar */}
+            <div className="shrink-0">
+              {user.avatar_url || user.avatar_middle || user.avatar_big ? (
+                <img
+                  src={user.avatar_big || user.avatar_middle || user.avatar_url}
+                  alt={user.en_name || user.name}
+                  className="w-20 h-20 rounded-full object-cover border-3 border-primary-100 shadow-md"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center">
+                  <UserCircle2 className="w-10 h-10 text-primary-600" />
+                </div>
+              )}
+            </div>
 
-      {/* User Info */}
-      <div className="flex-1 min-w-0">
-        <h3 className="text-lg font-semibold text-gray-900 truncate">
-          {user.en_name || user.name || 'User'}
-        </h3>
-        {user.email && (
-          <p className="text-sm text-gray-500 truncate">{user.email}</p>
-        )}
-        {user.mobile && (
-          <p className="text-sm text-gray-500 truncate">{user.mobile}</p>
-        )}
-        {organizationName && (
-          <p className="text-xs text-primary-600 mt-1 truncate">{organizationName}</p>
-        )}
+            {/* User Info */}
+            <div className="flex-1 min-w-0 text-left">
+              <h3 className="text-xl font-bold text-gray-900">
+                {user.en_name || user.name || 'User'}
+              </h3>
+              {jobTitle && (
+                <p className="text-sm text-gray-600 font-medium">{jobTitle}</p>
+              )}
+              {(departmentName || organizationName) && (
+                <p className="text-sm text-gray-600">
+                  {departmentName ? `${departmentName}` : organizationName}
+                </p>
+              )}
+              <div className="mt-2 space-y-1">
+                {user.email && (
+                  <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="truncate">{user.email}</span>
+                  </p>
+                )}
+                {user.mobile && (
+                  <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span>{user.mobile}</span>
+                  </p>
+                )}
+                {leaderName && (
+                  <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="truncate">Reports to {leaderName}</span>
+                  </p>
+                )}
+                {tenure && (
+                  <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span>{tenure} tenure</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Organization Logo */}
+            {orgLogo && (
+              <div className="shrink-0 ml-auto">
+                <img
+                  src={orgLogo}
+                  alt={organizationName || 'Organization'}
+                  className="w-16 h-16 rounded-lg object-contain"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Back Side - QR Code */}
+        <div
+          className="absolute inset-0 bg-white rounded-2xl shadow-sm p-5 flex flex-col items-center justify-center"
+          style={{
+            backfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)'
+          }}
+        >
+          <QRCodeSVG
+            value={vCardData}
+            size={120}
+            level="M"
+            marginSize={0}
+          />
+          <p className="text-sm text-gray-600 mt-3 font-medium">Scan to save contact</p>
+          <p className="text-xs text-gray-400 mt-1">{user.en_name || user.name}</p>
+        </div>
       </div>
     </div>
   );
@@ -124,7 +292,6 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
-        <p className="text-base text-gray-600">Loading products...</p>
       </div>
     );
   }
@@ -148,8 +315,8 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
   return (
     <div className="space-y-6">
       {/* User Profile Card - Top Left */}
-      <div className="max-w-sm">
-        <UserProfileCard user={userInfo} organizationName={organizationName} />
+      <div className="max-w-md">
+        <UserProfileCard user={userInfo} organizationName={organizationName} organizationSlug={organizationSlug} />
       </div>
 
       {/* Products Grid */}
@@ -709,10 +876,10 @@ const LoadingState = () => (
     </div>
 
     {/* Text overlay */}
-    <div className="lottie-placeholder">
+    {/* <div className="lottie-placeholder">
       <Loader2 className="w-10 h-10 animate-spin text-black" />
       <p className="text-base text-white mt-4" style={{ textShadow: '0 0 7px #000000, 0 0 14px #0000FF' }}>Authenticating with Lark…</p>
-    </div>
+    </div> */}
   </div>
 );
 
