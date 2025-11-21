@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { Users, BarChart3, Kanban, Settings, MapPin, Loader } from 'lucide-react';
+import { Users, BarChart3, Kanban, Settings, MapPin } from 'lucide-react';
 import { useContacts } from './hooks/useContacts';
 import { useStages } from './hooks/useStages';
 import { useChannels } from './hooks/useChannels';
