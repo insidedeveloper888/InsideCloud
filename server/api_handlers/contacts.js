@@ -22,6 +22,7 @@ module.exports = async function handler(req, res) {
   });
 
   // Create mock Koa context
+  const mockHeaders = {};
   const createMockCtx = () => ({
     request: {
       query,
@@ -31,6 +32,10 @@ module.exports = async function handler(req, res) {
     query,
     params: {},
     headers: req.headers,
+    set: (key, value) => {
+      mockHeaders[key] = value;
+    },
+    _mockHeaders: mockHeaders,
     throw: (status, message) => {
       const error = new Error(message);
       error.status = status;
@@ -50,12 +55,10 @@ module.exports = async function handler(req, res) {
     // Route: GET /api/contacts/import/template
     if (method === 'GET' && url.includes('/import/template')) {
       await contactController.getImportTemplate(ctx);
-      // Set CSV headers
-      if (ctx.set) {
-        Object.keys(ctx.set).forEach(key => {
-          res.setHeader(key, ctx.set[key]);
-        });
-      }
+      // Set CSV headers from mock context
+      Object.keys(ctx._mockHeaders).forEach(key => {
+        res.setHeader(key, ctx._mockHeaders[key]);
+      });
       return res.status(200).send(ctx.body);
     }
 
