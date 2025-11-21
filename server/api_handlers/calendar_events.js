@@ -44,55 +44,82 @@ module.exports = async function handler(req, res) {
     }
 
     const calendars = calendarListRes.data.data.calendar_list || [];
-    const primaryCalendar = calendars.find(c => c.summary === 'primary' || c.type === 'primary') || calendars[0];
 
-    if (!primaryCalendar) {
+    if (calendars.length === 0) {
       return res.status(200).json(okResponse([]));
     }
 
-    const calendarId = primaryCalendar.calendar_id;
-
-    // 2. Get events for today
+    // 2. Get events for today from ALL calendars
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-    console.log(`📅 Fetching events for calendar ${calendarId}`);
-    console.log(`   Time range: ${startOfDay.toISOString()} - ${endOfDay.toISOString()}`);
+    const startTimestamp = Math.floor(startOfDay.getTime() / 1000);
+    const endTimestamp = Math.floor(endOfDay.getTime() / 1000);
 
-    const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendarId}/events`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
-      params: {
-        start_time: Math.floor(startOfDay.getTime() / 1000).toString(),
-        end_time: Math.floor(endOfDay.getTime() / 1000).toString(),
-        page_size: 50
+    console.log(`📅 Fetching events for ${calendars.length} calendars`);
+    console.log(`   Time range: ${startTimestamp} - ${endTimestamp}`);
+
+    const eventPromises = calendars.map(async (calendar) => {
+      try {
+        const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendar.calendar_id}/events`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          },
+          params: {
+            start_time: startTimestamp.toString(),
+            end_time: endTimestamp.toString(),
+            page_size: 50
+          }
+        });
+
+        if (eventsRes.data.code === 0) {
+          return eventsRes.data.data.items || [];
+        }
+        return [];
+      } catch (e) {
+        console.error(`Failed to fetch events for calendar ${calendar.calendar_id}:`, e.message);
+        return [];
       }
     });
 
-    if (eventsRes.data.code !== 0) {
-      const errorDetails = JSON.stringify(eventsRes.data);
-      console.error('❌ Failed to fetch events:', errorDetails);
-      return res.status(500).json({
-        code: -1,
-        msg: `Calendar API Error: ${errorDetails}`,
-        data: null
-      });
-    }
+    const allEventsArrays = await Promise.all(eventPromises);
+    let allEvents = allEventsArrays.flat();
 
-    const events = eventsRes.data.data.items || [];
-    console.log(`✅ Found ${events.length} events`);
+    console.log(`✅ Found ${allEvents.length} total events before filtering`);
+
+    // Filter and format
+    const formattedEvents = allEvents
+      .filter(event => {
+        // 1. Filter out cancelled events
+        if (event.status === 'cancelled') return false;
+
+        // 2. Strict time range check (exclude recurring masters that don't match today)
+        const eventStart = event.start_time?.timestamp ? parseInt(event.start_time.timestamp) : 0;
+        if (eventStart < startTimestamp || eventStart > endTimestamp) return false;
+
+        return true;
+      })
+      .map(event => ({
+        id: event.event_id,
+        summary: event.summary || 'No title',
+        description: event.description || '',
+        start_time: event.start_time?.timestamp ? parseInt(event.start_time.timestamp) : null,
+        end_time: event.end_time?.timestamp ? parseInt(event.end_time.timestamp) : null,
+        is_all_day: !event.start_time?.timestamp,
+        location: event.location?.name || '',
+        status: event.status,
+        color: event.color || null,
+        visibility: event.visibility
+      }));
+
+    console.log(`✅ Returning ${formattedEvents.length} events after filtering`);
 
     // Sort by start time
-    events.sort((a, b) => {
-      const startA = parseInt(a.start_time.timestamp);
-      const startB = parseInt(b.start_time.timestamp);
-      return startA - startB;
-    });
+    formattedEvents.sort((a, b) => (a.start_time || 0) - (b.start_time || 0));
 
     // Return raw events to match frontend expectation
-    return res.status(200).json(okResponse(events));
+    return res.status(200).json(okResponse(formattedEvents));
 
   } catch (error) {
     const errorDetails = error.response ? JSON.stringify(error.response.data) : error.message;

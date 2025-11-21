@@ -1762,48 +1762,82 @@ async function getCalendarEvents(ctx) {
             throw new Error(`Lark API error: ${calendarListRes.data.msg}`)
         }
 
-        // Find primary calendar
         const calendars = calendarListRes.data.data.calendar_list || []
-        const primaryCalendar = calendars.find(c => c.summary === 'primary' || c.type === 'primary') || calendars[0]
 
-        if (!primaryCalendar) {
+        if (calendars.length === 0) {
             ctx.body = { code: 0, msg: 'No calendar found', data: [] }
             return
         }
 
-        const calendarId = primaryCalendar.calendar_id
-
-        // 2. Get events for today
-        // https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/calendar-v4/calendar-event/list
+        // 2. Get events for today from ALL calendars
         const now = new Date()
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
 
-        console.log(`📅 Fetching events for calendar ${calendarId}`)
-        console.log(`   Time range: ${startOfDay.toISOString()} - ${endOfDay.toISOString()}`)
+        const startTimestamp = Math.floor(startOfDay.getTime() / 1000)
+        const endTimestamp = Math.floor(endOfDay.getTime() / 1000)
 
-        const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendarId}/events`, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            },
-            params: {
-                start_time: Math.floor(startOfDay.getTime() / 1000).toString(),
-                end_time: Math.floor(endOfDay.getTime() / 1000).toString(),
-                page_size: 50
+        console.log(`📅 Fetching events for ${calendars.length} calendars`)
+        console.log(`   Time range: ${startTimestamp} - ${endTimestamp}`)
+
+        const eventPromises = calendars.map(async (calendar) => {
+            try {
+                const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendar.calendar_id}/events`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    params: {
+                        start_time: startTimestamp.toString(),
+                        end_time: endTimestamp.toString(),
+                        page_size: 50
+                    }
+                })
+
+                if (eventsRes.data.code === 0) {
+                    return eventsRes.data.data.items || []
+                }
+                return []
+            } catch (e) {
+                console.error(`Failed to fetch events for calendar ${calendar.calendar_id}:`, e.message)
+                return []
             }
         })
 
-        if (eventsRes.data.code !== 0) {
-            console.error('❌ Failed to fetch events:', JSON.stringify(eventsRes.data))
-            throw new Error(`Lark API error: ${eventsRes.data.msg}`)
-        }
+        const allEventsArrays = await Promise.all(eventPromises)
+        let allEvents = allEventsArrays.flat()
 
-        const events = eventsRes.data.data.items || []
-        console.log(`✅ Found ${events.length} events`)
+        console.log(`✅ Found ${allEvents.length} total events before filtering`)
 
-        // Filter out declined events if needed, or just return all
+        // Filter and format
+        const formattedEvents = allEvents
+            .filter(event => {
+                // 1. Filter out cancelled events
+                if (event.status === 'cancelled') return false
+
+                // 2. Strict time range check (exclude recurring masters that don't match today)
+                const eventStart = event.start_time?.timestamp ? parseInt(event.start_time.timestamp) : 0
+                if (eventStart < startTimestamp || eventStart > endTimestamp) return false
+
+                return true
+            })
+        // No need to map structure here as server.js returns raw data usually, but let's keep it consistent if needed.
+        // However, the original server.js returned raw items. Let's stick to raw items but filtered.
+        // Wait, api_handlers/calendar_events.js formats them. 
+        // The frontend expects raw items mostly, but let's check frontend code.
+        // Frontend uses: event.summary, event.start_time.timestamp, event.location.name, event.status
+        // The api_handler formatted it to flat properties: start_time (int), location (string).
+        // Let's check frontend again.
+
+        // Frontend code:
+        // const startTime = parseInt(event.start_time?.timestamp || event.start_time || 0) * 1000;
+        // location: event.location?.name || event.location
+        // So frontend handles both raw and formatted.
+        // Let's return raw items to minimize changes to server.js structure, but filtered.
+
+        console.log(`✅ Returning ${formattedEvents.length} events after filtering`)
+
         // Sort by start time
-        events.sort((a, b) => {
+        formattedEvents.sort((a, b) => {
             const startA = parseInt(a.start_time.timestamp)
             const startB = parseInt(b.start_time.timestamp)
             return startA - startB
@@ -1812,7 +1846,7 @@ async function getCalendarEvents(ctx) {
         ctx.body = {
             code: 0,
             msg: 'Success',
-            data: events
+            data: formattedEvents
         }
 
     } catch (error) {
