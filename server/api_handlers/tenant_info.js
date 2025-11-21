@@ -8,33 +8,39 @@
 const { handleCors, okResponse, failResponse } = require('../../api/_utils');
 const axios = require('axios');
 
-// Helper to get Lark credentials for an organization
+// Helper to get Lark credentials for an organization using RPC function
 async function getLarkCredentials(organizationSlug) {
   const { createClient } = require('@supabase/supabase-js');
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('Missing Supabase credentials');
     return null;
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const { data, error } = await supabase
-    .from('organizations')
-    .select('id, lark_app_id, lark_app_secret')
-    .eq('slug', organizationSlug)
-    .single();
+  // Use RPC function same as organization_helper.js
+  const { data, error } = await supabase.rpc('get_lark_credentials', {
+    org_slug: organizationSlug
+  });
 
-  if (error || !data) {
+  if (error) {
     console.error('Failed to get org credentials:', error);
     return null;
   }
 
+  if (!data || data.length === 0) {
+    console.warn(`No Lark credentials found for organization: ${organizationSlug}`);
+    return null;
+  }
+
+  const credentials = data[0];
   return {
-    organization_id: data.id,
-    lark_app_id: data.lark_app_id,
-    lark_app_secret: data.lark_app_secret
+    organization_id: credentials.organization_id,
+    lark_app_id: credentials.lark_app_id,
+    lark_app_secret: credentials.lark_app_secret
   };
 }
 
