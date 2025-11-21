@@ -299,7 +299,7 @@ const UserEventsCard = () => {
           console.warn('Failed to fetch events:', data.msg);
         }
       } catch (e) {
-        console.error('Failed to fetch events:', e);
+        console.error('Failed to fetch events:' + error, e);
         setError('Failed to load events');
       } finally {
         setLoading(false);
