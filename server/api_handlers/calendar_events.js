@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
         'Authorization': `Bearer ${accessToken}`
       },
       params: {
-        page_size: 20 // We just need the primary one
+        page_size: 50 // Min value is 50
       }
     });
 
