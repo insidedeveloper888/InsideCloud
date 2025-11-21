@@ -49,7 +49,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-key-change-in-prod
 // CORS configuration
 function setCorsHeaders(res, req) {
     // When using credentials, must specify exact origin (cannot use '*')
-    const origin = req.headers.origin || 'http://localhost:3000';
+    const origin = req.headers.origin || req.headers.host?.replace(/^([^:]+)(:\d+)?$/, 'https://$1') || '*';
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
