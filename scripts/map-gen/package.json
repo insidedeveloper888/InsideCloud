@@ -1,0 +1,14 @@
+{
+    "name": "map-gen",
+    "version": "1.0.0",
+    "description": "Generate Malaysia SVG paths",
+    "main": "generate_paths.js",
+    "scripts": {
+        "start": "node generate_paths.js"
+    },
+    "dependencies": {
+        "d3-geo": "^3.1.0",
+        "node-fetch": "^3.3.2"
+    },
+    "type": "module"
+}
