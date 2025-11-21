@@ -1778,11 +1778,18 @@ async function getCalendarEvents(ctx) {
         const endTimestamp = Math.floor(endOfDay.getTime() / 1000)
 
         console.log(`📅 Fetching events for ${calendars.length} calendars`)
-        console.log(`   Calendars:`, calendars.map(c => ({ id: c.calendar_id, type: c.type, summary: c.summary })))
+        console.log(`   Calendars:`, calendars.map(c => ({
+            id: c.calendar_id,
+            type: c.type,
+            role: c.role,
+            summary: c.summary,
+            description: c.description
+        })))
         console.log(`   Time range: ${startTimestamp} - ${endTimestamp} (${startOfDay.toISOString()} - ${endOfDay.toISOString()})`)
 
         const eventPromises = calendars.map(async (calendar) => {
             try {
+                console.log(`   📆 Fetching from: ${calendar.summary || calendar.calendar_id} (type: ${calendar.type})`)
                 const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendar.calendar_id}/events`, {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`
@@ -1795,11 +1802,19 @@ async function getCalendarEvents(ctx) {
                 })
 
                 if (eventsRes.data.code === 0) {
-                    return eventsRes.data.data.items || []
+                    const items = eventsRes.data.data.items || []
+                    console.log(`   ✅ ${calendar.summary || calendar.calendar_id}: ${items.length} events`)
+                    return items
                 }
+                console.log(`   ⚠️ ${calendar.summary || calendar.calendar_id}: API returned code ${eventsRes.data.code}`)
                 return []
             } catch (e) {
-                console.error(`Failed to fetch events for calendar ${calendar.calendar_id}:`, e.message)
+                const errorMsg = e.response?.data?.msg || e.message
+                if (errorMsg.includes('invalid calendar type')) {
+                    console.log(`   ⏭️ ${calendar.summary || calendar.calendar_id}: Skipped (external calendar - API doesn't support fetching events)`)
+                } else {
+                    console.error(`   ❌ ${calendar.summary || calendar.calendar_id}: ${errorMsg}`)
+                }
                 return []
             }
         })

@@ -293,8 +293,11 @@ const UserEventsCard = () => {
         const data = await response.json();
         if (data.code === 0) {
           setEvents(data.data || []);
+        } else if (data.msg?.includes('99991679') || data.msg?.includes('permission')) {
+          // Calendar permission not granted - show friendly message
+          console.warn('Calendar permission not granted');
+          setEvents([]);  // Will show "No events" state
         } else {
-          // Silently fail or show empty state if API fails (e.g. permission issues)
           console.warn('Failed to fetch events:', data.msg);
         }
       } catch (e) {
@@ -336,9 +339,17 @@ const UserEventsCard = () => {
         ) : (
           <div className="space-y-3">
             {events.map((event) => {
-              const startTime = new Date(event.start_time.timestamp * 1000);
-              const endTime = new Date(event.end_time.timestamp * 1000);
-              const timeString = `${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              // Parse unix timestamp (seconds) - handle both string and number
+              const startTs = parseInt(event.start_time?.timestamp || '0', 10);
+              const endTs = parseInt(event.end_time?.timestamp || '0', 10);
+              const startTime = new Date(startTs * 1000);
+              const endTime = new Date(endTs * 1000);
+
+              // Format in Malaysia timezone
+              const timeOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' };
+              const timeString = startTs && endTs
+                ? `${startTime.toLocaleTimeString('en-MY', timeOptions)} - ${endTime.toLocaleTimeString('en-MY', timeOptions)}`
+                : 'All day';
 
               return (
                 <div key={event.event_id} className="flex gap-3 group">
@@ -368,6 +379,20 @@ const UserEventsCard = () => {
 
 const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organizationName }) => {
   const { products, loading, error } = useOrganizationProducts(organizationSlug);
+  const [activeTab, setActiveTab] = useState('All');
+
+  // Extract unique categories and create tabs
+  const tabs = useMemo(() => {
+    if (!products) return ['All'];
+    const categories = new Set(products.map(p => p.category).filter(Boolean));
+    return ['All', ...Array.from(categories)];
+  }, [products]);
+
+  // Filter products based on active tab
+  const filteredProducts = useMemo(() => {
+    if (activeTab === 'All') return products;
+    return products.filter(p => p.category === activeTab);
+  }, [products, activeTab]);
 
   // Icon mapping: database icon name (string) -> React component
   // Database stores component names like "TargetIcon", "DocumentIcon", "ContactBookIcon"
@@ -417,10 +442,40 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
         </div>
       </div>
 
+      {/* Separator Line with Gradient Glow */}
+      <div className="relative my-4 h-4">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full h-px bg-gray-200/40"></div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-1/3 h-px bg-gradient-to-r from-transparent via-indigo-300/60 to-transparent blur-sm"></div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-1/4 h-0.5 bg-gradient-to-r from-transparent via-indigo-400/40 to-transparent"></div>
+        </div>
+      </div>
+
+      {/* Category Tabs - Scrollable Pills */}
+      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-4">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap",
+              activeTab === tab
+                ? "bg-gray-900 text-white shadow-md"
+                : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+            )}
+          >
+            {tab === 'All' ? 'All Apps' : titleizeSlug(tab)}
+          </button>
+        ))}
+      </div>
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
-        {products.map((product) => {
+        {filteredProducts.map((product) => {
           // Get icon component by name from database
           // Falls back to TargetIcon if icon not found
           const IconComponent = iconMap[product.icon] || TargetIcon;
@@ -1310,6 +1365,26 @@ const Home = () => {
         setAuthError(null);
         // Clear OAuth redirect flag on success
         sessionStorage.removeItem('oauth_redirect_attempted');
+
+        // Show greeting toast based on Malaysia time
+        const displayName = userData.en_name || userData.name || 'User';
+        const malaysiaHour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kuala_Lumpur' });
+        const hour = parseInt(malaysiaHour, 10);
+        let greeting = 'Good Evening';
+        if (hour >= 0 && hour < 12) greeting = 'Good Morning';
+        else if (hour >= 12 && hour < 15) greeting = 'Good Afternoon';
+
+        if (window.tt?.showToast) {
+          window.tt.showToast({
+            title: `${greeting}, ${displayName}!`,
+            icon: 'success',
+            duration: 2500
+          });
+        } else {
+          // Browser fallback - log to console
+          console.log(`🎉 ${greeting}, ${displayName}!`);
+        }
+
         if (!DISABLE_AUTO_NAVIGATION) {
           setIsLoading(false);
         }
@@ -1484,6 +1559,7 @@ const Home = () => {
       activeView={activeView}
       onNavigate={navigateToView}
       navItems={navItems}
+      mainClassName={activeView === 'dashboard' ? "bg-soft-gradient" : undefined}
     >
       {renderActiveView()}
     </ProtectedLayout>

@@ -78,12 +78,8 @@ function configJSAPIAccess(data, complete) {
         jsApiList: jsApiList,
         //成功回调
         onSuccess: (res) => {
-            console.log(`Authenticated: ${JSON.stringify(res)}`);
-            window.tt.showToast({
-                title: "Authenticated",
-                icon: "success",
-                duration: 2000
-            });
+            console.log(`JSAPI Auth Success: ${JSON.stringify(res)}`);
+            // Greeting toast is now shown after user auth with user's name
             complete(true)
             console.log("\n----------[接入方网页鉴权处理 END]----------")
         },
@@ -370,9 +366,8 @@ export function redirectToOAuth(organizationSlug = null) {
     const authUrl = new URL('https://open.feishu.cn/open-apis/authen/v1/authorize');
     authUrl.searchParams.set('app_id', appId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
-    // Don't set scope - let Lark use app's default scopes from Developer Console
-    // If you need specific scopes, uncomment the line below and configure them in Lark Developer Console
-    // authUrl.searchParams.set('scope', 'contact:user.id:readonly contact:user:readonly');
+    // Request calendar scope for reading events
+    authUrl.searchParams.set('scope', 'calendar:calendar:readonly');
     authUrl.searchParams.set('state', state);
     
     console.log('🔐 Redirecting to Lark OAuth:', authUrl.toString());

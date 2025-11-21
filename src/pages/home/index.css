@@ -46,6 +46,14 @@ body {
 .bg-dark-bg {
   background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
   min-height: 100vh;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Soft light abstract gradient background */
+.bg-soft-gradient {
+  background: linear-gradient(135deg, #fdfbf7 0%, #eef2ff 50%, #f0f9ff 100%);
+  min-height: 100vh;
   position: relative;
 }
 

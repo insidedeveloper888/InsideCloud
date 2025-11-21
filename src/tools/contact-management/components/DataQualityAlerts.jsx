@@ -20,7 +20,8 @@ export default function DataQualityAlerts({ organizationSlug, onAlertClick }) {
       try {
         setLoading(true);
         const response = await fetch(
-          `${API_BASE}/api/contacts/data-quality?organization_slug=${organizationSlug}`
+          `${API_BASE}/api/contacts/data-quality?organization_slug=${organizationSlug}`,
+          { credentials: 'include' }
         );
 
         if (!response.ok) {

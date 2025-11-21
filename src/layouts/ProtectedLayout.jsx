@@ -27,6 +27,7 @@ function ProtectedLayout({
   onNavigate,
   navItems = [],
   children,
+  mainClassName,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -142,67 +143,67 @@ function ProtectedLayout({
 
       {/* Top Navigation Bar - only show when there are nav items */}
       {showHeader && (
-      <header className="sticky top-0 z-50 bg-white border-b border-neutral-200">
-        <div className="px-2 sm:px-3 md:px-4">
-          <div className="flex items-center justify-between h-11 sm:h-12 md:h-12">
-            {/* Mobile menu button */}
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDrawerToggle}
-                className="h-9 w-9 sm:h-10 sm:w-10 "
-              >
-                <Menu size={20} />
-              </Button>
-            </div>
+        <header className="sticky top-0 z-50 bg-white border-b border-neutral-200">
+          <div className="px-2 sm:px-3 md:px-4">
+            <div className="flex items-center justify-between h-11 sm:h-12 md:h-12">
+              {/* Mobile menu button */}
+              <div className="md:hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDrawerToggle}
+                  className="h-9 w-9 sm:h-10 sm:w-10 "
+                >
+                  <Menu size={20} />
+                </Button>
+              </div>
 
-            {/* Desktop navigation tabs */}
-            <nav className="hidden md:flex flex-1 items-center space-x-1 mr-4">
-              {navItems.map((item) => {
-                const isSelected = item.key === activeView;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => handleNavigate(item.key)}
-                    className={cn(
-                      "px-3 lg:px-4 py-2 text-xs lg:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap",
-                      isSelected
-                        ? "text-gray-900 border-primary-600"
-                        : "text-neutral-600 border-transparent hover:text-primary-600"
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
+              {/* Desktop navigation tabs */}
+              <nav className="hidden md:flex flex-1 items-center space-x-1 mr-4">
+                {navItems.map((item) => {
+                  const isSelected = item.key === activeView;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => handleNavigate(item.key)}
+                      className={cn(
+                        "px-3 lg:px-4 py-2 text-xs lg:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap",
+                        isSelected
+                          ? "text-gray-900 border-primary-600"
+                          : "text-neutral-600 border-transparent hover:text-primary-600"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
 
-            {/* User profile section (always visible) */}
-            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-2 lg:space-x-3 ml-auto">
-              <Avatar className="w-7 h-7 sm:w-8 sm:h-8 md:w-7 md:h-7 lg:w-8 lg:h-8">
-                <AvatarImage
-                  src={user?.avatar_url || user?.avatarUrl}
-                  alt={user?.en_name || user?.name}
-                />
-                <AvatarFallback className="text-xs">
-                  {getUserInitials()}
-                </AvatarFallback>
-              </Avatar>
+              {/* User profile section (always visible) */}
+              <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-2 lg:space-x-3 ml-auto">
+                <Avatar className="w-7 h-7 sm:w-8 sm:h-8 md:w-7 md:h-7 lg:w-8 lg:h-8">
+                  <AvatarImage
+                    src={user?.avatar_url || user?.avatarUrl}
+                    alt={user?.en_name || user?.name}
+                  />
+                  <AvatarFallback className="text-xs">
+                    {getUserInitials()}
+                  </AvatarFallback>
+                </Avatar>
 
-              {/* User name and org (hidden on very small screens) */}
-              <div className="hidden sm:flex md:flex flex-col max-w-[120px] md:max-w-[150px] lg:max-w-[180px]">
-                <p className="text-[11px] sm:text-xs md:text-[11px] lg:text-[13px] font-semibold text-neutral-900 truncate leading-tight">
-                  {user?.en_name || user?.name || "User"}
-                </p>
-                <p className="hidden md:block text-[10px] lg:text-[11px] text-neutral-500 truncate leading-tight">
-                  {organizationName || organizationSlug || "Organisation"}
-                </p>
+                {/* User name and org (hidden on very small screens) */}
+                <div className="hidden sm:flex md:flex flex-col max-w-[120px] md:max-w-[150px] lg:max-w-[180px]">
+                  <p className="text-[11px] sm:text-xs md:text-[11px] lg:text-[13px] font-semibold text-neutral-900 truncate leading-tight">
+                    {user?.en_name || user?.name || "User"}
+                  </p>
+                  <p className="hidden md:block text-[10px] lg:text-[11px] text-neutral-500 truncate leading-tight">
+                    {organizationName || organizationSlug || "Organisation"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
       )}
 
       {/* Mobile Drawer Overlay - only show when there are nav items */}
@@ -223,7 +224,8 @@ function ProtectedLayout({
 
       {/* Main Content */}
       <main className={cn(
-        "flex-grow bg-gray-50",
+        "flex-grow",
+        mainClassName || "bg-gray-50",
         showHeader ? "min-h-[calc(100vh-44px)] sm:min-h-[calc(100vh-48px)]" : "min-h-screen"
       )}>
         <div

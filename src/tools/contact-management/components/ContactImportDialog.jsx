@@ -36,7 +36,8 @@ export default function ContactImportDialog({ isOpen, onClose, organizationSlug,
   const handleDownloadTemplate = async () => {
     try {
       const response = await fetch(
-        `${API_BASE}/api/contacts/import/template?organization_slug=${organizationSlug}`
+        `${API_BASE}/api/contacts/import/template?organization_slug=${organizationSlug}`,
+        { credentials: 'include' }
       );
 
       if (!response.ok) {
@@ -115,6 +116,7 @@ export default function ContactImportDialog({ isOpen, onClose, organizationSlug,
       const response = await fetch(`${API_BASE}/api/contacts/import/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           organization_slug: organizationSlug,
           rows,
@@ -150,6 +152,7 @@ export default function ContactImportDialog({ isOpen, onClose, organizationSlug,
       const response = await fetch(`${API_BASE}/api/contacts/import/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           organization_slug: organizationSlug,
           individual_id: individualId,
