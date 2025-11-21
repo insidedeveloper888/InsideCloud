@@ -33,6 +33,8 @@ import {
   Loader2,
   Mail,
   Phone,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
@@ -249,6 +251,10 @@ END:VCARD`.replace(/\n+/g, '\n').trim();
               </div>
             )}
           </div>
+          {/* Flip indicator */}
+          <div className="absolute bottom-2 right-2 text-gray-400">
+            <RefreshCw className="w-4 h-4" />
+          </div>
         </div>
 
         {/* Back Side - QR Code */}
@@ -268,6 +274,95 @@ END:VCARD`.replace(/\n+/g, '\n').trim();
           <p className="text-sm text-gray-600 mt-3 font-medium">Scan to save contact</p>
           <p className="text-xs text-gray-400 mt-1">{user.en_name || user.name}</p>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// User Events Card Component
+const UserEventsCard = () => {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch(`${resolveApiOrigin()}/api/calendar/events`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        if (data.code === 0) {
+          setEvents(data.data || []);
+        } else {
+          // Silently fail or show empty state if API fails (e.g. permission issues)
+          console.warn('Failed to fetch events:', data.msg);
+        }
+      } catch (e) {
+        console.error('Failed to fetch events:', e);
+        setError('Failed to load events');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm p-5 h-[200px] flex flex-col">
+        <div className="flex items-center gap-2 mb-4">
+          <Calendar className="w-5 h-5 text-primary-600" />
+          <h3 className="text-lg font-bold text-gray-900">Today's Events</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5 h-[200px] flex flex-col">
+      <div className="flex items-center gap-2 mb-4">
+        <Calendar className="w-5 h-5 text-primary-600" />
+        <h3 className="text-lg font-bold text-gray-900">Today's Events</h3>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+        {events.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-gray-400">
+            <p className="text-sm">No events scheduled for today</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {events.map((event) => {
+              const startTime = new Date(event.start_time.timestamp * 1000);
+              const endTime = new Date(event.end_time.timestamp * 1000);
+              const timeString = `${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+              return (
+                <div key={event.event_id} className="flex gap-3 group">
+                  <div className="flex flex-col items-center pt-1">
+                    <div className={`w-2 h-2 rounded-full ${event.status === 'confirmed' ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div className="w-0.5 h-full bg-gray-100 mt-1 group-last:hidden" />
+                  </div>
+                  <div className="pb-1 min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{event.summary || '(No Title)'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <Clock className="w-3 h-3 text-gray-400" />
+                      <p className="text-xs text-gray-500">{timeString}</p>
+                    </div>
+                    {event.location && event.location.name && (
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{event.location.name}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -314,10 +409,16 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
 
   return (
     <div className="space-y-6">
-      {/* User Profile Card - Top Left */}
-      <div className="max-w-md">
-        <UserProfileCard user={userInfo} organizationName={organizationName} organizationSlug={organizationSlug} />
+      {/* Top Section: User Profile and Events */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <UserProfileCard user={userInfo} organizationName={organizationName} organizationSlug={organizationSlug} />
+        </div>
+        <div className="md:col-span-1">
+          <UserEventsCard />
+        </div>
       </div>
+
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
@@ -335,11 +436,10 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
           return (
             <div
               key={product.key}
-              className={`relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm ${
-                isComingSoon || isDeprecated
-                  ? 'opacity-60'
-                  : 'cursor-pointer hover:-translate-y-2 hover:shadow-xl'
-              }`}
+              className={`relative bg-white rounded-3xl min-h-[200px] transition-all duration-300 flex flex-col justify-center items-center p-8 shadow-sm ${isComingSoon || isDeprecated
+                ? 'opacity-60'
+                : 'cursor-pointer hover:-translate-y-2 hover:shadow-xl'
+                }`}
               onClick={() => {
                 // Only allow navigation for active and beta products
                 if ((isActive || isBeta) && onNavigate) {
