@@ -1748,7 +1748,7 @@ async function getCalendarEvents(ctx) {
 
         // 1. Get primary calendar
         // https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/calendar-v4/calendar/list
-        const calendarListRes = await axios.get('https://open.feishu.cn/open-apis/calendar/v4/calendars', {
+        const calendarListRes = await axios.get('https://open.larksuite.com/open-apis/calendar/v4/calendars', {
             headers: {
                 'Authorization': `Bearer ${accessToken}`
             },
@@ -1782,13 +1782,13 @@ async function getCalendarEvents(ctx) {
         console.log(`📅 Fetching events for calendar ${calendarId}`)
         console.log(`   Time range: ${startOfDay.toISOString()} - ${endOfDay.toISOString()}`)
 
-        const eventsRes = await axios.get(`https://open.feishu.cn/open-apis/calendar/v4/calendars/${calendarId}/events`, {
+        const eventsRes = await axios.get(`https://open.larksuite.com/open-apis/calendar/v4/calendars/${calendarId}/events`, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`
             },
             params: {
-                start_time: startOfDay.toISOString(),
-                end_time: endOfDay.toISOString(),
+                start_time: Math.floor(startOfDay.getTime() / 1000).toString(),
+                end_time: Math.floor(endOfDay.getTime() / 1000).toString(),
                 page_size: 50
             }
         })

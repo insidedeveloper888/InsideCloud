@@ -65,8 +65,8 @@ module.exports = async function handler(req, res) {
         'Authorization': `Bearer ${accessToken}`
       },
       params: {
-        start_time: startOfDay.toISOString(),
-        end_time: endOfDay.toISOString(),
+        start_time: Math.floor(startOfDay.getTime() / 1000).toString(),
+        end_time: Math.floor(endOfDay.getTime() / 1000).toString(),
         page_size: 50
       }
     });
