@@ -121,12 +121,12 @@ module.exports = async function handler(req, res) {
                     return;
                 } else {
                     console.error('❌ Lark API returned error:', userInfoRes.data);
-                    res.status(401).json(failResponse(`Token verification failed: ${userInfoRes.data?.msg || 'Invalid token'}`));
+                    res.status(401).json(failResponse(`Token verification failed: ${userInfoRes.data?.msg || 'Invalid token'}`, -2));
                     return;
                 }
             } catch (tokenError) {
                 console.error('❌ Token verification failed:', tokenError.response?.data || tokenError.message);
-                res.status(401).json(failResponse(`Token verification failed: ${tokenError.response?.data?.msg || tokenError.message || 'Invalid or expired token'}`));
+                res.status(401).json(failResponse(`Token verification failed: ${tokenError.response?.data?.msg || tokenError.message || 'Invalid or expired token'}`, -2));
                 return;
             }
         }

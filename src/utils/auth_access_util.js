@@ -252,13 +252,20 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
             return
         }
         
-        // Check if response indicates token invalidity (code -2) or code is empty error (code -1) when we sent a token
+        // Check if response indicates token invalidity (code -2) or token-related error when we sent a token
         const responseCode = response.data.code;
+        const responseMsg = response.data.msg || '';
         const sentToken = !code || code.length === 0; // We sent a token if code was empty
-        
-        if (responseCode === -2 || (responseCode === -1 && sentToken && response.data.msg && response.data.msg.includes('code is empty'))) {
+
+        // Check for token invalidity - code -2 OR message contains token-related error
+        const isTokenInvalid = responseCode === -2 ||
+            (sentToken && responseCode !== 0 && (responseMsg.includes('Token verification failed') ||
+                          responseMsg.includes('invalid access token') ||
+                          responseMsg.includes('code is empty')));
+
+        if (isTokenInvalid) {
             console.warn("⚠️ Token验证失败或无效，清除旧token并重新认证")
-            console.warn("⚠️ Response code:", responseCode, "Message:", response.data.msg);
+            console.warn("⚠️ Response code:", responseCode, "Message:", responseMsg);
             // Clear invalid token from localStorage and cookies
             localStorage.removeItem(LJ_TOKEN_KEY)
             Cookies.remove(LJ_TOKEN_KEY)
@@ -297,7 +304,13 @@ function requestUserAccessToken(code, complete, organizationSlug = null) {
         const errorMsg = error.response?.data?.msg || '';
         const sentToken = !code || code.length === 0; // We sent a token if code was empty
         
-        if (errorCode === -2 || (errorCode === -1 && sentToken && errorMsg.includes('code is empty'))) {
+        // Check for token invalidity - code -2 OR message contains token-related error
+        const isTokenInvalid = errorCode === -2 ||
+            (sentToken && (errorMsg.includes('Token verification failed') ||
+                          errorMsg.includes('invalid access token') ||
+                          errorMsg.includes('code is empty')));
+
+        if (isTokenInvalid) {
             console.warn("⚠️ Token验证失败，清除旧token并重新认证")
             console.warn("⚠️ Error code:", errorCode, "Message:", errorMsg);
             // Clear invalid token from localStorage and cookies
