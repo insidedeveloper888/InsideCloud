@@ -283,7 +283,6 @@ END:VCARD`.replace(/\n+/g, '\n').trim();
 const UserEventsCard = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -299,8 +298,7 @@ const UserEventsCard = () => {
           console.warn('Failed to fetch events:', data.msg);
         }
       } catch (e) {
-        console.error('Failed to fetch events:' + error, e);
-        setError('Failed to load events');
+        console.error('Failed to fetch events:', e);
       } finally {
         setLoading(false);
       }
