@@ -1778,7 +1778,8 @@ async function getCalendarEvents(ctx) {
         const endTimestamp = Math.floor(endOfDay.getTime() / 1000)
 
         console.log(`📅 Fetching events for ${calendars.length} calendars`)
-        console.log(`   Time range: ${startTimestamp} - ${endTimestamp}`)
+        console.log(`   Calendars:`, calendars.map(c => ({ id: c.calendar_id, type: c.type, summary: c.summary })))
+        console.log(`   Time range: ${startTimestamp} - ${endTimestamp} (${startOfDay.toISOString()} - ${endOfDay.toISOString()})`)
 
         const eventPromises = calendars.map(async (calendar) => {
             try {
@@ -1806,18 +1807,32 @@ async function getCalendarEvents(ctx) {
         const allEventsArrays = await Promise.all(eventPromises)
         let allEvents = allEventsArrays.flat()
 
-        console.log(`✅ Found ${allEvents.length} total events before filtering`)
+        // Deduplicate by event_id (same event can appear in multiple calendars)
+        const eventMap = new Map()
+        allEvents.forEach(event => {
+            if (!eventMap.has(event.event_id)) {
+                eventMap.set(event.event_id, event)
+            }
+        })
+        allEvents = Array.from(eventMap.values())
 
-        // Filter and format
+        console.log(`✅ Found ${allEvents.length} total events before filtering`)
+        console.log(`   Raw events:`, allEvents.map(e => ({
+            id: e.event_id,
+            summary: e.summary,
+            status: e.status,
+            start: e.start_time?.timestamp,
+            end: e.end_time?.timestamp
+        })))
+
+        // Filter and format - only filter cancelled, API already handles time range
         const formattedEvents = allEvents
             .filter(event => {
-                // 1. Filter out cancelled events
-                if (event.status === 'cancelled') return false
-
-                // 2. Strict time range check (exclude recurring masters that don't match today)
-                const eventStart = event.start_time?.timestamp ? parseInt(event.start_time.timestamp) : 0
-                if (eventStart < startTimestamp || eventStart > endTimestamp) return false
-
+                // Only filter out cancelled events
+                if (event.status === 'cancelled') {
+                    console.log(`   Filtered out cancelled: ${event.summary}`)
+                    return false
+                }
                 return true
             })
         // No need to map structure here as server.js returns raw data usually, but let's keep it consistent if needed.
