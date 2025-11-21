@@ -311,7 +311,8 @@ class InventoryController {
         .select(`
           *,
           product:inventory_products (id, sku, name, category),
-          location:inventory_locations (id, name, code)
+          location:inventory_locations (id, name, code),
+          individual:individuals (id, display_name, avatar_url)
         `)
         .eq('organization_id', org.id);
 

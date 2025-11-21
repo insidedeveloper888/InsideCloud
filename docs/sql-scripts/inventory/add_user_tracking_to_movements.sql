@@ -17,6 +17,10 @@
 --   - reference_id (UUID) - links to the source document
 
 -- 2. Create a view for movements with user information
+-- NOTE: Table structure verified via Supabase MCP:
+--   - individuals table has: id, user_id, display_name, primary_email, avatar_url, profile (JSONB)
+--   - lark_users table has: id, lark_user_id, name, email, avatar_url, lark_union_id
+--   - JOIN relationship: individuals.profile->'profile'->>'user_id' = lark_users.lark_user_id
 CREATE OR REPLACE VIEW inventory_stock_movements_with_users AS
 SELECT
   m.id,
@@ -36,12 +40,12 @@ SELECT
   m.created_at,
   m.created_by_individual_id,
 
-  -- User information (from lark_users table via individuals.lark_user_id)
-  lu.name as created_by_name,
-  lu.email as created_by_email,
+  -- User information (from individuals table, preferring lark_users if available)
+  COALESCE(lu.name, i.display_name) as created_by_name,
+  COALESCE(lu.email, i.primary_email) as created_by_email,
+  COALESCE(lu.avatar_url, i.avatar_url) as created_by_avatar_url,
   lu.lark_user_id as created_by_lark_user_id,
-  lu.avatar_url as created_by_avatar_url,
-  lu.union_id as created_by_union_id,
+  lu.lark_union_id as created_by_union_id,
 
   -- Product information
   p.sku as product_sku,
@@ -66,7 +70,7 @@ SELECT
 
 FROM inventory_stock_movements m
 LEFT JOIN individuals i ON m.created_by_individual_id = i.id
-LEFT JOIN lark_users lu ON i.lark_user_id = lu.lark_user_id
+LEFT JOIN lark_users lu ON (i.profile->'profile'->>'user_id') = lu.lark_user_id
 LEFT JOIN inventory_products p ON m.product_id = p.id
 LEFT JOIN inventory_locations l ON m.location_id = l.id;
 
