@@ -65,7 +65,47 @@ const slugify = (value) =>
     .replace(/(^-|-$)+/g, '')
     .substring(0, 60);
 
-const DashboardContent = ({ onNavigate, organizationSlug }) => {
+// User Profile Card Component
+const UserProfileCard = ({ user, organizationName }) => {
+  if (!user) return null;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center gap-4">
+      {/* Avatar */}
+      <div className="shrink-0">
+        {user.avatar_url || user.avatar_middle ? (
+          <img
+            src={user.avatar_middle || user.avatar_url}
+            alt={user.en_name || user.name}
+            className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
+            <UserCircle2 className="w-8 h-8 text-primary-600" />
+          </div>
+        )}
+      </div>
+
+      {/* User Info */}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-lg font-semibold text-gray-900 truncate">
+          {user.en_name || user.name || 'User'}
+        </h3>
+        {user.email && (
+          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+        )}
+        {user.mobile && (
+          <p className="text-sm text-gray-500 truncate">{user.mobile}</p>
+        )}
+        {organizationName && (
+          <p className="text-xs text-primary-600 mt-1 truncate">{organizationName}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organizationName }) => {
   const { products, loading, error } = useOrganizationProducts(organizationSlug);
 
   // Icon mapping: database icon name (string) -> React component
@@ -106,7 +146,13 @@ const DashboardContent = ({ onNavigate, organizationSlug }) => {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
+      {/* User Profile Card - Top Left */}
+      <div className="max-w-sm">
+        <UserProfileCard user={userInfo} organizationName={organizationName} />
+      </div>
+
+      {/* Products Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
         {products.map((product) => {
           // Get icon component by name from database
@@ -743,10 +789,15 @@ const Home = () => {
       setActiveView(view);
     };
 
-    // Initialize URL state on mount
-    const initialView = activeView || 'dashboard';
-    const initialPath = initialView === 'dashboard' ? '/' : `/${initialView}`;
-    window.history.replaceState({ view: initialView }, '', initialPath);
+    // Initialize URL state on mount - but NOT if we have OAuth params in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasOAuthParams = urlParams.has('code') || urlParams.has('error');
+
+    if (!hasOAuthParams) {
+      const initialView = activeView || 'dashboard';
+      const initialPath = initialView === 'dashboard' ? '/' : `/${initialView}`;
+      window.history.replaceState({ view: initialView }, '', initialPath);
+    }
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -807,16 +858,13 @@ const Home = () => {
   }, [isAdmin, activeView]);
 
   const navItems = useMemo(() => {
-    // Normal users only see Dashboard
+    // Normal users see no nav items (back button navigation only)
     if (!isAdmin) {
-      return [
-        { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
-      ];
+      return [];
     }
 
-    // Admin users see system tabs + dynamic products
+    // Admin users see system tabs + dynamic products (no Dashboard - use back button)
     const systemTabs = [
-      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'General' },
       { key: 'account', label: 'Account', icon: UserCircle2, section: 'General' },
       { key: 'users', label: 'Users', icon: Users, section: 'Team' },
       { key: 'audit_log', label: 'Audit Log', icon: FileText, section: 'System' },
@@ -920,7 +968,7 @@ const Home = () => {
     // Set authentication guard
     authInProgress.current = true;
 
-    const AUTH_TIMEOUT_MS = 8000;
+    const AUTH_TIMEOUT_MS = 15000; // Increased timeout for OAuth flow
     const withTimeout = (promise, ms) => {
       return new Promise((resolve) => {
         let settled = false;
@@ -995,6 +1043,8 @@ const Home = () => {
       if (userData) {
         setUserInfo(userData);
         setAuthError(null);
+        // Clear OAuth redirect flag on success
+        sessionStorage.removeItem('oauth_redirect_attempted');
         if (!DISABLE_AUTO_NAVIGATION) {
           setIsLoading(false);
         }
@@ -1009,6 +1059,18 @@ const Home = () => {
           resetAuthState();
           return;
         }
+        // Check if we've already attempted OAuth (prevent infinite redirect loop)
+        const oauthAttempted = sessionStorage.getItem('oauth_redirect_attempted');
+        if (oauthAttempted) {
+          console.error('❌ OAuth authentication failed after redirect. Please try again.');
+          sessionStorage.removeItem('oauth_redirect_attempted');
+          setAuthError('Authentication failed. Please try again or contact support.');
+          setIsLoading(false);
+          resetAuthState();
+          return;
+        }
+        // Mark that we're attempting OAuth redirect
+        sessionStorage.setItem('oauth_redirect_attempted', 'true');
         // OAuth redirect is happening, page will reload
         // Keep loading state - OAuth callback will handle completion
         console.log('⏳ OAuth redirect initiated, waiting for callback...');
@@ -1122,7 +1184,7 @@ const Home = () => {
         return <OrganizationView isAdmin={isAdmin} />;
       case 'dashboard':
       default:
-        return <DashboardContent onNavigate={navigateToView} organizationSlug={selectedOrganizationSlug} />;
+        return <DashboardContent onNavigate={navigateToView} organizationSlug={selectedOrganizationSlug} userInfo={userInfo} organizationName={selectedOrganizationName} />;
     }
   };
 
