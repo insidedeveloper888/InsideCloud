@@ -676,7 +676,8 @@ export default function InventoryProduct({ onBack }) {
             movement_type: 'stock_in',
             quantity: newProduct.initial_quantity,
             unit_cost: newProduct.initial_unit_cost || 0,
-            notes: 'Initial stock'
+            notes: 'Initial stock',
+            created_by_individual_id: individualId
           };
 
           console.log('Creating initial stock movement:', movementData);
@@ -2360,15 +2361,17 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Product Modal */}
       {showAddProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
-                <Plus className="w-5 h-5 text-white" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+            <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Add New Product</h2>
             </div>
-            <div className="space-y-5">
+            <div className="px-8 pb-8 pt-4 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">SKU</label>
                 <input
@@ -2477,7 +2480,7 @@ export default function InventoryProduct({ onBack }) {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
+            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100 flex justify-end space-x-3">
               <button
                 onClick={() => setShowAddProductModal(false)}
                 className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
@@ -2497,15 +2500,17 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Warehouse/Location Modal */}
       {showAddLocationModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all">
-            <div className="flex items-center space-x-3 mb-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+            <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10">
+              <div className="flex items-center space-x-3">
               <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl">
                 <Warehouse className="w-5 h-5 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900">Add Warehouse/Location</h2>
+              </div>
             </div>
-            <div className="space-y-5">
+            <div className="px-8 pb-8 pt-4 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Warehouse Name <span className="text-red-500">*</span>
@@ -2543,7 +2548,7 @@ export default function InventoryProduct({ onBack }) {
                 />
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
+            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100 flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setShowAddLocationModal(false);
@@ -2570,15 +2575,17 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Stock Out Modal - Supports both pre-selected item and manual selection */}
       {showStockOutModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl">
-                <Minus className="w-5 h-5 text-white" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+            <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl">
+                  <Minus className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Stock Out</h2>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Stock Out</h2>
             </div>
-
+            <div className="px-8 pb-8 pt-4">
             {/* Product Info - Only show if pre-selected */}
             {selectedStockItem && (
               <div className="bg-gray-50 rounded-xl p-4 mb-6">
@@ -2678,8 +2685,8 @@ export default function InventoryProduct({ onBack }) {
                 />
               </div>
             </div>
-
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
+            </div>
+            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100 flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setShowStockOutModal(false);
@@ -2703,15 +2710,17 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Stock In Modal - Supports both pre-selected item and manual selection */}
       {showStockInModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-emerald-200/50 transform transition-all max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
-                <Plus className="w-5 h-5 text-white" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-emerald-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+            <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Stock In</h2>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Stock In</h2>
             </div>
-
+            <div className="px-8 pb-8 pt-4">
             {/* Product Info - Only show if pre-selected */}
             {selectedStockItem && (
               <div className={`rounded-xl p-4 mb-6 border ${selectedStockItem.isVirtual ? 'bg-purple-50 border-purple-200' : 'bg-emerald-50 border-emerald-200'}`}>
@@ -2834,7 +2843,8 @@ export default function InventoryProduct({ onBack }) {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
+            </div>
+            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100 flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setShowStockInModal(false);
@@ -2862,15 +2872,17 @@ export default function InventoryProduct({ onBack }) {
       {/* Create Purchase Order Modal */}
       {showAddPOModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl border border-gray-200/50 transform transition-all my-8">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
-                <FileText className="w-5 h-5 text-white" />
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-8 max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Create Purchase Order</h2>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Create Purchase Order</h2>
             </div>
 
-            <div className="space-y-6">
+            <div className="px-8 pb-8 pt-4 space-y-6">
               {/* PO Basic Info */}
               <div className="grid grid-cols-2 gap-5">
                 <div>
@@ -3087,8 +3099,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Supplier Modal */}
       {showAddSupplierModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
                 <Users className="w-5 h-5 text-white" />
@@ -3190,8 +3202,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Quick Add Product Modal (for PO) */}
       {showQuickAddProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl">
                 <Package className="w-5 h-5 text-white" />
@@ -3284,8 +3296,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Custom Category Modal */}
       {showAddCategoryModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-200/50 transform transition-all">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl">
                 <Plus className="w-5 h-5 text-white" />
@@ -3332,8 +3344,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Custom Unit Modal */}
       {showAddUnitModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-200/50 transform transition-all">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl">
                 <Plus className="w-5 h-5 text-white" />
@@ -3380,8 +3392,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* PO Detail Modal */}
       {showPODetailModal && selectedPO && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-gray-200/50 transform transition-all">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-gray-200/50 transform transition-all my-auto">
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
