@@ -4,3 +4,4 @@ export { default as SheetIcon } from './SheetIcon.jsx';
 export { default as DocumentIcon } from './DocumentIcon.jsx';
 export { default as ContactBookIcon } from './ContactBookIcon.jsx';
 export { default as InventoryIcon } from './InventoryIcon.jsx';
+export { default as ProjectManagementIcon } from './ProjectManagementIcon.jsx';

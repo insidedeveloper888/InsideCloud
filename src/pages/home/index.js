@@ -46,7 +46,8 @@ import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
 import DocumentParser from '../../tools/document-parser/index.jsx';
 import ContactManagementApp from '../../tools/contact-management/index.jsx';
 import InventoryProduct from '../../tools/inventory/index.jsx';
-import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon } from '../../components/ui/icons';
+import ProjectManagement from '../../tools/project-management/index.jsx';
+import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon, ProjectManagementIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';
 import { useOrganizationProducts } from '../../hooks/useOrganizationProducts';
@@ -405,6 +406,7 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
     'SheetIcon': SheetIcon,
     'PromotionIcon': PromotionIcon,
     'InventoryIcon': InventoryIcon,
+    'ProjectManagementIcon': ProjectManagementIcon,
   };
 
   if (loading) {
@@ -1168,7 +1170,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory') {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory' && activeView !== 'project_management') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
@@ -1498,6 +1500,12 @@ const Home = () => {
       case 'inventory':
         return (
           <InventoryProduct
+            organizationSlug={selectedOrganizationSlug}
+          />
+        );
+      case 'project_management':
+        return (
+          <ProjectManagement
             organizationSlug={selectedOrganizationSlug}
           />
         );

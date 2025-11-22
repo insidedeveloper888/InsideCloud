@@ -13,6 +13,7 @@ function App() {
         <Route path="/document_parser" element={<Home />} />
         <Route path="/contact_management" element={<Home />} />
         <Route path="/inventory" element={<Home />} />
+        <Route path="/project_management" element={<Home />} />
         <Route path="/account" element={<Home />} />
         <Route path="/audit_logs" element={<Home />} />
         <Route path="/organization" element={<Home />} />

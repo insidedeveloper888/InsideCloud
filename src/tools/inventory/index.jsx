@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector';
 import { InventoryAPI } from './api/inventory';
 import { useCurrentUser } from '../../tools/contact-management/hooks/useCurrentUser';
-import { Package, Plus, Warehouse, Activity, Search, Minus, FileText, Truck, CheckCircle, Settings, Users, X, Upload, Eye, ChevronDown, Trash2 } from 'lucide-react';
+import { Package, Plus, Warehouse, Activity, Search, Minus, FileText, Truck, CheckCircle, Settings, Users, X, Upload, Eye, ChevronDown, Trash2, Filter } from 'lucide-react';
+import FilterPanel from './components/FilterPanel';
 
 // Searchable Select Component with Add New option
 const SearchableSelect = ({ value, onChange, options, placeholder = 'Select...', className = '', allowAddNew = false, onAddNew = null, addNewLabel = '+ Add New...' }) => {
@@ -119,11 +120,31 @@ export default function InventoryProduct({ onBack }) {
 
   // Filter states for Stock Overview
   const [searchTerm, setSearchTerm] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [showUnstocked, setShowUnstocked] = useState(false); // Hide unstocked items by default
   const [sortBy, setSortBy] = useState({ field: '', direction: '' }); // { field: 'sku'|'name'|'category'|'warehouse'|'quantity'|'available'|'status', direction: 'asc'|'desc' }
-  const [categoryFilter] = useState(''); // eslint-disable-line no-unused-vars
+
+  // New sidebar filter states - per tab
+  const [showFilters, setShowFilters] = useState({
+    overview: false,
+    movements: false,
+    products: false,
+    'purchase-orders': false,
+    'delivery-orders': false,
+    suppliers: false,
+  });
+  const [filters, setFilters] = useState({
+    categories: [],
+    locations: [],
+    suppliers: [],
+    stockStatuses: [],
+    showInactive: false,
+    movementTypes: [],  // For movements tab
+    poStatuses: [],     // For purchase orders tab
+    doStatuses: [],     // For delivery orders tab
+    states: [],         // For suppliers tab
+    minQuantity: null,  // For overview tab - quantity range
+    maxQuantity: null,  // For overview tab - quantity range
+  });
 
   // Search states for each tab
   const [poSearchTerm, setPoSearchTerm] = useState('');
@@ -131,15 +152,10 @@ export default function InventoryProduct({ onBack }) {
   const [movementSearchTerm, setMovementSearchTerm] = useState('');
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
 
-  // Date filter states
-  const [movementDateFrom, setMovementDateFrom] = useState('');
-  const [movementDateTo, setMovementDateTo] = useState('');
-  const [movementLocationFilter, setMovementLocationFilter] = useState('');
-  const [movementProductFilter, setMovementProductFilter] = useState('');
-  const [movementUserFilter, setMovementUserFilter] = useState('');
-  const [movementTypeFilter, setMovementTypeFilter] = useState(''); // 'stock_in', 'stock_out'
+  // Sort states
   const [movementSortBy, setMovementSortBy] = useState({ field: '', direction: '' });
   const [productSortBy, setProductSortBy] = useState({ field: '', direction: '' });
+  const [poSortBy, setPoSortBy] = useState({ field: '', direction: '' });
 
   // Pagination states
   const [stockPage, setStockPage] = useState(1);
@@ -147,21 +163,11 @@ export default function InventoryProduct({ onBack }) {
   const [productPage, setProductPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const [poDateFrom, setPoDateFrom] = useState('');
-  const [poDateTo, setPoDateTo] = useState('');
-  const [poSupplierFilter, setPoSupplierFilter] = useState('');
-  const [poWarehouseFilter, setPoWarehouseFilter] = useState('');
-  const [poStatusFilter, setPoStatusFilter] = useState('');
-  const [poSortBy, setPoSortBy] = useState({ field: '', direction: '' });
-
   // Supplier filters
   const [supplierSortBy, setSupplierSortBy] = useState({ field: '', direction: '' });
 
   // Delivery Order (Out) states
   const [doSearchTerm, setDoSearchTerm] = useState('');
-  const [doStatusFilter, setDoStatusFilter] = useState('');
-  const [doCustomerFilter, setDoCustomerFilter] = useState('');
-  const [doWarehouseFilter, setDoWarehouseFilter] = useState('');
   const [doSortBy, setDoSortBy] = useState({ field: '', direction: '' });
   const [showAddDOModal, setShowAddDOModal] = useState(false);
   const [showDODetailModal, setShowDODetailModal] = useState(false);
@@ -379,8 +385,8 @@ export default function InventoryProduct({ onBack }) {
   }, [organizationSlug]);
 
   // Reset pages when filters change
-  useEffect(() => { setStockPage(1); }, [searchTerm, locationFilter, statusFilter, showUnstocked, sortBy]);
-  useEffect(() => { setMovementPage(1); }, [movementSearchTerm, movementDateFrom, movementDateTo, movementLocationFilter, movementProductFilter, movementUserFilter, movementTypeFilter, movementSortBy]);
+  useEffect(() => { setStockPage(1); }, [searchTerm, showUnstocked, sortBy, filters]);
+  useEffect(() => { setMovementPage(1); }, [movementSearchTerm, movementSortBy, filters]);
   useEffect(() => { setProductPage(1); }, [productSearchTerm, productSortBy]);
 
   // ESC key to close modals
@@ -402,6 +408,36 @@ export default function InventoryProduct({ onBack }) {
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
+  // Clear filters when switching tabs
+  useEffect(() => {
+    setFilters({
+      categories: [],
+      locations: [],
+      suppliers: [],
+      stockStatuses: [],
+      showInactive: false,
+      movementTypes: [],
+      poStatuses: [],
+      doStatuses: [],
+      states: [],
+      minQuantity: null,
+      maxQuantity: null,
+      movementDateFrom: '',
+      movementDateTo: '',
+      users: [],
+      products: [],
+      managedBy: [],
+      poOrderDateFrom: '',
+      poOrderDateTo: '',
+      poExpectedDeliveryFrom: '',
+      poExpectedDeliveryTo: '',
+      customers: [],
+      createdBy: [],
+      doOrderDateFrom: '',
+      doOrderDateTo: '',
+    });
+  }, [tab]);
+
   useEffect(() => {
     if (!organizationSlug) return;
     fetchData();
@@ -416,7 +452,6 @@ export default function InventoryProduct({ onBack }) {
       if (tab === 'overview') {
         const [itemsRes, productsRes, locationsRes] = await Promise.all([
           InventoryAPI.getItems(organizationSlug, {
-            category: categoryFilter,
             search: searchTerm
           }),
           InventoryAPI.getProducts(organizationSlug),
@@ -549,6 +584,86 @@ export default function InventoryProduct({ onBack }) {
     return [...itemsWithUpdatedStatus, ...virtualItems];
   }, [items, products, locations]);
 
+  // Extract unique categories from products
+  const uniqueCategories = React.useMemo(() => {
+    const cats = new Set();
+    products.forEach(p => {
+      if (p.category && p.category.trim()) {
+        cats.add(p.category.trim());
+      }
+    });
+    return Array.from(cats).sort();
+  }, [products]);
+
+  // Extract unique users from movements, POs, and DOs
+  const uniqueUsers = React.useMemo(() => {
+    const usersMap = new Map();
+
+    // From movements
+    movements.forEach(m => {
+      if (m.created_by?.id) {
+        usersMap.set(m.created_by.id, m.created_by);
+      }
+    });
+
+    // From purchase orders
+    purchaseOrders.forEach(po => {
+      if (po.created_by?.id) {
+        usersMap.set(po.created_by.id, po.created_by);
+      }
+    });
+
+    // From delivery orders
+    deliveryOrders.forEach(d => {
+      if (d.created_by?.id) {
+        usersMap.set(d.created_by.id, d.created_by);
+      }
+    });
+
+    return Array.from(usersMap.values()).sort((a, b) =>
+      (a.display_name || a.email || '').localeCompare(b.display_name || b.email || '')
+    );
+  }, [movements, purchaseOrders, deliveryOrders]);
+
+  // Extract unique states from suppliers
+  const uniqueStates = React.useMemo(() => {
+    const statesSet = new Set();
+    suppliers.forEach(s => {
+      if (s.state && s.state.trim()) {
+        statesSet.add(s.state.trim());
+      }
+    });
+    return Array.from(statesSet).sort();
+  }, [suppliers]);
+
+  // Extract unique suppliers from purchase orders only
+  const uniquePOSuppliers = React.useMemo(() => {
+    const suppliersMap = new Map();
+    purchaseOrders.forEach(po => {
+      if (po.supplier?.id) {
+        suppliersMap.set(po.supplier.id, po.supplier);
+      }
+    });
+    return Array.from(suppliersMap.values()).sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '')
+    );
+  }, [purchaseOrders]);
+
+  // Extract unique customers from delivery orders only
+  const uniqueDOCustomers = React.useMemo(() => {
+    const customersMap = new Map();
+    deliveryOrders.forEach(d => {
+      if (d.customer?.id) {
+        customersMap.set(d.customer.id, d.customer);
+      }
+    });
+    return Array.from(customersMap.values()).sort((a, b) => {
+      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.company_name || '';
+      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim() || b.company_name || '';
+      return nameA.localeCompare(nameB);
+    });
+  }, [deliveryOrders]);
+
   // Filter and sort items
   const filteredItems = React.useMemo(() => {
     let result = itemsWithUnstockedProducts.filter(item => {
@@ -557,18 +672,43 @@ export default function InventoryProduct({ onBack }) {
         item.product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.product?.sku?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Location filter
-      const matchesLocation = !locationFilter ||
-        item.location_id === locationFilter ||
+      // Category filter (new sidebar filter)
+      const matchesCategory = filters.categories.length === 0 ||
+        (item.product?.category && filters.categories.includes(item.product.category));
+
+      // Location filter (new sidebar filter)
+      const matchesLocation = filters.locations.length === 0 ||
+        filters.locations.includes(item.location_id) ||
         (item.isVirtual && !item.location_id);
 
-      // Status filter
-      const matchesStatus = !statusFilter || item.stock_status === statusFilter;
+      // Stock Status filter (new sidebar filter)
+      const matchesStockStatus = filters.stockStatuses.length === 0 ||
+        filters.stockStatuses.includes(item.stock_status);
+
+      // Supplier filter (new sidebar filter) - check if product has supplier in purchase orders
+      const matchesSupplier = filters.suppliers.length === 0 ||
+        (() => {
+          // For now, we'll match all items if supplier filter is selected
+          // In the future, we can add supplier_id to products table
+          return true;
+        })();
+
+      // Active status filter
+      const matchesActiveStatus = filters.showInactive || item.product?.is_active !== false;
 
       // Hide unstocked items unless toggled on
       const matchesUnstocked = showUnstocked || item.stock_status !== 'no_stock';
 
-      return matchesSearch && matchesLocation && matchesStatus && matchesUnstocked;
+      // Quantity range filter
+      const matchesQuantityRange = (() => {
+        const quantity = item.quantity || 0;
+        const minMatch = filters.minQuantity === null || quantity >= filters.minQuantity;
+        const maxMatch = filters.maxQuantity === null || quantity <= filters.maxQuantity;
+        return minMatch && maxMatch;
+      })();
+
+      return matchesSearch && matchesCategory && matchesLocation && matchesStockStatus &&
+             matchesSupplier && matchesActiveStatus && matchesUnstocked && matchesQuantityRange;
     });
 
     // Sorting
@@ -617,7 +757,7 @@ export default function InventoryProduct({ onBack }) {
     }
 
     return result;
-  }, [itemsWithUnstockedProducts, searchTerm, locationFilter, statusFilter, showUnstocked, sortBy]);
+  }, [itemsWithUnstockedProducts, searchTerm, showUnstocked, sortBy, filters]);
 
   // Toggle sort for a field: asc -> desc -> none
   const createToggleSort = (setter) => (field) => {
@@ -1645,7 +1785,25 @@ export default function InventoryProduct({ onBack }) {
         </div>
 
         {/* Content - No padding for full width */}
-        <div className="px-4 md:px-8 py-4 md:py-6">
+        <div className="flex h-[calc(100vh-180px)]">
+          {/* Filter Panel - Full height sidebar */}
+          <FilterPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+            categories={uniqueCategories}
+            locations={locations}
+            suppliers={uniquePOSuppliers}
+            products={products}
+            users={uniqueUsers}
+            customers={uniqueDOCustomers}
+            states={uniqueStates}
+            isOpen={showFilters[tab] || false}
+            onClose={() => setShowFilters(prev => ({ ...prev, [tab]: false }))}
+            currentTab={tab}
+          />
+
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-auto px-4 md:px-8 py-4 md:py-6">
         {error && (
           <div className="bg-red-50/80 backdrop-blur-sm border-l-4 border-red-500 rounded-xl p-5 mb-6 shadow-sm">
             <p className="text-red-900 text-sm font-medium">Error: {error}</p>
@@ -1687,7 +1845,7 @@ export default function InventoryProduct({ onBack }) {
                     <div className="relative">
                       <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Low Stock Alert</div>
                       <div className="text-4xl font-bold text-amber-600 mb-1">
-                        {items.filter(i => i.stock_status === 'low_stock').length}
+                        {filteredItems.filter(i => i.stock_status === 'low_stock' && i.id).length}
                       </div>
                       <div className="text-xs text-amber-600 font-medium">Need restock</div>
                     </div>
@@ -1697,7 +1855,7 @@ export default function InventoryProduct({ onBack }) {
                     <div className="relative">
                       <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Out of Stock</div>
                       <div className="text-4xl font-bold text-red-600 mb-1">
-                        {items.filter(i => i.stock_status === 'out_of_stock').length}
+                        {filteredItems.filter(i => i.stock_status === 'out_of_stock' && i.id).length}
                       </div>
                       <div className="text-xs text-red-600 font-medium">Zero quantity</div>
                     </div>
@@ -1748,31 +1906,26 @@ export default function InventoryProduct({ onBack }) {
                             className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-gray-900 text-sm"
                           />
                         </div>
-                        <div className="flex gap-2">
-                          <SearchableSelect
-                            value={locationFilter}
-                            onChange={setLocationFilter}
-                            options={[
-                              { value: '', label: 'All Warehouses' },
-                              ...locations.map(l => ({ value: l.id, label: l.name }))
-                            ]}
-                            placeholder="All Warehouses"
-                            className="w-36 sm:w-48"
-                          />
-                          <SearchableSelect
-                            value={statusFilter}
-                            onChange={setStatusFilter}
-                            options={[
-                              { value: '', label: 'All Status' },
-                              { value: 'normal', label: 'Normal' },
-                              { value: 'low_stock', label: 'Low Stock' },
-                              { value: 'out_of_stock', label: 'Out of Stock' },
-                              { value: 'no_stock', label: 'Unstocked' }
-                            ]}
-                            placeholder="All Status"
-                            className="w-32 sm:w-40"
-                          />
-                        </div>
+                        {/* Filter Toggle Button */}
+                        <button
+                          onClick={() => setShowFilters(prev => ({ ...prev, overview: !prev.overview }))}
+                          className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-all flex-1 sm:flex-initial ${
+                            showFilters.overview
+                              ? 'bg-gray-900 border-gray-900 text-white'
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                          }`}
+                          title="Toggle filters"
+                        >
+                          <Filter size={14} />
+                          <span className="hidden sm:inline">Filter</span>
+                          {(filters.categories.length > 0 || filters.locations.length > 0 || filters.stockStatuses.length > 0 || filters.minQuantity !== null || filters.maxQuantity !== null) && (
+                            <span className={`px-1.5 py-0.5 text-xs rounded-md font-semibold ${
+                              showFilters.overview ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
+                            }`}>
+                              {filters.categories.length + filters.locations.length + filters.stockStatuses.length + (filters.minQuantity !== null || filters.maxQuantity !== null ? 1 : 0)}
+                            </span>
+                          )}
+                        </button>
                       </div>
                       {/* Show Unstocked Toggle */}
                       <div className="flex items-center justify-between">
@@ -1797,7 +1950,7 @@ export default function InventoryProduct({ onBack }) {
                           <Package className="w-8 h-8 text-gray-400" />
                         </div>
                         <p className="text-gray-500 font-medium">
-                          {searchTerm || locationFilter ? 'No matching inventory found' : 'No inventory data'}
+                          {searchTerm || filters.categories.length > 0 || filters.locations.length > 0 || filters.suppliers.length > 0 || filters.stockStatuses.length > 0 ? 'No matching inventory found' : 'No inventory data'}
                         </p>
                       </div>
                     ) : (
@@ -1905,7 +2058,7 @@ export default function InventoryProduct({ onBack }) {
                                   <Package className="w-8 h-8 text-gray-400" />
                                 </div>
                                 <p className="text-gray-500 font-medium">
-                                  {searchTerm || locationFilter ? 'No matching inventory found' : 'No inventory data'}
+                                  {searchTerm || filters.categories.length > 0 || filters.locations.length > 0 || filters.suppliers.length > 0 || filters.stockStatuses.length > 0 ? 'No matching inventory found' : 'No inventory data'}
                                 </p>
                               </div>
                             </td>
@@ -2009,96 +2162,38 @@ export default function InventoryProduct({ onBack }) {
                 </div>
                 {/* Search and Filter Bar */}
                 <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50 space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search by product, warehouse, or notes..."
-                      value={movementSearchTerm}
-                      onChange={(e) => setMovementSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
-                    />
-                  </div>
-                  {/* Date Range */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Date From:</label>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
-                        type="date"
-                        value={movementDateFrom}
-                        onChange={(e) => setMovementDateFrom(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+                        type="text"
+                        placeholder="Search by product, warehouse, or notes..."
+                        value={movementSearchTerm}
+                        onChange={(e) => setMovementSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">To:</label>
-                      <input
-                        type="date"
-                        value={movementDateTo}
-                        onChange={(e) => setMovementDateTo(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
-                      />
-                    </div>
-                  </div>
-                  {/* Dropdown Filters */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <SearchableSelect
-                      value={movementTypeFilter}
-                      onChange={setMovementTypeFilter}
-                      options={[
-                        { value: '', label: 'All Types' },
-                        { value: 'stock_in', label: 'Stock In' },
-                        { value: 'stock_out', label: 'Stock Out' }
-                      ]}
-                      placeholder="All Types"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={movementLocationFilter}
-                      onChange={setMovementLocationFilter}
-                      options={[
-                        { value: '', label: 'All Warehouses' },
-                        ...locations.map(loc => ({ value: loc.id, label: loc.name }))
-                      ]}
-                      placeholder="All Warehouses"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={movementProductFilter}
-                      onChange={setMovementProductFilter}
-                      options={[
-                        { value: '', label: 'All Products' },
-                        ...products.map(prod => ({ value: prod.id, label: prod.name }))
-                      ]}
-                      placeholder="All Products"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={movementUserFilter}
-                      onChange={setMovementUserFilter}
-                      options={[
-                        { value: '', label: 'All Users' },
-                        ...[...new Map(movements.filter(m => m.individual?.id).map(m => [m.individual.id, m.individual])).values()].map(user => ({ value: user.id, label: user.display_name }))
-                      ]}
-                      placeholder="All Users"
-                      className="w-full"
-                    />
-                  </div>
-                  {(movementDateFrom || movementDateTo || movementTypeFilter || movementLocationFilter || movementProductFilter || movementUserFilter) && (
+                    {/* Filter Toggle Button */}
                     <button
-                      onClick={() => {
-                        setMovementDateFrom('');
-                        setMovementDateTo('');
-                        setMovementTypeFilter('');
-                        setMovementLocationFilter('');
-                        setMovementProductFilter('');
-                        setMovementUserFilter('');
-                      }}
-                      className="w-full px-3 py-2 text-sm text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                      onClick={() => setShowFilters(prev => ({ ...prev, movements: !prev.movements }))}
+                      className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-all flex-1 sm:flex-initial ${
+                        showFilters.movements
+                          ? 'bg-gray-900 border-gray-900 text-white'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                      }`}
+                      title="Toggle filters"
                     >
-                      Clear All Filters
+                      <Filter size={14} />
+                      <span className="hidden sm:inline">Filter</span>
+                      {(filters.locations.length > 0 || filters.movementTypes?.length > 0 || filters.users?.length > 0 || filters.products?.length > 0 || filters.movementDateFrom || filters.movementDateTo) && (
+                        <span className={`px-1.5 py-0.5 text-xs rounded-md font-semibold ${
+                          showFilters.movements ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
+                        }`}>
+                          {filters.locations.length + (filters.movementTypes?.length || 0) + (filters.users?.length || 0) + (filters.products?.length || 0) + (filters.movementDateFrom || filters.movementDateTo ? 1 : 0)}
+                        </span>
+                      )}
                     </button>
-                  )}
+                  </div>
                 </div>
                 <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200/70">
@@ -2134,6 +2229,36 @@ export default function InventoryProduct({ onBack }) {
                       {(() => {
                         // Filter movements based on all filters
                         const filteredMovements = movements.filter(movement => {
+                          // Movement Type filter
+                          if (filters.movementTypes?.length > 0 && !filters.movementTypes.includes(movement.movement_type)) {
+                            return false;
+                          }
+
+                          // Location filter
+                          if (filters.locations?.length > 0 && !filters.locations.includes(movement.location_id)) {
+                            return false;
+                          }
+
+                          // Product filter
+                          if (filters.products?.length > 0 && !filters.products.includes(movement.product_id)) {
+                            return false;
+                          }
+
+                          // Date Range filter
+                          if (filters.movementDateFrom) {
+                            const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
+                            if (movementDate < filters.movementDateFrom) return false;
+                          }
+                          if (filters.movementDateTo) {
+                            const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
+                            if (movementDate > filters.movementDateTo) return false;
+                          }
+
+                          // User/Operator filter
+                          if (filters.users?.length > 0 && !filters.users.includes(movement.created_by?.id)) {
+                            return false;
+                          }
+
                           // Text search filter
                           if (movementSearchTerm) {
                             const searchLower = movementSearchTerm.toLowerCase();
@@ -2144,36 +2269,6 @@ export default function InventoryProduct({ onBack }) {
                               movement.notes?.toLowerCase().includes(searchLower)
                             );
                             if (!matchesSearch) return false;
-                          }
-
-                          // Movement type filter (stock_in / stock_out)
-                          if (movementTypeFilter && movement.movement_type !== movementTypeFilter) return false;
-
-                          // Location filter
-                          if (movementLocationFilter && movement.location_id !== movementLocationFilter) return false;
-
-                          // Product filter
-                          if (movementProductFilter && movement.product_id !== movementProductFilter) return false;
-
-                          // User filter
-                          if (movementUserFilter && movement.created_by?.id !== movementUserFilter) return false;
-
-                          // Date range filter
-                          if (movementDateFrom || movementDateTo) {
-                            const movementDate = new Date(movement.occurred_at);
-                            movementDate.setHours(0, 0, 0, 0);
-
-                            if (movementDateFrom) {
-                              const fromDate = new Date(movementDateFrom);
-                              fromDate.setHours(0, 0, 0, 0);
-                              if (movementDate < fromDate) return false;
-                            }
-
-                            if (movementDateTo) {
-                              const toDate = new Date(movementDateTo);
-                              toDate.setHours(23, 59, 59, 999);
-                              if (movementDate > toDate) return false;
-                            }
                           }
 
                           return true;
@@ -2279,6 +2374,37 @@ export default function InventoryProduct({ onBack }) {
                 {(() => {
                   // Filter movements based on all filters (same logic)
                   const filteredMovements = movements.filter(movement => {
+                    // Movement Type filter
+                    if (filters.movementTypes?.length > 0 && !filters.movementTypes.includes(movement.movement_type)) {
+                      return false;
+                    }
+
+                    // Location filter
+                    if (filters.locations?.length > 0 && !filters.locations.includes(movement.location_id)) {
+                      return false;
+                    }
+
+                    // Product filter
+                    if (filters.products?.length > 0 && !filters.products.includes(movement.product_id)) {
+                      return false;
+                    }
+
+                    // Date Range filter
+                    if (filters.movementDateFrom) {
+                      const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
+                      if (movementDate < filters.movementDateFrom) return false;
+                    }
+                    if (filters.movementDateTo) {
+                      const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
+                      if (movementDate > filters.movementDateTo) return false;
+                    }
+
+                    // User/Operator filter
+                    if (filters.users?.length > 0 && !filters.users.includes(movement.created_by?.id)) {
+                      return false;
+                    }
+
+                    // Text search filter
                     if (movementSearchTerm) {
                       const searchLower = movementSearchTerm.toLowerCase();
                       const matchesSearch = (
@@ -2289,24 +2415,7 @@ export default function InventoryProduct({ onBack }) {
                       );
                       if (!matchesSearch) return false;
                     }
-                    if (movementTypeFilter && movement.movement_type !== movementTypeFilter) return false;
-                    if (movementLocationFilter && movement.location_id !== movementLocationFilter) return false;
-                    if (movementProductFilter && movement.product_id !== movementProductFilter) return false;
-                    if (movementUserFilter && movement.created_by?.id !== movementUserFilter) return false;
-                    if (movementDateFrom || movementDateTo) {
-                      const movementDate = new Date(movement.occurred_at);
-                      movementDate.setHours(0, 0, 0, 0);
-                      if (movementDateFrom) {
-                        const fromDate = new Date(movementDateFrom);
-                        fromDate.setHours(0, 0, 0, 0);
-                        if (movementDate < fromDate) return false;
-                      }
-                      if (movementDateTo) {
-                        const toDate = new Date(movementDateTo);
-                        toDate.setHours(23, 59, 59, 999);
-                        if (movementDate > toDate) return false;
-                      }
-                    }
+
                     return true;
                   });
                   const paginatedMovements = filteredMovements.slice((movementPage - 1) * ITEMS_PER_PAGE, movementPage * ITEMS_PER_PAGE);
@@ -2361,17 +2470,39 @@ export default function InventoryProduct({ onBack }) {
                   <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200/70 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center rounded-t-2xl">
                     <h2 className="text-lg md:text-xl font-bold text-gray-900">Product Catalog</h2>
                   </div>
-                  {/* Search Bar */}
+                  {/* Search Bar and Filter Button */}
                   <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by SKU, product name, or category..."
-                        value={productSearchTerm}
-                        onChange={(e) => setProductSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
-                      />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search by SKU, product name, or category..."
+                          value={productSearchTerm}
+                          onChange={(e) => setProductSearchTerm(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+                        />
+                      </div>
+                      {/* Filter Toggle Button */}
+                      <button
+                        onClick={() => setShowFilters(prev => ({ ...prev, products: !prev.products }))}
+                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-all flex-1 sm:flex-initial ${
+                          showFilters.products
+                            ? 'bg-gray-900 border-gray-900 text-white'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                        }`}
+                        title="Toggle filters"
+                      >
+                        <Filter size={14} />
+                        <span className="hidden sm:inline">Filter</span>
+                        {(filters.categories.length > 0 || filters.showInactive) && (
+                          <span className={`px-1.5 py-0.5 text-xs rounded-md font-semibold ${
+                            showFilters.products ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
+                          }`}>
+                            {filters.categories.length + (filters.showInactive ? 1 : 0)}
+                          </span>
+                        )}
+                      </button>
                     </div>
                   </div>
                   {/* Mobile Card View for Products */}
@@ -2379,13 +2510,24 @@ export default function InventoryProduct({ onBack }) {
                     {(() => {
                       let filteredProducts = products.filter(product => {
                         if (product.is_deleted) return false;
-                        if (!productSearchTerm) return true;
-                        const searchLower = productSearchTerm.toLowerCase();
-                        return (
-                          product.sku?.toLowerCase().includes(searchLower) ||
-                          product.name?.toLowerCase().includes(searchLower) ||
-                          product.category?.toLowerCase().includes(searchLower)
-                        );
+
+                        // Category filter
+                        if (filters.categories.length > 0 && !filters.categories.includes(product.category)) {
+                          return false;
+                        }
+
+                        // Search filter
+                        if (productSearchTerm) {
+                          const searchLower = productSearchTerm.toLowerCase();
+                          const matchesSearch = (
+                            product.sku?.toLowerCase().includes(searchLower) ||
+                            product.name?.toLowerCase().includes(searchLower) ||
+                            product.category?.toLowerCase().includes(searchLower)
+                          );
+                          if (!matchesSearch) return false;
+                        }
+
+                        return true;
                       });
 
                       if (filteredProducts.length === 0) {
@@ -2473,13 +2615,24 @@ export default function InventoryProduct({ onBack }) {
                           // Filter products based on search term and exclude deleted
                           let filteredProducts = products.filter(product => {
                             if (product.is_deleted) return false;
-                            if (!productSearchTerm) return true;
-                            const searchLower = productSearchTerm.toLowerCase();
-                            return (
-                              product.sku?.toLowerCase().includes(searchLower) ||
-                              product.name?.toLowerCase().includes(searchLower) ||
-                              product.category?.toLowerCase().includes(searchLower)
-                            );
+
+                            // Category filter
+                            if (filters.categories.length > 0 && !filters.categories.includes(product.category)) {
+                              return false;
+                            }
+
+                            // Search filter
+                            if (productSearchTerm) {
+                              const searchLower = productSearchTerm.toLowerCase();
+                              const matchesSearch = (
+                                product.sku?.toLowerCase().includes(searchLower) ||
+                                product.name?.toLowerCase().includes(searchLower) ||
+                                product.category?.toLowerCase().includes(searchLower)
+                              );
+                              if (!matchesSearch) return false;
+                            }
+
+                            return true;
                           });
 
                           // Sort products
@@ -2722,92 +2875,96 @@ export default function InventoryProduct({ onBack }) {
             {/* Purchase Orders Tab */}
             {tab === 'purchase-orders' && (
               <div className="bg-white border border-gray-200/60 rounded-2xl shadow-sm overflow-hidden">
+                {/* Title */}
+                <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200/70 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl">
+                  <h2 className="text-lg md:text-xl font-bold text-gray-900">Purchase Orders</h2>
+                </div>
                 {/* Search and Filter Bar */}
-                <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search by PO number, supplier, or product..."
-                      value={poSearchTerm}
-                      onChange={(e) => setPoSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">From:</label>
+                <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
-                        type="date"
-                        value={poDateFrom}
-                        onChange={(e) => setPoDateFrom(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+                        type="text"
+                        placeholder="Search by PO number, supplier, or product..."
+                        value={poSearchTerm}
+                        onChange={(e) => setPoSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">To:</label>
-                      <input
-                        type="date"
-                        value={poDateTo}
-                        onChange={(e) => setPoDateTo(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
-                      />
-                    </div>
-                    <SearchableSelect
-                      value={poSupplierFilter}
-                      onChange={setPoSupplierFilter}
-                      options={[{ value: '', label: 'All Suppliers' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
-                      placeholder="Supplier"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={poWarehouseFilter}
-                      onChange={setPoWarehouseFilter}
-                      options={[{ value: '', label: 'All Warehouses' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
-                      placeholder="Warehouse"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={poStatusFilter}
-                      onChange={setPoStatusFilter}
-                      options={[
-                        { value: '', label: 'All Status' },
-                        { value: 'draft', label: 'Draft' },
-                        { value: 'ordered', label: 'Ordered' },
-                        { value: 'in_transit', label: 'In Transit' },
-                        { value: 'received', label: 'Received' }
-                      ]}
-                      placeholder="Status"
-                      className="w-full"
-                    />
-                  </div>
-                  {(poDateFrom || poDateTo || poSupplierFilter || poWarehouseFilter || poStatusFilter) && (
+                    {/* Filter Toggle Button */}
                     <button
-                      onClick={() => {
-                        setPoDateFrom('');
-                        setPoDateTo('');
-                        setPoSupplierFilter('');
-                        setPoWarehouseFilter('');
-                        setPoStatusFilter('');
-                      }}
-                      className="w-full px-3 py-2 text-sm text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                      onClick={() => setShowFilters(prev => ({ ...prev, 'purchase-orders': !prev['purchase-orders'] }))}
+                      className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-all flex-1 sm:flex-initial ${
+                        showFilters['purchase-orders']
+                          ? 'bg-gray-900 border-gray-900 text-white'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                      }`}
+                      title="Toggle filters"
                     >
-                      Clear All Filters
+                      <Filter size={14} />
+                      <span className="hidden sm:inline">Filter</span>
+                      {(filters.suppliers.length > 0 || filters.locations.length > 0 || filters.poStatuses?.length > 0 || filters.managedBy?.length > 0 || filters.poOrderDateFrom || filters.poOrderDateTo || filters.poExpectedDeliveryFrom || filters.poExpectedDeliveryTo) && (
+                        <span className={`px-1.5 py-0.5 text-xs rounded-md font-semibold ${
+                          showFilters['purchase-orders'] ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
+                        }`}>
+                          {filters.suppliers.length + filters.locations.length + (filters.poStatuses?.length || 0) + (filters.managedBy?.length || 0) + (filters.poOrderDateFrom || filters.poOrderDateTo ? 1 : 0) + (filters.poExpectedDeliveryFrom || filters.poExpectedDeliveryTo ? 1 : 0)}
+                        </span>
+                      )}
                     </button>
-                  )}
+                  </div>
                 </div>
                 {/* Mobile Card View for POs */}
                 <div className="md:hidden space-y-3 p-4">
                   {(() => {
                     let filteredPOs = purchaseOrders.filter(po => {
+                      // Supplier filter
+                      if (filters.suppliers?.length > 0 && !filters.suppliers.includes(po.supplier_id)) {
+                        return false;
+                      }
+
+                      // Location filter
+                      if (filters.locations?.length > 0 && !filters.locations.includes(po.location_id)) {
+                        return false;
+                      }
+
+                      // PO Status filter
+                      if (filters.poStatuses?.length > 0 && !filters.poStatuses.includes(po.status)) {
+                        return false;
+                      }
+
+                      // Managed By filter
+                      if (filters.managedBy?.length > 0 && !filters.managedBy.includes(po.created_by?.id)) {
+                        return false;
+                      }
+
+                      // Order Date Range filter
+                      if (filters.poOrderDateFrom) {
+                        const orderDate = po.order_date || '';
+                        if (orderDate < filters.poOrderDateFrom) return false;
+                      }
+                      if (filters.poOrderDateTo) {
+                        const orderDate = po.order_date || '';
+                        if (orderDate > filters.poOrderDateTo) return false;
+                      }
+
+                      // Expected Delivery Date Range filter
+                      if (filters.poExpectedDeliveryFrom) {
+                        const deliveryDate = po.expected_delivery_date || '';
+                        if (deliveryDate < filters.poExpectedDeliveryFrom) return false;
+                      }
+                      if (filters.poExpectedDeliveryTo) {
+                        const deliveryDate = po.expected_delivery_date || '';
+                        if (deliveryDate > filters.poExpectedDeliveryTo) return false;
+                      }
+
+                      // Text search filter
                       if (poSearchTerm) {
                         const searchLower = poSearchTerm.toLowerCase();
                         const matchesSearch = (po.po_number?.toLowerCase().includes(searchLower) || po.supplier?.name?.toLowerCase().includes(searchLower));
                         if (!matchesSearch) return false;
                       }
-                      if (poSupplierFilter && po.supplier_id !== poSupplierFilter) return false;
-                      if (poWarehouseFilter && po.location_id !== poWarehouseFilter) return false;
-                      if (poStatusFilter && po.status !== poStatusFilter) return false;
+
                       return true;
                     });
 
@@ -2881,6 +3038,46 @@ export default function InventoryProduct({ onBack }) {
                       {(() => {
                         // Filter purchase orders based on search term and date range
                         let filteredPOs = purchaseOrders.filter(po => {
+                          // Supplier filter
+                          if (filters.suppliers?.length > 0 && !filters.suppliers.includes(po.supplier_id)) {
+                            return false;
+                          }
+
+                          // Location filter
+                          if (filters.locations?.length > 0 && !filters.locations.includes(po.location_id)) {
+                            return false;
+                          }
+
+                          // PO Status filter
+                          if (filters.poStatuses?.length > 0 && !filters.poStatuses.includes(po.status)) {
+                            return false;
+                          }
+
+                          // Managed By filter
+                          if (filters.managedBy?.length > 0 && !filters.managedBy.includes(po.created_by?.id)) {
+                            return false;
+                          }
+
+                          // Order Date Range filter
+                          if (filters.poOrderDateFrom) {
+                            const orderDate = po.order_date || '';
+                            if (orderDate < filters.poOrderDateFrom) return false;
+                          }
+                          if (filters.poOrderDateTo) {
+                            const orderDate = po.order_date || '';
+                            if (orderDate > filters.poOrderDateTo) return false;
+                          }
+
+                          // Expected Delivery Date Range filter
+                          if (filters.poExpectedDeliveryFrom) {
+                            const deliveryDate = po.expected_delivery_date || '';
+                            if (deliveryDate < filters.poExpectedDeliveryFrom) return false;
+                          }
+                          if (filters.poExpectedDeliveryTo) {
+                            const deliveryDate = po.expected_delivery_date || '';
+                            if (deliveryDate > filters.poExpectedDeliveryTo) return false;
+                          }
+
                           // Text search filter
                           if (poSearchTerm) {
                             const searchLower = poSearchTerm.toLowerCase();
@@ -2893,32 +3090,6 @@ export default function InventoryProduct({ onBack }) {
                               )
                             );
                             if (!matchesSearch) return false;
-                          }
-
-                          // Supplier filter
-                          if (poSupplierFilter && po.supplier_id !== poSupplierFilter) return false;
-
-                          // Warehouse filter
-                          if (poWarehouseFilter && po.location_id !== poWarehouseFilter) return false;
-
-                          // Status filter
-                          if (poStatusFilter && po.status !== poStatusFilter) return false;
-
-                          // Date range filter (by order_date)
-                          if (poDateFrom || poDateTo) {
-                            if (!po.order_date) return false;
-                            const orderDate = new Date(po.order_date);
-                            orderDate.setHours(0, 0, 0, 0);
-                            if (poDateFrom) {
-                              const fromDate = new Date(poDateFrom);
-                              fromDate.setHours(0, 0, 0, 0);
-                              if (orderDate < fromDate) return false;
-                            }
-                            if (poDateTo) {
-                              const toDate = new Date(poDateTo);
-                              toDate.setHours(23, 59, 59, 999);
-                              if (orderDate > toDate) return false;
-                            }
                           }
 
                           return true;
@@ -3063,6 +3234,12 @@ export default function InventoryProduct({ onBack }) {
                 <div className="md:hidden space-y-3 p-4">
                   {(() => {
                     let filteredSuppliers = suppliers.filter(supplier => {
+                      // State filter
+                      if (filters.states?.length > 0 && !filters.states.includes(supplier.state)) {
+                        return false;
+                      }
+
+                      // Text search filter
                       if (supplierSearchTerm) {
                         const searchLower = supplierSearchTerm.toLowerCase();
                         return (
@@ -3072,6 +3249,7 @@ export default function InventoryProduct({ onBack }) {
                           supplier.phone?.toLowerCase().includes(searchLower)
                         );
                       }
+
                       return true;
                     });
 
@@ -3143,6 +3321,12 @@ export default function InventoryProduct({ onBack }) {
                       {(() => {
                         // Filter suppliers based on search term
                         let filteredSuppliers = suppliers.filter(supplier => {
+                          // State filter
+                          if (filters.states?.length > 0 && !filters.states.includes(supplier.state)) {
+                            return false;
+                          }
+
+                          // Text search filter
                           if (supplierSearchTerm) {
                             const searchLower = supplierSearchTerm.toLowerCase();
                             return (
@@ -3153,6 +3337,7 @@ export default function InventoryProduct({ onBack }) {
                               supplier.address?.toLowerCase().includes(searchLower)
                             );
                           }
+
                           return true;
                         });
 
@@ -3236,70 +3421,83 @@ export default function InventoryProduct({ onBack }) {
                 <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200/70 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl">
                   <h2 className="text-lg md:text-xl font-bold text-gray-900">Delivery Orders</h2>
                 </div>
-                {/* Filters */}
-                <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50 space-y-3 relative z-20">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search by DO number, customer..."
-                      value={doSearchTerm}
-                      onChange={(e) => setDoSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 relative z-20">
-                    <SearchableSelect
-                      value={doStatusFilter}
-                      onChange={setDoStatusFilter}
-                      options={[
-                        { value: '', label: 'All Status' },
-                        { value: 'draft', label: 'Draft' },
-                        { value: 'confirmed', label: 'Confirmed' },
-                        { value: 'dispatched', label: 'Dispatched' },
-                        { value: 'delivered', label: 'Delivered' },
-                        { value: 'cancelled', label: 'Cancelled' }
-                      ]}
-                      placeholder="Status"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={doCustomerFilter}
-                      onChange={setDoCustomerFilter}
-                      options={[{ value: '', label: 'All Customers' }, ...customers.map(c => ({ value: c.id, label: `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.company_name || 'Unknown' }))]}
-                      placeholder="Customer"
-                      className="w-full"
-                    />
-                    <SearchableSelect
-                      value={doWarehouseFilter}
-                      onChange={setDoWarehouseFilter}
-                      options={[{ value: '', label: 'All Warehouses' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
-                      placeholder="Warehouse"
-                      className="w-full"
-                    />
-                  </div>
-                  {(doStatusFilter || doCustomerFilter || doWarehouseFilter) && (
+                {/* Search and Filter Bar */}
+                <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by DO number, customer..."
+                        value={doSearchTerm}
+                        onChange={(e) => setDoSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+                      />
+                    </div>
+                    {/* Filter Toggle Button */}
                     <button
-                      onClick={() => { setDoStatusFilter(''); setDoCustomerFilter(''); setDoWarehouseFilter(''); }}
-                      className="w-full px-3 py-2 text-sm text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                      onClick={() => setShowFilters(prev => ({ ...prev, 'delivery-orders': !prev['delivery-orders'] }))}
+                      className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-all flex-1 sm:flex-initial ${
+                        showFilters['delivery-orders']
+                          ? 'bg-gray-900 border-gray-900 text-white'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                      }`}
+                      title="Toggle filters"
                     >
-                      Clear All Filters
+                      <Filter size={14} />
+                      <span className="hidden sm:inline">Filter</span>
+                      {(filters.customers?.length > 0 || filters.locations.length > 0 || filters.doStatuses?.length > 0 || filters.createdBy?.length > 0 || filters.doOrderDateFrom || filters.doOrderDateTo) && (
+                        <span className={`px-1.5 py-0.5 text-xs rounded-md font-semibold ${
+                          showFilters['delivery-orders'] ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
+                        }`}>
+                          {(filters.customers?.length || 0) + filters.locations.length + (filters.doStatuses?.length || 0) + (filters.createdBy?.length || 0) + (filters.doOrderDateFrom || filters.doOrderDateTo ? 1 : 0)}
+                        </span>
+                      )}
                     </button>
-                  )}
+                  </div>
                 </div>
                 {/* Mobile Card View for DOs */}
                 <div className="md:hidden space-y-3 p-4">
                   {(() => {
                     let filteredDOs = deliveryOrders.filter(d => {
+                      // Location filter
+                      if (filters.locations?.length > 0 && !filters.locations.includes(d.location_id)) {
+                        return false;
+                      }
+
+                      // DO Status filter
+                      if (filters.doStatuses?.length > 0 && !filters.doStatuses.includes(d.status)) {
+                        return false;
+                      }
+
+                      // Customer filter
+                      if (filters.customers?.length > 0 && !filters.customers.includes(d.customer?.id)) {
+                        return false;
+                      }
+
+                      // Created By filter
+                      if (filters.createdBy?.length > 0 && !filters.createdBy.includes(d.created_by?.id)) {
+                        return false;
+                      }
+
+                      // Order Date Range filter
+                      if (filters.doOrderDateFrom) {
+                        const orderDate = d.order_date || '';
+                        if (orderDate < filters.doOrderDateFrom) return false;
+                      }
+                      if (filters.doOrderDateTo) {
+                        const orderDate = d.order_date || '';
+                        if (orderDate > filters.doOrderDateTo) return false;
+                      }
+
+                      // Text search filter
                       if (doSearchTerm) {
                         const search = doSearchTerm.toLowerCase();
                         if (!d.do_number?.toLowerCase().includes(search) &&
                             !d.customer_name?.toLowerCase().includes(search) &&
                             !d.customer?.first_name?.toLowerCase().includes(search)) return false;
                       }
-                      if (doStatusFilter && d.status !== doStatusFilter) return false;
-                      if (doCustomerFilter && d.customer_id !== doCustomerFilter) return false;
-                      if (doWarehouseFilter && d.location_id !== doWarehouseFilter) return false;
+
                       return true;
                     });
 
@@ -3368,6 +3566,37 @@ export default function InventoryProduct({ onBack }) {
                     <tbody className="divide-y divide-gray-200">
                       {(() => {
                         let filteredDOs = deliveryOrders.filter(d => {
+                          // Location filter
+                          if (filters.locations?.length > 0 && !filters.locations.includes(d.location_id)) {
+                            return false;
+                          }
+
+                          // DO Status filter
+                          if (filters.doStatuses?.length > 0 && !filters.doStatuses.includes(d.status)) {
+                            return false;
+                          }
+
+                          // Customer filter
+                          if (filters.customers?.length > 0 && !filters.customers.includes(d.customer?.id)) {
+                            return false;
+                          }
+
+                          // Created By filter
+                          if (filters.createdBy?.length > 0 && !filters.createdBy.includes(d.created_by?.id)) {
+                            return false;
+                          }
+
+                          // Order Date Range filter
+                          if (filters.doOrderDateFrom) {
+                            const orderDate = d.order_date || '';
+                            if (orderDate < filters.doOrderDateFrom) return false;
+                          }
+                          if (filters.doOrderDateTo) {
+                            const orderDate = d.order_date || '';
+                            if (orderDate > filters.doOrderDateTo) return false;
+                          }
+
+                          // Text search filter
                           if (doSearchTerm) {
                             const search = doSearchTerm.toLowerCase();
                             if (!d.do_number?.toLowerCase().includes(search) &&
@@ -3375,9 +3604,7 @@ export default function InventoryProduct({ onBack }) {
                                 !d.customer?.first_name?.toLowerCase().includes(search) &&
                                 !d.customer?.company_name?.toLowerCase().includes(search)) return false;
                           }
-                          if (doStatusFilter && d.status !== doStatusFilter) return false;
-                          if (doCustomerFilter && d.customer_id !== doCustomerFilter) return false;
-                          if (doWarehouseFilter && d.location_id !== doWarehouseFilter) return false;
+
                           return true;
                         });
 
@@ -3448,13 +3675,13 @@ export default function InventoryProduct({ onBack }) {
 
           </>
         )}
+          </div>
         </div>
-      </div>
 
       {/* Add Product Modal */}
       {showAddProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
@@ -3612,8 +3839,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Warehouse/Location Modal */}
       {showAddLocationModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
               <div className="flex items-center space-x-3">
               <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl">
@@ -3695,8 +3922,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Stock Out Modal - Supports both pre-selected item and manual selection */}
       {showStockOutModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl">
@@ -4103,8 +4330,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Create Purchase Order Modal */}
       {showAddPOModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-4 md:my-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto mx-2 md:mx-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-4 md:my-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
@@ -4319,13 +4546,13 @@ export default function InventoryProduct({ onBack }) {
               </div>
             </div>
 
-            <div className="mt-8 pt-6 pb-6 border-t-2 border-gray-100">
+            <div className="px-8 pb-8">
               {modalError && (
-                <div className="mb-3 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
-                  {modalError}
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-600 text-sm">{modalError}</p>
                 </div>
               )}
-              <div className="flex justify-end space-x-3 pt-4">
+              <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => {
                     setShowAddPOModal(false);
@@ -4340,14 +4567,14 @@ export default function InventoryProduct({ onBack }) {
                     });
                     setPoItemToAdd({ product_id: '', quantity: 0, unit_cost: 0, unit: 'pcs' });
                   }}
-                  className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
+                  className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreatePO}
                   disabled={!newPO.supplier_id || !newPO.po_number || !newPO.location_id || newPO.items.length === 0}
-                  className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                 >
                   Create Purchase Order
                 </button>
@@ -4359,8 +4586,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Add Supplier Modal */}
       {showAddSupplierModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 w-full max-w-2xl border border-gray-200/50 transform transition-all max-h-[95vh] md:max-h-[90vh] overflow-y-auto my-auto mx-2 md:mx-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 w-full max-w-2xl border border-gray-200/50 transform transition-all max-h-[95vh] md:max-h-[90vh] overflow-y-auto my-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
@@ -4625,8 +4852,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Quick Add Product Modal (for PO) */}
       {showQuickAddProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowQuickAddProductModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-visible my-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowQuickAddProductModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-visible my-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl">
                 <Package className="w-5 h-5 text-white" />
@@ -4849,8 +5076,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* PO Detail Modal */}
       {showPODetailModal && selectedPO && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto border border-gray-200/50 transform transition-all my-auto mx-2 md:mx-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto border border-gray-200/50 transform transition-all my-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
             {/* Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 md:px-8 py-4 md:py-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -5142,8 +5369,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Create Delivery Order Modal */}
       {showAddDOModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-4 md:my-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto mx-2 md:mx-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-4 md:my-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
@@ -5428,8 +5655,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* Cancel DO Confirmation Modal */}
       {showCancelDOModal && selectedDO && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowCancelDOModal(false); setCancelDOReason(''); } }}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowCancelDOModal(false); setCancelDOReason(''); } }}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 fade-in duration-300">
             <div className="p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-red-100 rounded-full">
@@ -5475,8 +5702,8 @@ export default function InventoryProduct({ onBack }) {
 
       {/* DO Detail Modal */}
       {showDODetailModal && selectedDO && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200/50 my-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200/50 my-auto animate-in zoom-in-95 fade-in duration-300">
             <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10 flex justify-between items-center">
               <div><h2 className="text-xl md:text-2xl font-bold text-gray-900">Delivery Order Details</h2><p className="text-sm text-gray-500">{selectedDO.do_number}</p></div>
               <button onClick={() => { setShowDODetailModal(false); setSelectedDO(null); }} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
@@ -5674,6 +5901,7 @@ export default function InventoryProduct({ onBack }) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
