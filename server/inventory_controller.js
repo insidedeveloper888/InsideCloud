@@ -957,14 +957,14 @@ class InventoryController {
         throw error;
       }
 
-      // If no settings exist, return defaults
+      // If no settings exist, return empty defaults
       if (!data) {
         return {
           success: true,
           data: {
             low_stock_threshold: 10,
-            custom_categories: ['CCTV', 'Lighting', 'AV System', 'Network', 'Accessories'],
-            custom_units: ['pcs', 'meter', 'box', 'set']
+            custom_categories: [],
+            custom_units: []
           },
           metadata: {
             organizationId: org.id,
@@ -977,8 +977,8 @@ class InventoryController {
         success: true,
         data: {
           low_stock_threshold: data.low_stock_threshold,
-          custom_categories: data.custom_categories || ['CCTV', 'Lighting', 'AV System', 'Network', 'Accessories'],
-          custom_units: data.custom_units || ['pcs', 'meter', 'box', 'set']
+          custom_categories: data.custom_categories || [],
+          custom_units: data.custom_units || []
         },
         metadata: {
           organizationId: org.id,

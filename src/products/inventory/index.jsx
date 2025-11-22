@@ -28,14 +28,12 @@ const SearchableSelect = ({ value, onChange, options, placeholder = 'Select...',
 
   const handleAddNew = () => {
     const newValue = search.trim();
-    if (onAddNew) {
-      onAddNew(newValue); // Pass search value (can be empty for modal triggers)
-      if (newValue) {
-        onChange(newValue); // Only set value if there's text
-      }
+    if (newValue && onAddNew) {
+      onAddNew(newValue); // Pass search value to parent
+      // Don't call onChange here - let onAddNew handle the state update
+      setIsOpen(false);
+      setSearch('');
     }
-    setIsOpen(false);
-    setSearch('');
   };
 
   return (
@@ -210,9 +208,9 @@ export default function InventoryProduct({ onBack }) {
   const [newProduct, setNewProduct] = useState({
     sku: '',
     name: '',
-    category: 'CCTV',
-    unit: 'pcs',
-    base_unit: 'pcs',
+    category: '',
+    unit: '',
+    base_unit: '',
     unit_conversion_factor: 1,
     description: '',
     // Optional initial stock fields
@@ -224,8 +222,8 @@ export default function InventoryProduct({ onBack }) {
   const [quickProduct, setQuickProduct] = useState({
     sku: '',
     name: '',
-    category: 'CCTV',
-    unit: 'pcs'
+    category: '',
+    unit: ''
   });
   const [stockOutData, setStockOutData] = useState({
     quantity: 0,
@@ -1317,6 +1315,27 @@ export default function InventoryProduct({ onBack }) {
     setNewProduct({ ...newProduct, category: value });
   };
 
+  // Save custom categories to database
+  const saveCustomCategories = async (newCategories) => {
+    try {
+      await InventoryAPI.updateSettings(organizationSlug, {
+        custom_categories: newCategories
+      });
+    } catch (err) {
+      console.error('Failed to save categories:', err);
+    }
+  };
+
+  // Save custom units to database
+  const saveCustomUnits = async (newUnits) => {
+    try {
+      await InventoryAPI.updateSettings(organizationSlug, {
+        custom_units: newUnits
+      });
+    } catch (err) {
+      console.error('Failed to save units:', err);
+    }
+  };
 
   const handleOpenPODetail = (po) => {
     setSelectedPO(po);
@@ -3470,12 +3489,15 @@ export default function InventoryProduct({ onBack }) {
                 <SearchableSelect
                   value={newProduct.category}
                   onChange={(val) => handleCategoryChange(val)}
-                  options={customCategories.map(c => ({ value: c, label: c }))}
+                  options={customCategories.filter(c => c && c.trim()).map(c => ({ value: c, label: c }))}
                   placeholder="Select category..."
                   allowAddNew={true}
                   onAddNew={(newCat) => {
-                    if (!customCategories.includes(newCat)) {
-                      setCustomCategories([...customCategories, newCat]);
+                    if (newCat && newCat.trim() && !customCategories.includes(newCat)) {
+                      const updatedCategories = [...customCategories, newCat];
+                      setCustomCategories(updatedCategories);
+                      setNewProduct({ ...newProduct, category: newCat });
+                      saveCustomCategories(updatedCategories);
                     }
                   }}
                   addNewLabel="+ Add New Category..."
@@ -3486,12 +3508,15 @@ export default function InventoryProduct({ onBack }) {
                 <SearchableSelect
                   value={newProduct.base_unit}
                   onChange={(val) => setNewProduct({ ...newProduct, base_unit: val, unit: val })}
-                  options={customUnits.map(u => ({ value: u, label: u }))}
+                  options={customUnits.filter(u => u && u.trim()).map(u => ({ value: u, label: u }))}
                   placeholder="Select unit..."
                   allowAddNew={true}
                   onAddNew={(newUnit) => {
-                    if (!customUnits.includes(newUnit)) {
-                      setCustomUnits([...customUnits, newUnit]);
+                    if (newUnit && newUnit.trim() && !customUnits.includes(newUnit)) {
+                      const updatedUnits = [...customUnits, newUnit];
+                      setCustomUnits(updatedUnits);
+                      setNewProduct({ ...newProduct, base_unit: newUnit, unit: newUnit });
+                      saveCustomUnits(updatedUnits);
                     }
                   }}
                   addNewLabel="+ Add New Unit..."
@@ -4636,12 +4661,15 @@ export default function InventoryProduct({ onBack }) {
                   <SearchableSelect
                     value={quickProduct.category}
                     onChange={(val) => setQuickProduct({ ...quickProduct, category: val })}
-                    options={customCategories.map(cat => ({ value: cat, label: cat }))}
+                    options={customCategories.filter(c => c && c.trim()).map(cat => ({ value: cat, label: cat }))}
                     placeholder="Select category..."
                     allowAddNew={true}
                     onAddNew={(newCat) => {
-                      if (newCat && !customCategories.includes(newCat)) {
-                        setCustomCategories([...customCategories, newCat]);
+                      if (newCat && newCat.trim() && !customCategories.includes(newCat)) {
+                        const updatedCategories = [...customCategories, newCat];
+                        setCustomCategories(updatedCategories);
+                        setQuickProduct({ ...quickProduct, category: newCat });
+                        saveCustomCategories(updatedCategories);
                       }
                     }}
                     addNewLabel="+ Add new category..."
@@ -4652,12 +4680,15 @@ export default function InventoryProduct({ onBack }) {
                   <SearchableSelect
                     value={quickProduct.unit}
                     onChange={(val) => setQuickProduct({ ...quickProduct, unit: val })}
-                    options={customUnits.map(u => ({ value: u, label: u }))}
+                    options={customUnits.filter(u => u && u.trim()).map(u => ({ value: u, label: u }))}
                     placeholder="Select unit..."
                     allowAddNew={true}
                     onAddNew={(newUnit) => {
-                      if (newUnit && !customUnits.includes(newUnit)) {
-                        setCustomUnits([...customUnits, newUnit]);
+                      if (newUnit && newUnit.trim() && !customUnits.includes(newUnit)) {
+                        const updatedUnits = [...customUnits, newUnit];
+                        setCustomUnits(updatedUnits);
+                        setQuickProduct({ ...quickProduct, unit: newUnit });
+                        saveCustomUnits(updatedUnits);
                       }
                     }}
                     addNewLabel="+ Add new unit..."
