@@ -5,7 +5,7 @@ This guide shows where to add the "Stock In" button for manual stock entries (re
 
 ## Current Structure
 
-**File**: `src/products/inventory/index.jsx`
+**File**: `src/tools/inventory/index.jsx`
 
 ### Existing Stock Out Flow
 - Line 44: `showStockOutModal` state

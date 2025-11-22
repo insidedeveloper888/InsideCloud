@@ -44,7 +44,7 @@ import './index.css';
 import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
 import DocumentParser from '../../tools/document-parser/index.jsx';
 import ContactManagementApp from '../../tools/contact-management/index.jsx';
-import InventoryProduct from '../../products/inventory/index.jsx';
+import InventoryProduct from '../../tools/inventory/index.jsx';
 import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';

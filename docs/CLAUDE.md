@@ -200,6 +200,31 @@ The Contact Management tool is a **full-featured CRM system for managing custome
 - **Hooks**: `src/tools/contact-management/hooks/` (useContacts, useContactStages, useTrafficChannels, useContactTags, useContactSettings)
 - **Complete Schema**: `docs/contact-management-complete-schema.sql`
 
+### Inventory Management (库存管理) - Production Ready ✅
+
+**Status**: Production-ready as of 2025-11-22
+
+A comprehensive inventory management system with multi-location stock tracking, purchase orders, suppliers, and stock movements.
+
+**Key Features:**
+- ✅ Product catalog with SKU, categories, and units of measurement
+- ✅ Multi-location inventory tracking (warehouses, sites, vehicles)
+- ✅ Stock movements (IN/OUT) with batch recording support
+- ✅ Purchase order management with supplier integration
+- ✅ Supplier management with contact details
+- ✅ Low stock alerts and inventory thresholds
+- ✅ Custom categories and units per organization
+- ✅ Quick add product functionality
+- ✅ Mobile-responsive card views for tables
+- ✅ Real-time stock level calculations
+
+**Implementation Files:**
+- **Main Component**: `src/tools/inventory/index.jsx`
+- **Backend Controller**: `server/inventory_controller.js`
+- **API Client**: `src/tools/inventory/api/inventory.js`
+- **Complete Schema**: `docs/inventory/inventory_schema.sql`
+- **Documentation**: `docs/inventory/` (integration plans, setup guides, feature docs)
+
 ### Strategic Map - Production Ready ✅
 
 **Status**: Production-ready as of 2025-11-17 (v2.2.0)
@@ -441,7 +466,11 @@ src/
 ## Entry Points
 
 - **Frontend**: [src/pages/home/index.js](src/pages/home/index.js) - Main application entry
-- **Tools**: [src/tools/strategic-map/index.jsx](src/tools/strategic-map/index.jsx) - Strategic map tool
+- **Tools**:
+  - [src/tools/strategic-map/index.jsx](src/tools/strategic-map/index.jsx) - Strategic map tool
+  - [src/tools/inventory/index.jsx](src/tools/inventory/index.jsx) - Inventory management
+  - [src/tools/contact-management/index.jsx](src/tools/contact-management/index.jsx) - Contact management
+  - [src/tools/document-parser/index.jsx](src/tools/document-parser/index.jsx) - Document parser
 - **Backend (Dev)**: [server/server.js](server/server.js) - Koa server with all API endpoints
 - **Backend (Prod)**: [api/strategic_map.js](api/strategic_map.js) - Primary serverless function
 - **Authentication**: [src/utils/auth_access_util.js](src/utils/auth_access_util.js) - Auth utilities

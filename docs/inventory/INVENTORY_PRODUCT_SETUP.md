@@ -176,7 +176,7 @@ The Inventory product is already integrated in the frontend:
 
 ### Routes
 - Main route: `/inventory`
-- Component: `src/products/inventory/index.jsx`
+- Component: `src/tools/inventory/index.jsx`
 
 ### Dashboard
 - Appears in product cards (if enabled for org)

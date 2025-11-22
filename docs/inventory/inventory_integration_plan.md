@@ -71,7 +71,7 @@ InsideCloud/
 │   └── migrations/
 │       └── inventory_schema.sql          # ✅ Created - Run this in Supabase
 │
-├── src/products/inventory/               # 🆕 Create this
+├── src/tools/inventory/               # 🆕 Create this
 │   ├── index.jsx                         # Main inventory UI
 │   ├── components/
 │   │   ├── InventoryOverview.jsx        # Stock list with filters
@@ -168,16 +168,16 @@ const routes = {
 
 #### **Step 3.1: Create Product Structure**
 ```bash
-mkdir -p src/products/inventory/{components,hooks,api}
+mkdir -p src/tools/inventory/{components,hooks,api}
 ```
 
 #### **Step 3.2: Create Files**
 
-1. **`src/products/inventory/api/inventory.js`** - API client
-2. **`src/products/inventory/index.jsx`** - Main UI with tabs
-3. **`src/products/inventory/components/InventoryOverview.jsx`**
-4. **`src/products/inventory/components/StockMovements.jsx`**
-5. **`src/products/inventory/components/PurchaseOrders.jsx`**
+1. **`src/tools/inventory/api/inventory.js`** - API client
+2. **`src/tools/inventory/index.jsx`** - Main UI with tabs
+3. **`src/tools/inventory/components/InventoryOverview.jsx`**
+4. **`src/tools/inventory/components/StockMovements.jsx`**
+5. **`src/tools/inventory/components/PurchaseOrders.jsx`**
 
 #### **Step 3.3: Add to Dashboard**
 
@@ -290,7 +290,7 @@ Copy components from:
 - [ ] Test API with Postman/curl
 
 ### Phase 3: Frontend Structure
-- [ ] Create `src/products/inventory/` directory
+- [ ] Create `src/tools/inventory/` directory
 - [ ] Create `api/inventory.js` (client helper)
 - [ ] Create `index.jsx` (main UI)
 - [ ] Create components (InventoryOverview, etc.)
