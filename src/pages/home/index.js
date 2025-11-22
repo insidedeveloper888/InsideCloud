@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Cookies from 'js-cookie';
 import Lottie from 'lottie-react';
@@ -503,7 +504,7 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
               <div className="w-16 h-16 bg-primary-500 text-white rounded-full flex items-center justify-center mb-4">
                 <IconComponent size={56} />
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 whitespace-nowrap">
+              <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 text-center">
                 {product.name}
               </h3>
 
@@ -1086,6 +1087,9 @@ const Home = () => {
 
   const [userInfo, setUserInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [authError, setAuthError] = useState(null);
   const [showOrganizationSelector, setShowOrganizationSelector] = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
@@ -1095,33 +1099,25 @@ const Home = () => {
   const hasInitialized = useRef(false); // Prevent double initialization in React Strict Mode
   const authInProgress = useRef(false); // Ref-based guard for authentication (more reliable than state)
 
-  // Navigation helper: Update both state and URL for proper back button support
+  // Navigation helper: Use React Router navigate
   const navigateToView = useCallback((view) => {
     const path = view === 'dashboard' ? '/' : `/${view}`;
-    window.history.pushState({ view }, '', path);
+    navigate(path);
     setActiveView(view);
-  }, []);
+  }, [navigate]);
 
-  // Handle browser back/forward button
+  // Sync activeView with URL on route change
   useEffect(() => {
-    const handlePopState = (event) => {
-      const view = event.state?.view || 'dashboard';
-      setActiveView(view);
-    };
-
-    // Initialize URL state on mount - but NOT if we have OAuth params in URL
-    const urlParams = new URLSearchParams(window.location.search);
+    // Don't process if we have OAuth params
+    const urlParams = new URLSearchParams(location.search);
     const hasOAuthParams = urlParams.has('code') || urlParams.has('error');
 
     if (!hasOAuthParams) {
-      const initialView = activeView || 'dashboard';
-      const initialPath = initialView === 'dashboard' ? '/' : `/${initialView}`;
-      window.history.replaceState({ view: initialView }, '', initialPath);
+      const path = location.pathname.slice(1); // Remove leading "/"
+      const view = path || 'dashboard';
+      setActiveView(view);
     }
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location]);
 
   // Fetch products for navigation (admin only)
   const { products: navProducts } = useOrganizationProducts(
