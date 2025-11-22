@@ -1,101 +1,32 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ORGANIZATION_SLUG_KEY } from '../../components/organizationSelector';
 import { InventoryAPI } from './api/inventory';
 import { useCurrentUser } from '../../tools/contact-management/hooks/useCurrentUser';
 import { Package, Plus, Warehouse, Activity, Search, Minus, FileText, Truck, CheckCircle, Settings, Users, X, Upload, Eye, ChevronDown, Trash2, Filter } from 'lucide-react';
 import FilterPanel from './components/FilterPanel';
-
-// Searchable Select Component with Add New option
-const SearchableSelect = ({ value, onChange, options, placeholder = 'Select...', className = '', allowAddNew = false, onAddNew = null, addNewLabel = '+ Add New...' }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const containerRef = useRef(null);
-
-  const selectedOption = options.find(opt => opt.value === value);
-  const filteredOptions = options.filter(opt =>
-    opt.label.toLowerCase().includes(search.toLowerCase())
-  );
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
-        setSearch('');
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleAddNew = () => {
-    const newValue = search.trim();
-    if (newValue && onAddNew) {
-      onAddNew(newValue); // Pass search value to parent
-      // Don't call onChange here - let onAddNew handle the state update
-      setIsOpen(false);
-      setSearch('');
-    }
-  };
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl bg-white text-left flex items-center justify-between text-sm text-gray-900 hover:border-gray-300 transition-all"
-      >
-        <span className={selectedOption || value ? 'text-gray-900' : 'text-gray-400'}>
-          {selectedOption ? selectedOption.label : (value || placeholder)}
-        </span>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      {isOpen && (
-        <div className="absolute z-[9999] mt-1 w-full bg-white border-2 border-gray-200 rounded-xl shadow-lg overflow-visible">
-          <div className="p-2 border-b border-gray-100">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Type to search..."
-              className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              autoFocus
-            />
-          </div>
-          <div className="max-h-40 overflow-y-auto bg-white">
-            {filteredOptions.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                  setSearch('');
-                }}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-emerald-50 transition-colors ${
-                  opt.value === value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-            {filteredOptions.length === 0 && !allowAddNew && (
-              <div className="px-3 py-2 text-sm text-gray-400">No results</div>
-            )}
-            {allowAddNew && (
-              <button
-                type="button"
-                onClick={handleAddNew}
-                className="w-full px-3 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 font-medium border-t border-gray-100"
-              >
-                {search.trim() ? `+ Add "${search.trim()}"` : addNewLabel}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import SearchableSelect from './components/SearchableSelect';
+import Pagination from './components/Pagination';
+import AddLocationModal from './components/AddLocationModal';
+import AddCategoryModal from './components/AddCategoryModal';
+import AddProductModal from './components/AddProductModal';
+import CancelDOModal from './components/CancelDOModal';
+import QuickAddProductModal from './components/QuickAddProductModal';
+import AddSupplierModal from './components/AddSupplierModal';
+import CreatePOModal from './components/CreatePOModal';
+import StockOutModal from './components/StockOutModal';
+import StockInModal from './components/StockInModal';
+import {
+  getStatusColor,
+  getStatusLabel,
+  getMovementTypeColor,
+  getMovementTypeLabel,
+  getPOStatusColor,
+  getPOStatusLabel,
+  getPOStatusIcon
+} from './utils/helpers';
+import { createToggleSort, createSortIcon } from './utils/sorting';
+import { filterInventoryItems, filterMovements, sortInventoryItems, sortMovements } from './utils/filtering';
+import './index.css';
 
 /**
  * Inventory Management Product
@@ -244,7 +175,7 @@ export default function InventoryProduct({ onBack }) {
   const [stockInData, setStockInData] = useState({
     quantity: 0,
     unit_cost: 0,
-    reference_type: 'return',  // 'return', 'refund', 'adjustment', 'transfer_in', 'found', or custom
+    reference_type: '',  // User can add custom types
     location_id: '',  // For products without existing stock (virtual items)
     notes: '',
     unit: '',  // Selected unit (empty = base unit)
@@ -666,269 +597,23 @@ export default function InventoryProduct({ onBack }) {
 
   // Filter and sort items
   const filteredItems = React.useMemo(() => {
-    let result = itemsWithUnstockedProducts.filter(item => {
-      // Search filter
-      const matchesSearch = !searchTerm ||
-        item.product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.product?.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      // Category filter (new sidebar filter)
-      const matchesCategory = filters.categories.length === 0 ||
-        (item.product?.category && filters.categories.includes(item.product.category));
-
-      // Location filter (new sidebar filter)
-      const matchesLocation = filters.locations.length === 0 ||
-        filters.locations.includes(item.location_id) ||
-        (item.isVirtual && !item.location_id);
-
-      // Stock Status filter (new sidebar filter)
-      const matchesStockStatus = filters.stockStatuses.length === 0 ||
-        filters.stockStatuses.includes(item.stock_status);
-
-      // Supplier filter (new sidebar filter) - check if product has supplier in purchase orders
-      const matchesSupplier = filters.suppliers.length === 0 ||
-        (() => {
-          // For now, we'll match all items if supplier filter is selected
-          // In the future, we can add supplier_id to products table
-          return true;
-        })();
-
-      // Active status filter
-      const matchesActiveStatus = filters.showInactive || item.product?.is_active !== false;
-
-      // Hide unstocked items unless toggled on
-      const matchesUnstocked = showUnstocked || item.stock_status !== 'no_stock';
-
-      // Quantity range filter
-      const matchesQuantityRange = (() => {
-        const quantity = item.quantity || 0;
-        const minMatch = filters.minQuantity === null || quantity >= filters.minQuantity;
-        const maxMatch = filters.maxQuantity === null || quantity <= filters.maxQuantity;
-        return minMatch && maxMatch;
-      })();
-
-      return matchesSearch && matchesCategory && matchesLocation && matchesStockStatus &&
-             matchesSupplier && matchesActiveStatus && matchesUnstocked && matchesQuantityRange;
+    const filtered = filterInventoryItems(itemsWithUnstockedProducts, {
+      searchTerm,
+      filters,
+      showUnstocked
     });
-
-    // Sorting
-    if (sortBy.field && sortBy.direction) {
-      result = [...result].sort((a, b) => {
-        let aVal, bVal;
-        switch (sortBy.field) {
-          case 'sku':
-            aVal = a.product?.sku || '';
-            bVal = b.product?.sku || '';
-            break;
-          case 'name':
-            aVal = a.product?.name || '';
-            bVal = b.product?.name || '';
-            break;
-          case 'category':
-            aVal = a.product?.category || '';
-            bVal = b.product?.category || '';
-            break;
-          case 'warehouse':
-            aVal = a.location?.name || '';
-            bVal = b.location?.name || '';
-            break;
-          case 'quantity':
-            aVal = a.quantity || 0;
-            bVal = b.quantity || 0;
-            return sortBy.direction === 'asc' ? aVal - bVal : bVal - aVal;
-          case 'available':
-            aVal = a.available_quantity || 0;
-            bVal = b.available_quantity || 0;
-            return sortBy.direction === 'asc' ? aVal - bVal : bVal - aVal;
-          case 'status':
-            aVal = a.status || '';
-            bVal = b.status || '';
-            break;
-          default:
-            return 0;
-        }
-        // String comparison
-        if (typeof aVal === 'string') {
-          const cmp = aVal.localeCompare(bVal);
-          return sortBy.direction === 'asc' ? cmp : -cmp;
-        }
-        return 0;
-      });
-    }
-
-    return result;
+    return sortInventoryItems(filtered, sortBy);
   }, [itemsWithUnstockedProducts, searchTerm, showUnstocked, sortBy, filters]);
 
-  // Toggle sort for a field: asc -> desc -> none
-  const createToggleSort = (setter) => (field) => {
-    setter(prev => {
-      if (prev.field !== field) return { field, direction: 'asc' };
-      if (prev.direction === 'asc') return { field, direction: 'desc' };
-      return { field: '', direction: '' };
-    });
-  };
+  // Sort handlers
   const toggleSort = createToggleSort(setSortBy);
   const toggleMovementSort = createToggleSort(setMovementSortBy);
   const toggleProductSort = createToggleSort(setProductSortBy);
 
-  // Render sort indicator
-  const createSortIcon = (sortState) => ({ field }) => {
-    if (sortState.field !== field) return <span className="text-gray-300">↕</span>;
-    if (sortState.direction === 'asc') return <span className="text-emerald-600">↑</span>;
-    return <span className="text-emerald-600">↓</span>;
-  };
+  // Sort icons
   const SortIcon = createSortIcon(sortBy);
   const MovementSortIcon = createSortIcon(movementSortBy);
   const ProductSortIcon = createSortIcon(productSortBy);
-
-  // Pagination component
-  const Pagination = ({ currentPage, totalItems, onPageChange }) => {
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-    if (totalPages <= 1) return null;
-    return (
-      <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
-        <span className="text-sm text-gray-600">
-          Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems}
-        </span>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
-          >
-            Previous
-          </button>
-          {[...Array(totalPages)].map((_, i) => (
-            <button
-              key={i + 1}
-              onClick={() => onPageChange(i + 1)}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${currentPage === i + 1 ? 'bg-emerald-500 text-white' : 'border border-gray-300 hover:bg-gray-100'}`}
-            >
-              {i + 1}
-            </button>
-          )).slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))}
-          <button
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
-          >
-            Next
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'normal':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'low_stock':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'out_of_stock':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'no_stock':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'normal':
-        return 'Normal';
-      case 'low_stock':
-        return 'Low Stock';
-      case 'out_of_stock':
-        return 'Out of Stock';
-      case 'no_stock':
-        return 'Unstocked';
-      default:
-        return status;
-    }
-  };
-
-  const getMovementTypeColor = (type) => {
-    switch (type) {
-      case 'stock_in':
-        return 'text-green-600';
-      case 'stock_out':
-        return 'text-red-600';
-      case 'adjustment':
-        return 'text-blue-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
-
-  const getMovementTypeLabel = (type) => {
-    switch (type) {
-      case 'stock_in':
-        return 'Stock In';
-      case 'stock_out':
-        return 'Stock Out';
-      case 'adjustment':
-        return 'Adjustment';
-      default:
-        return type;
-    }
-  };
-
-  const getPOStatusColor = (status) => {
-    switch (status) {
-      case 'draft':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'approved':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'ordered':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'in_transit':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'received':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getPOStatusLabel = (status) => {
-    switch (status) {
-      case 'draft':
-        return 'Draft';
-      case 'approved':
-        return 'Approved';
-      case 'ordered':
-        return 'Ordered';
-      case 'in_transit':
-        return 'In Transit';
-      case 'received':
-        return 'Received';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  };
-
-  const getPOStatusIcon = (status) => {
-    switch (status) {
-      case 'draft':
-        return FileText;
-      case 'approved':
-        return CheckCircle;
-      case 'ordered':
-        return CheckCircle;
-      case 'in_transit':
-        return Truck;
-      case 'received':
-        return CheckCircle;
-      default:
-        return FileText;
-    }
-  };
 
   const handleAddProduct = async () => {
     try {
@@ -1208,7 +893,7 @@ export default function InventoryProduct({ onBack }) {
         setShowStockInModal(false);
         setSelectedStockItem(null);
         setModalError('');
-        setStockInData({ quantity: 0, unit_cost: 0, reference_type: 'return', location_id: '', notes: '', unit: '', product_id: '' });
+        setStockInData({ quantity: 0, unit_cost: 0, reference_type: '', location_id: '', notes: '', unit: '', product_id: '' });
         fetchData();
       } else {
         setModalError(result.msg || 'Failed to stock in');
@@ -1449,10 +1134,6 @@ export default function InventoryProduct({ onBack }) {
     } catch (err) {
       console.error('Failed to save units:', err);
     }
-  };
-
-  const handleCategoryChange = (value) => {
-    setNewProduct({ ...newProduct, category: value });
   };
 
   // Save custom categories to database
@@ -1871,7 +1552,7 @@ export default function InventoryProduct({ onBack }) {
                         <button
                           onClick={() => {
                             setSelectedStockItem(null);
-                            setStockInData({ quantity: 1, unit_cost: 0, reference_type: 'return', location_id: '', notes: '', product_id: '' });
+                            setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '', product_id: '' });
                             setShowStockInModal(true);
                           }}
                           className="px-3 md:px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold rounded-xl hover:from-emerald-600 hover:to-cyan-600 transition-all flex items-center space-x-1 md:space-x-2 shadow-sm"
@@ -1992,7 +1673,7 @@ export default function InventoryProduct({ onBack }) {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedStockItem(item);
-                                setStockInData({ quantity: 1, unit_cost: 0, reference_type: 'return', location_id: '', notes: '' });
+                                setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '' });
                                 setShowStockInModal(true);
                               }}
                               className="px-3 py-1.5 text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center"
@@ -2016,7 +1697,7 @@ export default function InventoryProduct({ onBack }) {
                         </div>
                       ))
                     )}
-                    <Pagination currentPage={stockPage} totalItems={filteredItems.length} onPageChange={setStockPage} />
+                    <Pagination currentPage={stockPage} totalItems={filteredItems.length} onPageChange={setStockPage} itemsPerPage={ITEMS_PER_PAGE} />
                   </div>
                   {/* Desktop Table View */}
                   <div className="hidden md:block overflow-x-auto">
@@ -2117,7 +1798,7 @@ export default function InventoryProduct({ onBack }) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedStockItem(item);
-                                      setStockInData({ quantity: 1, unit_cost: 0, reference_type: 'return', location_id: '', notes: '' });
+                                      setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '' });
                                       setShowStockInModal(true);
                                     }}
                                     className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -2147,7 +1828,7 @@ export default function InventoryProduct({ onBack }) {
                         )}
                       </tbody>
                     </table>
-                    <Pagination currentPage={stockPage} totalItems={filteredItems.length} onPageChange={setStockPage} />
+                    <Pagination currentPage={stockPage} totalItems={filteredItems.length} onPageChange={setStockPage} itemsPerPage={ITEMS_PER_PAGE} />
                   </div>
                 </div>
               </div>
@@ -2228,88 +1909,11 @@ export default function InventoryProduct({ onBack }) {
                     <tbody className="bg-white divide-y divide-gray-100">
                       {(() => {
                         // Filter movements based on all filters
-                        const filteredMovements = movements.filter(movement => {
-                          // Movement Type filter
-                          if (filters.movementTypes?.length > 0 && !filters.movementTypes.includes(movement.movement_type)) {
-                            return false;
-                          }
-
-                          // Location filter
-                          if (filters.locations?.length > 0 && !filters.locations.includes(movement.location_id)) {
-                            return false;
-                          }
-
-                          // Product filter
-                          if (filters.products?.length > 0 && !filters.products.includes(movement.product_id)) {
-                            return false;
-                          }
-
-                          // Date Range filter
-                          if (filters.movementDateFrom) {
-                            const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
-                            if (movementDate < filters.movementDateFrom) return false;
-                          }
-                          if (filters.movementDateTo) {
-                            const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
-                            if (movementDate > filters.movementDateTo) return false;
-                          }
-
-                          // User/Operator filter
-                          if (filters.users?.length > 0 && !filters.users.includes(movement.created_by?.id)) {
-                            return false;
-                          }
-
-                          // Text search filter
-                          if (movementSearchTerm) {
-                            const searchLower = movementSearchTerm.toLowerCase();
-                            const matchesSearch = (
-                              movement.product?.name?.toLowerCase().includes(searchLower) ||
-                              movement.product?.sku?.toLowerCase().includes(searchLower) ||
-                              movement.location?.name?.toLowerCase().includes(searchLower) ||
-                              movement.notes?.toLowerCase().includes(searchLower)
-                            );
-                            if (!matchesSearch) return false;
-                          }
-
-                          return true;
+                        const filtered = filterMovements(movements, {
+                          filters,
+                          searchTerm: movementSearchTerm
                         });
-
-                        // Sort movements
-                        if (movementSortBy.field && movementSortBy.direction) {
-                          filteredMovements.sort((a, b) => {
-                            let aVal, bVal;
-                            switch (movementSortBy.field) {
-                              case 'date':
-                                aVal = new Date(a.occurred_at).getTime();
-                                bVal = new Date(b.occurred_at).getTime();
-                                return movementSortBy.direction === 'asc' ? aVal - bVal : bVal - aVal;
-                              case 'type':
-                                aVal = a.movement_type || '';
-                                bVal = b.movement_type || '';
-                                break;
-                              case 'product':
-                                aVal = a.product?.name || '';
-                                bVal = b.product?.name || '';
-                                break;
-                              case 'warehouse':
-                                aVal = a.location?.name || '';
-                                bVal = b.location?.name || '';
-                                break;
-                              case 'quantity':
-                                aVal = a.quantity || 0;
-                                bVal = b.quantity || 0;
-                                return movementSortBy.direction === 'asc' ? aVal - bVal : bVal - aVal;
-                              case 'operator':
-                                aVal = a.individual?.display_name || '';
-                                bVal = b.individual?.display_name || '';
-                                break;
-                              default:
-                                return 0;
-                            }
-                            const cmp = String(aVal).localeCompare(String(bVal));
-                            return movementSortBy.direction === 'asc' ? cmp : -cmp;
-                          });
-                        }
+                        const filteredMovements = sortMovements(filtered, movementSortBy);
 
                         const paginatedMovements = filteredMovements.slice((movementPage - 1) * ITEMS_PER_PAGE, movementPage * ITEMS_PER_PAGE);
 
@@ -2363,7 +1967,7 @@ export default function InventoryProduct({ onBack }) {
                                 </td>
                               </tr>
                             ))}
-                            <tr><td colSpan="8" className="p-0"><Pagination currentPage={movementPage} totalItems={filteredMovements.length} onPageChange={setMovementPage} /></td></tr>
+                            <tr><td colSpan="8" className="p-0"><Pagination currentPage={movementPage} totalItems={filteredMovements.length} onPageChange={setMovementPage} itemsPerPage={ITEMS_PER_PAGE} /></td></tr>
                           </>
                         );
                       })()}
@@ -2372,52 +1976,12 @@ export default function InventoryProduct({ onBack }) {
                 </div>
                 {/* Mobile Card View for Movements */}
                 {(() => {
-                  // Filter movements based on all filters (same logic)
-                  const filteredMovements = movements.filter(movement => {
-                    // Movement Type filter
-                    if (filters.movementTypes?.length > 0 && !filters.movementTypes.includes(movement.movement_type)) {
-                      return false;
-                    }
-
-                    // Location filter
-                    if (filters.locations?.length > 0 && !filters.locations.includes(movement.location_id)) {
-                      return false;
-                    }
-
-                    // Product filter
-                    if (filters.products?.length > 0 && !filters.products.includes(movement.product_id)) {
-                      return false;
-                    }
-
-                    // Date Range filter
-                    if (filters.movementDateFrom) {
-                      const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
-                      if (movementDate < filters.movementDateFrom) return false;
-                    }
-                    if (filters.movementDateTo) {
-                      const movementDate = new Date(movement.occurred_at).toISOString().split('T')[0];
-                      if (movementDate > filters.movementDateTo) return false;
-                    }
-
-                    // User/Operator filter
-                    if (filters.users?.length > 0 && !filters.users.includes(movement.created_by?.id)) {
-                      return false;
-                    }
-
-                    // Text search filter
-                    if (movementSearchTerm) {
-                      const searchLower = movementSearchTerm.toLowerCase();
-                      const matchesSearch = (
-                        movement.product?.name?.toLowerCase().includes(searchLower) ||
-                        movement.product?.sku?.toLowerCase().includes(searchLower) ||
-                        movement.location?.name?.toLowerCase().includes(searchLower) ||
-                        movement.notes?.toLowerCase().includes(searchLower)
-                      );
-                      if (!matchesSearch) return false;
-                    }
-
-                    return true;
+                  // Filter and sort movements (same logic as desktop)
+                  const filtered = filterMovements(movements, {
+                    filters,
+                    searchTerm: movementSearchTerm
                   });
+                  const filteredMovements = sortMovements(filtered, movementSortBy);
                   const paginatedMovements = filteredMovements.slice((movementPage - 1) * ITEMS_PER_PAGE, movementPage * ITEMS_PER_PAGE);
 
                   return (
@@ -2453,7 +2017,7 @@ export default function InventoryProduct({ onBack }) {
                               </div>
                             </div>
                           ))}
-                          <Pagination currentPage={movementPage} totalItems={filteredMovements.length} onPageChange={setMovementPage} />
+                          <Pagination currentPage={movementPage} totalItems={filteredMovements.length} onPageChange={setMovementPage} itemsPerPage={ITEMS_PER_PAGE} />
                         </>
                       )}
                     </div>
@@ -2583,7 +2147,7 @@ export default function InventoryProduct({ onBack }) {
                               </button>
                             </div>
                           ))}
-                          <Pagination currentPage={productPage} totalItems={filteredProducts.length} onPageChange={setProductPage} />
+                          <Pagination currentPage={productPage} totalItems={filteredProducts.length} onPageChange={setProductPage} itemsPerPage={ITEMS_PER_PAGE} />
                         </>
                       );
                     })()}
@@ -2860,7 +2424,7 @@ export default function InventoryProduct({ onBack }) {
                                   </React.Fragment>
                                 );
                               })}
-                              <tr><td colSpan="5" className="p-0"><Pagination currentPage={productPage} totalItems={filteredProducts.length} onPageChange={setProductPage} /></td></tr>
+                              <tr><td colSpan="5" className="p-0"><Pagination currentPage={productPage} totalItems={filteredProducts.length} onPageChange={setProductPage} itemsPerPage={ITEMS_PER_PAGE} /></td></tr>
                             </>
                           );
                         })()}
@@ -3679,1325 +3243,122 @@ export default function InventoryProduct({ onBack }) {
         </div>
 
       {/* Add Product Modal */}
-      {showAddProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 fade-in duration-300">
-            <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
-                  <Plus className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add New Product</h2>
-              </div>
-            </div>
-            <div className="px-8 pb-8 pt-4 space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">SKU</label>
-                <input
-                  type="text"
-                  value={newProduct.sku}
-                  onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., CCTV-001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Product Name</label>
-                <input
-                  type="text"
-                  value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., 1080P Camera"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
-                <SearchableSelect
-                  value={newProduct.category}
-                  onChange={(val) => handleCategoryChange(val)}
-                  options={customCategories.filter(c => c && c.trim()).map(c => ({ value: c, label: c }))}
-                  placeholder="Select category..."
-                  allowAddNew={true}
-                  onAddNew={(newCat) => {
-                    if (newCat && newCat.trim() && !customCategories.includes(newCat)) {
-                      const updatedCategories = [...customCategories, newCat];
-                      setCustomCategories(updatedCategories);
-                      setNewProduct({ ...newProduct, category: newCat });
-                      saveCustomCategories(updatedCategories);
-                    }
-                  }}
-                  addNewLabel="+ Add New Category..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Base Unit</label>
-                <SearchableSelect
-                  value={newProduct.base_unit}
-                  onChange={(val) => setNewProduct({ ...newProduct, base_unit: val, unit: val })}
-                  options={customUnits.filter(u => u && u.trim()).map(u => ({ value: u, label: u }))}
-                  placeholder="Select unit..."
-                  allowAddNew={true}
-                  onAddNew={(newUnit) => {
-                    if (newUnit && newUnit.trim() && !customUnits.includes(newUnit)) {
-                      const updatedUnits = [...customUnits, newUnit];
-                      setCustomUnits(updatedUnits);
-                      setNewProduct({ ...newProduct, base_unit: newUnit, unit: newUnit });
-                      saveCustomUnits(updatedUnits);
-                    }
-                  }}
-                  addNewLabel="+ Add New Unit..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Description (Optional)</label>
-                <textarea
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
-                  rows="2"
-                  placeholder="Product description..."
-                />
-              </div>
-
-              {/* Initial Stock Section (Optional) */}
-              <div className="pt-5 border-t-2 border-gray-100">
-                <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center space-x-2">
-                  <Warehouse className="w-4 h-4 text-emerald-600" />
-                  <span>Initial Stock (Optional)</span>
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
-                    <select
-                      value={newProduct.initial_location_id}
-                      onChange={(e) => setNewProduct({ ...newProduct, initial_location_id: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                    >
-                      <option value="">Skip initial stock</option>
-                      {locations.map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {location.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {newProduct.initial_location_id && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity</label>
-                        <input
-                          type="number"
-                          value={newProduct.initial_quantity === 0 ? '' : newProduct.initial_quantity}
-                          onChange={(e) => setNewProduct({ ...newProduct, initial_quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                          placeholder="0"
-                          min="1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Unit Cost</label>
-                        <input
-                          type="number"
-                          value={newProduct.initial_unit_cost === 0 ? '' : newProduct.initial_unit_cost}
-                          onChange={(e) => setNewProduct({ ...newProduct, initial_unit_cost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                          placeholder="0.00"
-                          step="0.01"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100">
-              {modalError && (
-                <div className="mb-3 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
-                  {modalError}
-                </div>
-              )}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => { setShowAddProductModal(false); setModalError(''); }}
-                  className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddProduct}
-                  className="px-6 py-3 bg-gradient-to-r from-gray-900 to-gray-800 text-white font-semibold rounded-xl hover:from-gray-800 hover:to-gray-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-                >
-                  Add Product
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddProductModal
+        isOpen={showAddProductModal}
+        onClose={() => setShowAddProductModal(false)}
+        newProduct={newProduct}
+        setNewProduct={setNewProduct}
+        onSubmit={handleAddProduct}
+        modalError={modalError}
+        customCategories={customCategories}
+        setCustomCategories={setCustomCategories}
+        saveCustomCategories={saveCustomCategories}
+        customUnits={customUnits}
+        setCustomUnits={setCustomUnits}
+        saveCustomUnits={saveCustomUnits}
+        locations={locations}
+      />
 
       {/* Add Warehouse/Location Modal */}
-      {showAddLocationModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 fade-in duration-300">
-            <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
-              <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl">
-                <Warehouse className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add Warehouse/Location</h2>
-              </div>
-            </div>
-            <div className="px-8 pb-8 pt-4 space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Warehouse Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newLocation.name}
-                  onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., Main Warehouse, Site Storage, Truck 01"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Code (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newLocation.code}
-                  onChange={(e) => setNewLocation({ ...newLocation, code: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., MAIN, SITE-01, TRUCK-01"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Address (Optional)
-                </label>
-                <textarea
-                  value={newLocation.address}
-                  onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all resize-none"
-                  rows="2"
-                  placeholder="Warehouse address..."
-                />
-              </div>
-            </div>
-            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100">
-              {modalError && (
-                <div className="mb-3 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
-                  {modalError}
-                </div>
-              )}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowAddLocationModal(false);
-                    setModalError('');
-                    setNewLocation({
-                      name: '',
-                      code: '',
-                      address: ''
-                    });
-                  }}
-                  className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddLocation}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-                >
-                  Add Warehouse
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddLocationModal
+        isOpen={showAddLocationModal}
+        onClose={() => {
+          setShowAddLocationModal(false);
+          setModalError('');
+        }}
+        newLocation={newLocation}
+        setNewLocation={setNewLocation}
+        onSubmit={handleAddLocation}
+        modalError={modalError}
+      />
 
       {/* Stock Out Modal - Supports both pre-selected item and manual selection */}
-      {showStockOutModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto animate-in zoom-in-95 fade-in duration-300">
-            <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl">
-                  <Minus className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Stock Out</h2>
-              </div>
-            </div>
-            <div className="px-8 pb-8 pt-4">
-            {/* Product Info - Only show if pre-selected */}
-            {selectedStockItem && (
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Product</p>
-                    <p className="font-bold text-gray-900">{selectedStockItem.product?.name}</p>
-                    <p className="text-xs text-gray-600">{selectedStockItem.product?.sku}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Location</p>
-                    <p className="font-bold text-gray-900">{selectedStockItem.location?.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Current Stock</p>
-                    <p className="font-bold text-gray-900">{selectedStockItem.quantity}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Available</p>
-                    <p className="font-bold text-emerald-600">{selectedStockItem.available_quantity}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-5">
-              {/* Product Selector - Only show if no pre-selected item */}
-              {!selectedStockItem && (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Product *</label>
-                    <select
-                      value={stockOutData.product_id || ''}
-                      onChange={(e) => {
-                        const productId = e.target.value;
-                        setStockOutData({ ...stockOutData, product_id: productId, location_id: '' });
-                      }}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900 transition-all"
-                    >
-                      <option value="">Select product...</option>
-                      {products.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} ({product.sku})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Warehouse *</label>
-                    <select
-                      value={stockOutData.location_id || ''}
-                      onChange={(e) => setStockOutData({ ...stockOutData, location_id: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900 transition-all"
-                    >
-                      <option value="">Select warehouse...</option>
-                      {/* Only show locations that have stock for the selected product */}
-                      {stockOutData.product_id
-                        ? items.filter(item => item.product_id === stockOutData.product_id && item.quantity > 0).map(item => (
-                            <option key={item.location_id} value={item.location_id}>
-                              {item.location?.name} (Available: {item.available_quantity})
-                            </option>
-                          ))
-                        : locations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.name}
-                            </option>
-                          ))
-                      }
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {/* Quantity Input with Unit Selector */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity *</label>
-                {(() => {
-                  const currentProductId = selectedStockItem?.product?.id || stockOutData.product_id;
-                  const productUnitsForItem = currentProductId ? allProductUnits.filter(u => u.product_id === currentProductId) : [];
-                  const currentProduct = products.find(p => p.id === currentProductId);
-                  const baseUnit = currentProduct?.base_unit || 'pcs';
-
-                  return (
-                    <div className="flex space-x-2">
-                      <input
-                        type="number"
-                        value={stockOutData.quantity === 0 ? '' : stockOutData.quantity}
-                        onChange={(e) => setStockOutData({ ...stockOutData, quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900 transition-all"
-                        placeholder="Enter quantity"
-                        min="0.01"
-                        step="0.01"
-                      />
-                      {productUnitsForItem.length > 0 ? (
-                        <select
-                          value={stockOutData.unit || baseUnit}
-                          onChange={(e) => setStockOutData({ ...stockOutData, unit: e.target.value })}
-                          className="w-32 px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900"
-                        >
-                          <option value={baseUnit}>{baseUnit}</option>
-                          {productUnitsForItem.filter(u => !u.is_base_unit).map(u => (
-                            <option key={u.id} value={u.unit_name}>{u.unit_name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="w-32 px-3 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-600 text-center">
-                          {baseUnit}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                {stockOutData.unit && stockOutData.unit !== (selectedStockItem?.product?.base_unit || 'pcs') && (() => {
-                  const currentProductId = selectedStockItem?.product?.id || stockOutData.product_id;
-                  const unitConv = allProductUnits.find(u => u.product_id === currentProductId && u.unit_name === stockOutData.unit);
-                  if (unitConv && stockOutData.quantity > 0) {
-                    const baseQty = stockOutData.quantity * unitConv.conversion_to_base;
-                    const currentProduct = products.find(p => p.id === currentProductId);
-                    return (
-                      <p className="text-xs text-red-600 mt-1">
-                        = {baseQty} {currentProduct?.base_unit || 'pcs'} (base unit)
-                      </p>
-                    );
-                  }
-                  return null;
-                })()}
-                {selectedStockItem && (
-                  <p className="text-xs text-gray-500 mt-1">Available: {selectedStockItem.available_quantity} {selectedStockItem.product?.base_unit || selectedStockItem.product?.unit}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Notes <span className="text-gray-400 font-normal">(Optional)</span></label>
-                <textarea
-                  value={stockOutData.notes}
-                  onChange={(e) => setStockOutData({ ...stockOutData, notes: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-900 transition-all resize-none"
-                  rows="2"
-                  placeholder="e.g., Shipped to customer, Used in project..."
-                />
-              </div>
-            </div>
-            </div>
-            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100">
-              {modalError && (
-                <div className="mb-3 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
-                  {modalError}
-                </div>
-              )}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowStockOutModal(false);
-                    setSelectedStockItem(null);
-                    setModalError('');
-                    setStockOutData({ quantity: 0, notes: '', product_id: '', location_id: '' });
-                  }}
-                  className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleStockOut}
-                  className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-xl hover:from-red-700 hover:to-orange-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-                >
-                  Stock Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <StockOutModal
+        isOpen={showStockOutModal}
+        onClose={() => setShowStockOutModal(false)}
+        selectedStockItem={selectedStockItem}
+        setSelectedStockItem={setSelectedStockItem}
+        stockOutData={stockOutData}
+        setStockOutData={setStockOutData}
+        onSubmit={handleStockOut}
+        modalError={modalError}
+        setModalError={setModalError}
+        products={products}
+        items={items}
+        locations={locations}
+        allProductUnits={allProductUnits}
+      />
 
       {/* Stock In Modal - Supports both pre-selected item and manual selection */}
-      {showStockInModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-emerald-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
-            <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-xl">
-                  <Plus className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Stock In</h2>
-              </div>
-            </div>
-            <div className="px-8 pb-8 pt-4">
-            {/* Product Info - Only show if pre-selected */}
-            {selectedStockItem && (
-              <div className={`rounded-xl p-4 mb-6 border ${selectedStockItem.isVirtual ? 'bg-purple-50 border-purple-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Product</p>
-                    <p className="font-bold text-gray-900">{selectedStockItem.product?.name}</p>
-                    <p className="text-xs text-gray-600">{selectedStockItem.product?.sku}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Location</p>
-                    <p className={`font-bold ${selectedStockItem.isVirtual && !selectedStockItem.location_id ? 'text-purple-600' : 'text-gray-900'}`}>
-                      {selectedStockItem.isVirtual && !selectedStockItem.location_id
-                        ? 'Select below'
-                        : selectedStockItem.location?.name}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Current Stock</p>
-                    <p className={`font-bold ${selectedStockItem.isVirtual ? 'text-purple-600' : 'text-emerald-600'}`}>
-                      {selectedStockItem.quantity} {selectedStockItem.product?.unit}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-5">
-              {/* Product Selector - Only show if no pre-selected item */}
-              {!selectedStockItem && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Product *</label>
-                  <select
-                    value={stockInData.product_id || ''}
-                    onChange={(e) => setStockInData({ ...stockInData, product_id: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                  >
-                    <option value="">Select product...</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} ({product.sku})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Location Selector - Show if no pre-selected item OR virtual item without location */}
-              {(!selectedStockItem || (selectedStockItem?.isVirtual && !selectedStockItem?.location_id)) && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Warehouse *</label>
-                  <select
-                    value={stockInData.location_id}
-                    onChange={(e) => setStockInData({ ...stockInData, location_id: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                  >
-                    <option value="">Select warehouse...</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name} {location.code ? `(${location.code})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Reference Type Dropdown */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Stock In Type *</label>
-                <SearchableSelect
-                  value={stockInData.reference_type}
-                  onChange={(val) => setStockInData({ ...stockInData, reference_type: val })}
-                  options={[
-                    { value: 'return', label: 'Customer Return' },
-                    { value: 'refund', label: 'Supplier Refund' },
-                    { value: 'adjustment', label: 'Stock Adjustment' },
-                    { value: 'transfer_in', label: 'Transfer In' },
-                    { value: 'found', label: 'Found Stock' },
-                    ...customStockInTypes.map(t => ({ value: t, label: t }))
-                  ]}
-                  placeholder="Select type..."
-                  allowAddNew={true}
-                  onAddNew={(newType) => {
-                    if (newType && !customStockInTypes.includes(newType)) {
-                      setCustomStockInTypes([...customStockInTypes, newType]);
-                    }
-                    if (newType) {
-                      setStockInData({ ...stockInData, reference_type: newType });
-                    }
-                  }}
-                  addNewLabel="+ Add Custom Type..."
-                />
-              </div>
-
-              {/* Quantity Input with Unit Selector */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity *</label>
-                {(() => {
-                  const currentProductId = selectedStockItem?.product?.id || stockInData.product_id;
-                  const productUnitsForItem = currentProductId ? allProductUnits.filter(u => u.product_id === currentProductId) : [];
-                  const currentProduct = products.find(p => p.id === currentProductId);
-                  const baseUnit = currentProduct?.base_unit || 'pcs';
-
-                  return (
-                    <div className="flex space-x-2">
-                      <input
-                        type="number"
-                        value={stockInData.quantity === 0 ? '' : stockInData.quantity}
-                        onChange={(e) => setStockInData({ ...stockInData, quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                        placeholder="Enter quantity"
-                        min="0.01"
-                        step="0.01"
-                      />
-                      {productUnitsForItem.length > 0 ? (
-                        <select
-                          value={stockInData.unit || baseUnit}
-                          onChange={(e) => setStockInData({ ...stockInData, unit: e.target.value })}
-                          className="w-32 px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900"
-                        >
-                          <option value={baseUnit}>{baseUnit}</option>
-                          {productUnitsForItem.filter(u => !u.is_base_unit).map(u => (
-                            <option key={u.id} value={u.unit_name}>{u.unit_name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="w-32 px-3 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-600 text-center">
-                          {baseUnit}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                {stockInData.unit && stockInData.unit !== (selectedStockItem?.product?.base_unit || 'pcs') && (() => {
-                  const currentProductId = selectedStockItem?.product?.id || stockInData.product_id;
-                  const unitConv = allProductUnits.find(u => u.product_id === currentProductId && u.unit_name === stockInData.unit);
-                  if (unitConv && stockInData.quantity > 0) {
-                    const baseQty = stockInData.quantity * unitConv.conversion_to_base;
-                    const currentProduct = products.find(p => p.id === currentProductId);
-                    return (
-                      <p className="text-xs text-emerald-600 mt-1">
-                        = {baseQty} {currentProduct?.base_unit || 'pcs'} (base unit)
-                      </p>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-
-              {/* Unit Cost Input */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Unit Cost <span className="text-gray-400 font-normal">(Optional)</span></label>
-                <input
-                  type="number"
-                  value={stockInData.unit_cost === 0 ? '' : stockInData.unit_cost}
-                  onChange={(e) => setStockInData({ ...stockInData, unit_cost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                  placeholder="Enter unit cost"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              {/* Notes Input */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Notes <span className="text-gray-400 font-normal">(Optional)</span></label>
-                <textarea
-                  value={stockInData.notes}
-                  onChange={(e) => setStockInData({ ...stockInData, notes: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
-                  rows="2"
-                  placeholder="e.g., Returned from customer, Supplier refund..."
-                />
-              </div>
-            </div>
-
-            </div>
-            <div className="sticky bottom-0 bg-white px-8 py-4 border-t border-gray-100">
-              {modalError && (
-                <div className="mb-3 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
-                  {modalError}
-                </div>
-              )}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowStockInModal(false);
-                    setSelectedStockItem(null);
-                    setModalError('');
-                    setStockInData({ quantity: 0, unit_cost: 0, reference_type: 'return', location_id: '', notes: '' });
-                  }}
-                  className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleStockIn}
-                  className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-cyan-600 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Plus className="w-4 h-4" />
-                    <span>Confirm Stock In</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <StockInModal
+        isOpen={showStockInModal}
+        onClose={() => setShowStockInModal(false)}
+        selectedStockItem={selectedStockItem}
+        setSelectedStockItem={setSelectedStockItem}
+        stockInData={stockInData}
+        setStockInData={setStockInData}
+        onSubmit={handleStockIn}
+        modalError={modalError}
+        setModalError={setModalError}
+        products={products}
+        locations={locations}
+        allProductUnits={allProductUnits}
+        customStockInTypes={customStockInTypes}
+        setCustomStockInTypes={setCustomStockInTypes}
+      />
 
       {/* Create Purchase Order Modal */}
-      {showAddPOModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-4 md:my-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
-            <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
-                  <FileText className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Create Purchase Order</h2>
-              </div>
-            </div>
-
-            <div className="px-8 pb-8 pt-4 space-y-6">
-              {/* PO Basic Info */}
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Supplier *</label>
-                  <SearchableSelect
-                    value={newPO.supplier_id}
-                    onChange={(val) => setNewPO({ ...newPO, supplier_id: val })}
-                    options={suppliers.map(s => ({ value: s.id, label: s.name }))}
-                    placeholder="Select supplier..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">PO Number *</label>
-                  <input
-                    type="text"
-                    value={newPO.po_number}
-                    onChange={(e) => setNewPO({ ...newPO, po_number: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                    placeholder="e.g., PO-2025-001"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Expected Delivery Date</label>
-                  <input
-                    type="date"
-                    value={newPO.expected_delivery_date}
-                    onChange={(e) => setNewPO({ ...newPO, expected_delivery_date: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Receiving Warehouse *</label>
-                  <SearchableSelect
-                    value={newPO.location_id}
-                    onChange={(val) => setNewPO({ ...newPO, location_id: val })}
-                    options={locations.map(l => ({ value: l.id, label: l.name }))}
-                    placeholder="Select warehouse..."
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Notes (Optional)</label>
-                <textarea
-                  value={newPO.notes}
-                  onChange={(e) => setNewPO({ ...newPO, notes: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
-                  rows="2"
-                  placeholder="Additional notes for this purchase order..."
-                />
-              </div>
-
-              {/* Add Items Section */}
-              <div className="border-t-2 border-gray-100 pt-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Purchase Order Items *</h3>
-
-                {/* Add Item Form */}
-                <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                  <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
-                    <div className="col-span-2 md:col-span-4">
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Product</label>
-                      <SearchableSelect
-                        value={poItemToAdd.product_id}
-                        onChange={(val) => {
-                          const selectedProduct = products.find(p => p.id === val);
-                          setPoItemToAdd({
-                            ...poItemToAdd,
-                            product_id: val,
-                            unit: selectedProduct?.base_unit || selectedProduct?.unit || 'pcs'
-                          });
-                        }}
-                        options={products.filter(p => !p.is_deleted).map(p => ({
-                          value: p.id,
-                          label: `${p.name} (${p.sku})`
-                        }))}
-                        placeholder="Select product..."
-                        allowAddNew={true}
-                        onAddNew={() => setShowQuickAddProductModal(true)}
-                        addNewLabel="+ Create New Product"
-                      />
-                    </div>
-                    <div className="col-span-1 md:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Quantity</label>
-                      <input
-                        type="number"
-                        value={poItemToAdd.quantity === 0 ? '' : poItemToAdd.quantity}
-                        onChange={(e) => setPoItemToAdd({ ...poItemToAdd, quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm text-gray-900"
-                        placeholder="0"
-                        min="1"
-                      />
-                    </div>
-                    <div className="col-span-1 md:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">UOM</label>
-                      {(() => {
-                        const selectedProduct = products.find(p => p.id === poItemToAdd.product_id);
-                        const productUnitsForPO = poItemToAdd.product_id
-                          ? allProductUnits.filter(u => u.product_id === poItemToAdd.product_id)
-                          : [];
-                        const baseUnit = selectedProduct?.base_unit || 'pcs';
-                        const availableUnits = [
-                          baseUnit,
-                          ...productUnitsForPO.map(u => u.unit_name).filter(u => u !== baseUnit)
-                        ];
-                        return (
-                          <select
-                            value={poItemToAdd.unit || baseUnit}
-                            onChange={(e) => setPoItemToAdd({ ...poItemToAdd, unit: e.target.value })}
-                            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm text-gray-900"
-                            disabled={!poItemToAdd.product_id}
-                          >
-                            {availableUnits.map((unit) => (
-                              <option key={unit} value={unit}>{unit}</option>
-                            ))}
-                          </select>
-                        );
-                      })()}
-                    </div>
-                    <div className="col-span-1 md:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Unit Cost</label>
-                      <input
-                        type="number"
-                        value={poItemToAdd.unit_cost === 0 ? '' : poItemToAdd.unit_cost}
-                        onChange={(e) => setPoItemToAdd({ ...poItemToAdd, unit_cost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm text-gray-900"
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="col-span-1 md:col-span-2 flex items-end">
-                      <button
-                        onClick={handleAddItemToPO}
-                        className="w-full px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center space-x-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span className="hidden md:inline">Add Item</span>
-                        <span className="md:hidden">Add</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Items List with Scroll */}
-                {newPO.items.length > 0 ? (
-                  <>
-                    {/* Scrollable Items Container */}
-                    <div className="max-h-64 overflow-y-auto space-y-2 pr-2 mb-3">
-                      {newPO.items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between bg-white border-2 border-gray-200 rounded-xl p-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-gray-900 truncate">{item.product_name}</p>
-                            <p className="text-xs text-gray-500">{item.product_sku}</p>
-                          </div>
-                          <div className="text-center px-3">
-                            <p className="text-xs text-gray-500">Qty</p>
-                            <p className="font-bold text-gray-900">{item.quantity} {item.unit || 'pcs'}</p>
-                          </div>
-                          <div className="text-center px-3">
-                            <p className="text-xs text-gray-500">Unit Cost</p>
-                            <p className="font-bold text-gray-900">RM {item.unit_cost.toFixed(2)}</p>
-                          </div>
-                          <div className="text-right px-3">
-                            <p className="text-xs text-gray-500">Subtotal</p>
-                            <p className="font-bold text-emerald-600">RM {(item.quantity * item.unit_cost).toFixed(2)}</p>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveItemFromPO(index)}
-                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Items count indicator */}
-                    {newPO.items.length > 3 && (
-                      <p className="text-xs text-gray-500 text-center mb-2">
-                        Showing {newPO.items.length} items (scroll to see all)
-                      </p>
-                    )}
-                    {/* Total - Always visible */}
-                    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border-2 border-emerald-200 sticky bottom-0">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-lg font-bold text-gray-900">Total Amount:</span>
-                          <span className="text-xs text-gray-600 ml-2">({newPO.items.length} items)</span>
-                        </div>
-                        <span className="text-2xl font-bold text-emerald-600">
-                          RM {newPO.items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                    <p>No items added yet. Add at least one item to create the purchase order.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="px-8 pb-8">
-              {modalError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm">{modalError}</p>
-                </div>
-              )}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowAddPOModal(false);
-                    setModalError('');
-                    setNewPO({
-                      supplier_id: '',
-                      po_number: '',
-                      expected_delivery_date: '',
-                      location_id: '',
-                      notes: '',
-                      items: []
-                    });
-                    setPoItemToAdd({ product_id: '', quantity: 0, unit_cost: 0, unit: 'pcs' });
-                  }}
-                  className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreatePO}
-                  disabled={!newPO.supplier_id || !newPO.po_number || !newPO.location_id || newPO.items.length === 0}
-                  className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
-                >
-                  Create Purchase Order
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreatePOModal
+        isOpen={showAddPOModal}
+        onClose={() => setShowAddPOModal(false)}
+        newPO={newPO}
+        setNewPO={setNewPO}
+        poItemToAdd={poItemToAdd}
+        setPoItemToAdd={setPoItemToAdd}
+        onSubmit={handleCreatePO}
+        onAddItem={handleAddItemToPO}
+        onRemoveItem={handleRemoveItemFromPO}
+        modalError={modalError}
+        setModalError={setModalError}
+        suppliers={suppliers}
+        products={products}
+        locations={locations}
+        allProductUnits={allProductUnits}
+        onShowQuickAddProduct={() => setShowQuickAddProductModal(true)}
+      />
 
       {/* Add Supplier Modal */}
-      {showAddSupplierModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 w-full max-w-2xl border border-gray-200/50 transform transition-all max-h-[95vh] md:max-h-[90vh] overflow-y-auto my-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add Supplier</h2>
-              </div>
-              <button
-                onClick={() => setShowAddSupplierModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Personal Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Personal Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">First Name *</label>
-                    <input
-                      type="text"
-                      value={newSupplier.first_name}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, first_name: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="John"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Last Name *</label>
-                    <input
-                      type="text"
-                      value={newSupplier.last_name}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, last_name: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="Doe"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Contact Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone 1 *</label>
-                    <input
-                      type="tel"
-                      value={newSupplier.phone_1}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, phone_1: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="+60 12-345 6789"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone 2</label>
-                    <input
-                      type="tel"
-                      value={newSupplier.phone_2}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, phone_2: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="+60 3-1234 5678"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={newSupplier.email}
-                    onChange={(e) => setNewSupplier({ ...newSupplier, email: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                    placeholder="john@example.com"
-                  />
-                </div>
-              </div>
-
-              {/* Business Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Business Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Entity Type</label>
-                    <select
-                      value={newSupplier.entity_type}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, entity_type: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                    >
-                      <option value="individual">Individual</option>
-                      <option value="company">Company</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name</label>
-                    <input
-                      type="text"
-                      value={newSupplier.company_name}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, company_name: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="Acme Inc."
-                    />
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Industry</label>
-                  <input
-                    type="text"
-                    value={newSupplier.industry}
-                    onChange={(e) => setNewSupplier({ ...newSupplier, industry: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                    placeholder="e.g., Technology, Finance, Manufacturing"
-                  />
-                </div>
-                {newSupplier.entity_type === 'company' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Contact Person Name</label>
-                      <input
-                        type="text"
-                        value={newSupplier.contact_person_name}
-                        onChange={(e) => setNewSupplier({ ...newSupplier, contact_person_name: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                        placeholder="Contact person"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Contact Person Phone</label>
-                      <input
-                        type="tel"
-                        value={newSupplier.contact_person_phone}
-                        onChange={(e) => setNewSupplier({ ...newSupplier, contact_person_phone: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                        placeholder="Contact phone"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Address Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Address Information</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Address Line 1</label>
-                    <input
-                      type="text"
-                      value={newSupplier.address_line_1}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, address_line_1: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="Street address"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Address Line 2</label>
-                    <input
-                      type="text"
-                      value={newSupplier.address_line_2}
-                      onChange={(e) => setNewSupplier({ ...newSupplier, address_line_2: e.target.value })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      placeholder="Apartment, Suite, etc. (optional)"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Postal Code</label>
-                      <input
-                        type="text"
-                        value={newSupplier.postal_code}
-                        onChange={(e) => setNewSupplier({ ...newSupplier, postal_code: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                        placeholder="50000"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">State</label>
-                      <select
-                        value={newSupplier.state}
-                        onChange={(e) => setNewSupplier({ ...newSupplier, state: e.target.value, city: '' })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                      >
-                        <option value="">Select state...</option>
-                        <optgroup label="States">
-                          <option value="Johor">Johor</option>
-                          <option value="Kedah">Kedah</option>
-                          <option value="Kelantan">Kelantan</option>
-                          <option value="Melaka">Melaka</option>
-                          <option value="Negeri Sembilan">Negeri Sembilan</option>
-                          <option value="Pahang">Pahang</option>
-                          <option value="Penang">Penang</option>
-                          <option value="Perak">Perak</option>
-                          <option value="Perlis">Perlis</option>
-                          <option value="Sabah">Sabah</option>
-                          <option value="Sarawak">Sarawak</option>
-                          <option value="Selangor">Selangor</option>
-                          <option value="Terengganu">Terengganu</option>
-                        </optgroup>
-                        <optgroup label="Federal Territories">
-                          <option value="Kuala Lumpur">Kuala Lumpur</option>
-                          <option value="Labuan">Labuan</option>
-                          <option value="Putrajaya">Putrajaya</option>
-                        </optgroup>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">City</label>
-                      <input
-                        type="text"
-                        value={newSupplier.city}
-                        onChange={(e) => setNewSupplier({ ...newSupplier, city: e.target.value })}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
-                        placeholder="City"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
-                <textarea
-                  value={newSupplier.notes}
-                  onChange={(e) => setNewSupplier({ ...newSupplier, notes: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
-                  rows="2"
-                  placeholder="Additional notes..."
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
-              <button
-                onClick={() => {
-                  setShowAddSupplierModal(false);
-                  setNewSupplier({
-                    first_name: '', last_name: '', phone_1: '', phone_2: '', email: '',
-                    entity_type: 'company', company_name: '', industry: '',
-                    contact_person_name: '', contact_person_phone: '',
-                    address_line_1: '', address_line_2: '', postal_code: '', state: '', city: '',
-                    notes: ''
-                  });
-                }}
-                className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddSupplier}
-                disabled={!newSupplier.first_name || !newSupplier.last_name || !newSupplier.phone_1}
-                className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Add Supplier
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddSupplierModal
+        isOpen={showAddSupplierModal}
+        onClose={() => setShowAddSupplierModal(false)}
+        newSupplier={newSupplier}
+        setNewSupplier={setNewSupplier}
+        onSubmit={handleAddSupplier}
+      />
 
       {/* Quick Add Product Modal (for PO) */}
-      {showQuickAddProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowQuickAddProductModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200/50 transform transition-all max-h-[90vh] overflow-visible my-auto animate-in zoom-in-95 fade-in duration-300">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl">
-                <Package className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">Quick Add Product</h2>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">SKU *</label>
-                <input
-                  type="text"
-                  value={quickProduct.sku}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, sku: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., CAM-001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Product Name *</label>
-                <input
-                  type="text"
-                  value={quickProduct.name}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., HD Camera 1080P"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
-                  <SearchableSelect
-                    value={quickProduct.category}
-                    onChange={(val) => setQuickProduct({ ...quickProduct, category: val })}
-                    options={customCategories.filter(c => c && c.trim()).map(cat => ({ value: cat, label: cat }))}
-                    placeholder="Select category..."
-                    allowAddNew={true}
-                    onAddNew={(newCat) => {
-                      if (newCat && newCat.trim() && !customCategories.includes(newCat)) {
-                        const updatedCategories = [...customCategories, newCat];
-                        setCustomCategories(updatedCategories);
-                        setQuickProduct({ ...quickProduct, category: newCat });
-                        saveCustomCategories(updatedCategories);
-                      }
-                    }}
-                    addNewLabel="+ Add new category..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Unit</label>
-                  <SearchableSelect
-                    value={quickProduct.unit}
-                    onChange={(val) => setQuickProduct({ ...quickProduct, unit: val })}
-                    options={customUnits.filter(u => u && u.trim()).map(u => ({ value: u, label: u }))}
-                    placeholder="Select unit..."
-                    allowAddNew={true}
-                    onAddNew={(newUnit) => {
-                      if (newUnit && newUnit.trim() && !customUnits.includes(newUnit)) {
-                        const updatedUnits = [...customUnits, newUnit];
-                        setCustomUnits(updatedUnits);
-                        setQuickProduct({ ...quickProduct, unit: newUnit });
-                        saveCustomUnits(updatedUnits);
-                      }
-                    }}
-                    addNewLabel="+ Add new unit..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
-              <button
-                onClick={() => {
-                  setShowQuickAddProductModal(false);
-                  setQuickProduct({
-                    sku: '',
-                    name: '',
-                    category: '',
-                    unit: ''
-                  });
-                }}
-                className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleQuickAddProduct}
-                disabled={!quickProduct.sku || !quickProduct.name}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Create & Add to PO
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuickAddProductModal
+        isOpen={showQuickAddProductModal}
+        onClose={() => setShowQuickAddProductModal(false)}
+        quickProduct={quickProduct}
+        setQuickProduct={setQuickProduct}
+        onSubmit={handleQuickAddProduct}
+        customCategories={customCategories}
+        setCustomCategories={setCustomCategories}
+        saveCustomCategories={saveCustomCategories}
+        customUnits={customUnits}
+        setCustomUnits={setCustomUnits}
+        saveCustomUnits={saveCustomUnits}
+      />
 
       {/* Add Custom Category Modal */}
-      {showAddCategoryModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddProductModal(false); setShowAddLocationModal(false); setShowAddPOModal(false); setShowAddSupplierModal(false); setShowPODetailModal(false); setShowAddDOModal(false); setShowDODetailModal(false); setShowCancelDOModal(false); setModalError(''); } }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-200/50 transform transition-all max-h-[90vh] overflow-y-auto my-auto">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl">
-                <Plus className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add New Category</h2>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Category Name *</label>
-                <input
-                  type="text"
-                  value={newCustomCategory}
-                  onChange={(e) => setNewCustomCategory(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddCustomCategory()}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white text-gray-900 transition-all"
-                  placeholder="e.g., Smart Home, Security Systems"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-8 pt-6 border-t-2 border-gray-100">
-              <button
-                onClick={() => {
-                  setShowAddCategoryModal(false);
-                  setNewCustomCategory('');
-                }}
-                className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddCustomCategory}
-                disabled={!newCustomCategory.trim()}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                Add Category
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddCategoryModal
+        isOpen={showAddCategoryModal}
+        onClose={() => setShowAddCategoryModal(false)}
+        value={newCustomCategory}
+        onChange={setNewCustomCategory}
+        onSubmit={handleAddCustomCategory}
+      />
 
       {/* Add Custom Unit Modal */}
       {showAddUnitModal && (
@@ -5654,51 +4015,14 @@ export default function InventoryProduct({ onBack }) {
       )}
 
       {/* Cancel DO Confirmation Modal */}
-      {showCancelDOModal && selectedDO && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200" onClick={(e) => { if (e.target === e.currentTarget) { setShowCancelDOModal(false); setCancelDOReason(''); } }}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 fade-in duration-300">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="p-2 bg-red-100 rounded-full">
-                  <X className="w-6 h-6 text-red-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">Cancel Delivery Order</h3>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to cancel <span className="font-semibold">{selectedDO.do_number}</span>?
-                {(selectedDO.status === 'confirmed' || selectedDO.status === 'dispatched') && (
-                  <span className="block mt-2 text-amber-600 font-medium">Stock will be restored to inventory.</span>
-                )}
-              </p>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cancellation Reason *</label>
-                <textarea
-                  value={cancelDOReason}
-                  onChange={(e) => setCancelDOReason(e.target.value)}
-                  placeholder="Enter reason for cancellation..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 bg-white"
-                  rows={3}
-                />
-              </div>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => { setShowCancelDOModal(false); setCancelDOReason(''); }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  Go Back
-                </button>
-                <button
-                  onClick={handleCancelDO}
-                  disabled={!cancelDOReason.trim()}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel Order
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CancelDOModal
+        isOpen={showCancelDOModal}
+        onClose={() => setShowCancelDOModal(false)}
+        selectedDO={selectedDO}
+        cancelReason={cancelDOReason}
+        setCancelReason={setCancelDOReason}
+        onSubmit={handleCancelDO}
+      />
 
       {/* DO Detail Modal */}
       {showDODetailModal && selectedDO && (
