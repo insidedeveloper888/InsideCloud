@@ -48,7 +48,6 @@ export default function FilterPanel({
   const [categorySearch, setCategorySearch] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
   const [supplierSearch, setSupplierSearch] = useState('');
-  const [productSearch, setProductSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
 
@@ -74,13 +73,6 @@ export default function FilterPanel({
         : [...filters[type], value],
     };
     onFiltersChange(newFilters);
-  };
-
-  const handleToggleShowInactive = () => {
-    onFiltersChange({
-      ...filters,
-      showInactive: !filters.showInactive,
-    });
   };
 
   const handleClearFilters = () => {
@@ -114,7 +106,6 @@ export default function FilterPanel({
     setCategorySearch('');
     setLocationSearch('');
     setSupplierSearch('');
-    setProductSearch('');
     setUserSearch('');
     setCustomerSearch('');
   };
