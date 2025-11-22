@@ -179,6 +179,56 @@ export const InventoryAPI = {
   },
 
   /**
+   * Update product
+   * @param {string} organizationSlug
+   * @param {string} productId - Product ID
+   * @param {object} data - Fields to update { low_stock_threshold, name, etc. }
+   * @returns {Promise}
+   */
+  async updateProduct(organizationSlug, productId, data) {
+    const response = await fetch(`${API_BASE}/api/inventory`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'update-product',
+        product_id: productId,
+        data
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update product: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Soft delete a product (sets is_deleted = true)
+   * @param {string} organizationSlug
+   * @param {string} productId
+   * @returns {Promise}
+   */
+  async deleteProduct(organizationSlug, productId) {
+    const response = await fetch(`${API_BASE}/api/inventory`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'delete-product',
+        product_id: productId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete product: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
    * Create stock movement (IN/OUT/Adjustment)
    * @param {string} organizationSlug
    * @param {object} movementData - { product_id, location_id, movement_type, quantity, unit_cost, notes }
@@ -284,6 +334,60 @@ export const InventoryAPI = {
   },
 
   /**
+   * Update PO status
+   * @param {string} organizationSlug
+   * @param {string} poId - Purchase order ID
+   * @param {string} status - New status
+   * @param {string} deliveryOrderUrl - Delivery order attachment URL (required for 'received')
+   * @returns {Promise}
+   */
+  async updatePOStatus(organizationSlug, poId, status, deliveryOrderUrl = null) {
+    const response = await fetch(`${API_BASE}/api/inventory/${poId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'update-po-status',
+        status,
+        delivery_order_url: deliveryOrderUrl
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.msg || `Failed to update PO status: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Update PO details (expected delivery date, notes, delivery order URL)
+   * @param {string} organizationSlug
+   * @param {string} poId - Purchase order ID
+   * @param {object} updateData - { expected_delivery_date, notes, delivery_order_url }
+   * @returns {Promise}
+   */
+  async updatePO(organizationSlug, poId, updateData) {
+    const response = await fetch(`${API_BASE}/api/inventory/${poId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'update-po',
+        data: updateData
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.msg || `Failed to update PO: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
    * Create new supplier
    * @param {string} organizationSlug
    * @param {object} supplierData - { name, contact_person, email, phone, address, notes }
@@ -304,6 +408,31 @@ export const InventoryAPI = {
 
     if (!response.ok) {
       throw new Error(`Failed to create supplier: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Delete supplier (soft delete via contacts table)
+   * @param {string} organizationSlug
+   * @param {string} supplierId
+   * @returns {Promise}
+   */
+  async deleteSupplier(organizationSlug, supplierId) {
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      type: 'supplier',
+      id: supplierId
+    });
+
+    const response = await fetch(`${API_BASE}/api/inventory?${params}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete supplier: ${response.statusText}`);
     }
 
     return response.json();
@@ -377,5 +506,241 @@ export const InventoryAPI = {
     }
 
     return response.json();
+  },
+
+  /**
+   * Get unit conversions
+   * @param {string} organizationSlug
+   * @returns {Promise}
+   */
+  async getUnitConversions(organizationSlug) {
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      type: 'unit-conversions'
+    });
+
+    const response = await fetch(`${API_BASE}/api/inventory?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch unit conversions: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Create or update unit conversion
+   * @param {string} organizationSlug
+   * @param {object} conversionData - { from_unit, to_unit, conversion_factor }
+   * @returns {Promise}
+   */
+  async upsertUnitConversion(organizationSlug, conversionData) {
+    const response = await fetch(`${API_BASE}/api/inventory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'unit-conversion',
+        data: conversionData
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save unit conversion: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Delete unit conversion
+   * @param {string} organizationSlug
+   * @param {string} conversionId
+   * @returns {Promise}
+   */
+  async deleteUnitConversion(organizationSlug, conversionId) {
+    const response = await fetch(`${API_BASE}/api/inventory`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'unit-conversion',
+        conversion_id: conversionId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete unit conversion: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  // ==================== Product Units ====================
+
+  /**
+   * Get all product units for organization
+   * @param {string} organizationSlug
+   * @param {string} productId - Optional product ID to filter
+   * @returns {Promise}
+   */
+  async getProductUnits(organizationSlug, productId = null) {
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      type: 'product-units'
+    });
+    if (productId) {
+      params.append('product_id', productId);
+    }
+
+    const response = await fetch(`${API_BASE}/api/inventory?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch product units: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Create product unit
+   * @param {string} organizationSlug
+   * @param {object} unitData - { product_id, unit_name, conversion_to_base, is_base_unit }
+   * @returns {Promise}
+   */
+  async createProductUnit(organizationSlug, unitData) {
+    const response = await fetch(`${API_BASE}/api/inventory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'product-unit',
+        data: unitData
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create product unit: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Delete product unit
+   * @param {string} organizationSlug
+   * @param {string} unitId
+   * @returns {Promise}
+   */
+  async deleteProductUnit(organizationSlug, unitId) {
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      type: 'product-unit',
+      id: unitId
+    });
+
+    const response = await fetch(`${API_BASE}/api/inventory?${params}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete product unit: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  // ========================================================================
+  // DELIVERY ORDERS (OUT) METHODS
+  // ========================================================================
+
+  async getDeliveryOrders(organizationSlug, filters = {}) {
+    const params = new URLSearchParams({
+      organization_slug: organizationSlug,
+      type: 'delivery-orders',
+      ...filters
+    });
+
+    const response = await fetch(`${API_BASE}/api/inventory?${params}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch delivery orders: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  async createDeliveryOrder(organizationSlug, doData, individualId = null) {
+    const response = await fetch(`${API_BASE}/api/inventory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'delivery-order',
+        data: doData,
+        individual_id: individualId
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok || result.code !== 0) {
+      throw new Error(result.msg || `Failed to create delivery order: ${response.statusText}`);
+    }
+    return result;
+  },
+
+  async updateDOStatus(organizationSlug, doId, status, deliveryOrderUrl = null) {
+    const response = await fetch(`${API_BASE}/api/inventory/${doId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'update-do-status',
+        status,
+        delivery_order_url: deliveryOrderUrl
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok || result.code !== 0) {
+      throw new Error(result.msg || `Failed to update DO status: ${response.statusText}`);
+    }
+    return result;
+  },
+
+  async cancelDeliveryOrder(organizationSlug, doId, cancellationReason, individualId = null) {
+    const response = await fetch(`${API_BASE}/api/inventory/${doId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        organization_slug: organizationSlug,
+        action: 'cancel-do',
+        cancellation_reason: cancellationReason,
+        individual_id: individualId
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok || result.code !== 0) {
+      throw new Error(result.msg || `Failed to cancel delivery order: ${response.statusText}`);
+    }
+    return result;
+  },
+
+  async deletePurchaseOrder(organizationSlug, poId) {
+    const response = await fetch(`${API_BASE}/api/inventory?organization_slug=${organizationSlug}&type=purchase-order&id=${poId}`, {
+      method: 'DELETE'
+    });
+
+    const result = await response.json();
+    if (!response.ok || result.code !== 0) {
+      throw new Error(result.msg || `Failed to delete purchase order: ${response.statusText}`);
+    }
+    return result;
   }
 };

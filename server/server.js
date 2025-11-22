@@ -884,6 +884,21 @@ const koaSessionConfig = {
 };
 app.use(session(koaSessionConfig, app));
 
+// Global CORS middleware
+app.use(async (ctx, next) => {
+  ctx.set('Access-Control-Allow-Origin', ctx.headers.origin || '*');
+  ctx.set('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE');
+  ctx.set('Access-Control-Allow-Credentials', 'true');
+  ctx.set('Access-Control-Allow-Headers', 'x-requested-with, accept, origin, content-type, authorization, Authorization');
+
+  if (ctx.method === 'OPTIONS') {
+    ctx.status = 200;
+    return;
+  }
+
+  await next();
+});
+
 // Add body parser middleware to parse JSON request bodies
 app.use(bodyParser({
     enableTypes: ['json'],
@@ -1673,6 +1688,13 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
 
 const contactController = require('./contact_management_controller')
 
+// CORS preflight for contacts
+router.options('/api/contacts', async (ctx) => {
+  const serverUtil = require('./server_util');
+  serverUtil.configAccessControl(ctx);
+  ctx.status = 200;
+})
+
 // Contacts (specific routes before parameterized routes)
 router.get('/api/contacts/data-quality', requireProductAccess('contact_management'), contactController.getDataQualityMetrics)
 router.get('/api/contacts', requireProductAccess('contact_management'), contactController.getContacts)
@@ -2071,6 +2093,44 @@ router.put('/api/inventory/:id', async (ctx) => {
         body: ctx.request.body || {},
         headers: ctx.headers,
         url: ctx.url // Pass the full URL with the ID
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: (name, value) => { ctx.set(name, value) },
+    })
+})
+
+router.put('/api/inventory', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    const inventoryHandler = require('./api_handlers/inventory')
+
+    await inventoryHandler({
+        method: ctx.method,
+        query: ctx.query,
+        body: ctx.request.body || {},
+        headers: ctx.headers,
+        url: ctx.url
+    }, {
+        status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
+        json: (data) => { ctx.body = data },
+        setHeader: (name, value) => { ctx.set(name, value) },
+    })
+})
+
+router.delete('/api/inventory', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+
+    const inventoryHandler = require('./api_handlers/inventory')
+
+    await inventoryHandler({
+        method: ctx.method,
+        query: ctx.query,
+        body: ctx.request.body || {},
+        headers: ctx.headers,
+        url: ctx.url
     }, {
         status: (code) => ({ json: (data) => { ctx.status = code; ctx.body = data } }),
         json: (data) => { ctx.body = data },

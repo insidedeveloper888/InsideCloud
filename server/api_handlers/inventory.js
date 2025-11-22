@@ -34,6 +34,16 @@ module.exports = async function handler(req, res) {
   const organization_slug = queryParams.organization_slug || bodyParams.organization_slug;
   const { type = 'items', ...filters } = queryParams;
 
+  // Handle DO upload endpoint early (special case - file upload has different body format)
+  if (method === 'POST' && resourceId === 'upload-do') {
+    // For file uploads, organization_slug comes from form data which may be in bodyParams
+    // Return placeholder for now - in production, implement file upload to Supabase Storage
+    return res.status(200).json(okResponse({
+      file_url: '/placeholder-do-file.pdf',
+      uploaded_at: new Date().toISOString()
+    }));
+  }
+
   if (!organization_slug) {
     return res.status(400).json(failResponse('organization_slug is required'));
   }
@@ -81,8 +91,27 @@ module.exports = async function handler(req, res) {
           result = await controller.getSettings(organization_slug);
           break;
 
+        case 'unit-conversions':
+          // Get unit conversions
+          result = await controller.getUnitConversions(organization_slug);
+          break;
+
+        case 'product-units':
+          // Get all product units or for specific product
+          if (filters.product_id) {
+            result = await controller.getProductUnits(organization_slug, filters.product_id);
+          } else {
+            result = await controller.getAllProductUnits(organization_slug);
+          }
+          break;
+
+        case 'delivery-orders':
+          // Get delivery orders (out)
+          result = await controller.getDeliveryOrders(organization_slug, filters);
+          break;
+
         default:
-          return res.status(400).json(failResponse(`Invalid type: ${type}. Valid types: items, products, locations, movements, purchase-orders, suppliers, settings`));
+          return res.status(400).json(failResponse(`Invalid type: ${type}. Valid types: items, products, locations, movements, purchase-orders, suppliers, settings, unit-conversions, product-units, delivery-orders`));
       }
 
       return res.status(200).json(okResponse(result.data, result.metadata));
@@ -92,16 +121,6 @@ module.exports = async function handler(req, res) {
     // POST: Create new record (product, movement, purchase order, etc.)
     // ========================================================================
     if (method === 'POST') {
-      // Handle DO upload endpoint (special case)
-      if (resourceId === 'upload-do') {
-        // For now, return a placeholder response
-        // In production, implement file upload to Supabase Storage or S3
-        return res.status(200).json(okResponse({
-          file_url: '/placeholder-do-file.pdf',
-          uploaded_at: new Date().toISOString()
-        }));
-      }
-
       const { action, data, individual_id } = bodyParams;
 
       if (!action) {
@@ -137,7 +156,7 @@ module.exports = async function handler(req, res) {
           break;
 
         case 'supplier':
-          // Create new supplier
+          // Create supplier (syncs to contacts table with contact_type='supplier')
           result = await controller.createSupplier(organization_slug, data, individual_id);
           break;
 
@@ -151,8 +170,23 @@ module.exports = async function handler(req, res) {
           result = await controller.migrateStockThresholds(organization_slug);
           break;
 
+        case 'unit-conversion':
+          // Create or update unit conversion
+          result = await controller.upsertUnitConversion(organization_slug, data);
+          break;
+
+        case 'product-unit':
+          // Create product unit
+          result = await controller.createProductUnit(organization_slug, data);
+          break;
+
+        case 'delivery-order':
+          // Create delivery order (out)
+          result = await controller.createDeliveryOrder(organization_slug, data, individual_id);
+          break;
+
         default:
-          return res.status(400).json(failResponse(`Invalid action: ${action}. Valid actions: product, movement, location, stock-item, purchase-order, supplier, settings, migrate-thresholds`));
+          return res.status(400).json(failResponse(`Invalid action: ${action}. Valid actions: product, movement, location, stock-item, purchase-order, supplier, settings, migrate-thresholds, unit-conversion, product-unit, delivery-order`));
       }
 
       return res.status(201).json(okResponse(result.data, result.metadata));
@@ -162,37 +196,113 @@ module.exports = async function handler(req, res) {
     // PUT: Update existing record
     // ========================================================================
     if (method === 'PUT') {
-      const { action, item_id, quantity, average_cost, status } = bodyParams;
+      const { action, item_id, quantity, average_cost, status, product_id, data } = bodyParams;
 
       // Handle PO status update (ID in URL path)
       if (action === 'update-po-status' && resourceId) {
         if (!status) {
           return res.status(400).json(failResponse('status is required'));
         }
-
-        const result = await controller.updatePOStatus(organization_slug, resourceId, status);
+        const { delivery_order_url } = bodyParams;
+        const result = await controller.updatePOStatus(organization_slug, resourceId, status, delivery_order_url);
         return res.status(200).json(okResponse(result.data));
       }
 
-      // Handle inventory quantity update
-      if (!item_id && !resourceId) {
-        return res.status(400).json(failResponse('item_id is required'));
+      // Handle PO details update (expected delivery date, notes, etc.)
+      if (action === 'update-po' && resourceId) {
+        const result = await controller.updatePO(organization_slug, resourceId, data);
+        return res.status(200).json(okResponse(result.data));
       }
 
-      const result = await controller.updateInventoryQuantity(
-        organization_slug,
-        item_id || resourceId,
-        quantity,
-        average_cost
-      );
+      // Handle Delivery Order (Out) status update
+      if (action === 'update-do-status' && resourceId) {
+        if (!status) {
+          return res.status(400).json(failResponse('status is required'));
+        }
+        const { delivery_order_url } = bodyParams;
+        const result = await controller.updateDOStatus(organization_slug, resourceId, status, delivery_order_url);
+        return res.status(200).json(okResponse(result.data));
+      }
 
-      return res.status(200).json(okResponse(result.data));
+      // Handle Delivery Order cancellation
+      if (action === 'cancel-do' && resourceId) {
+        const { cancellation_reason, individual_id } = bodyParams;
+        if (!cancellation_reason) {
+          return res.status(400).json(failResponse('cancellation_reason is required'));
+        }
+        const result = await controller.cancelDeliveryOrder(organization_slug, resourceId, cancellation_reason, individual_id);
+        return res.status(200).json(okResponse(result.data));
+      }
+
+      // Handle product update (e.g., low_stock_threshold)
+      if (action === 'update-product' && product_id) {
+        const result = await controller.updateProduct(organization_slug, product_id, data);
+        return res.status(200).json(okResponse(result.data));
+      }
+
+      // Handle product soft delete
+      if (action === 'delete-product' && product_id) {
+        const result = await controller.softDeleteProduct(organization_slug, product_id);
+        return res.status(200).json(okResponse(result.data));
+      }
+
+      // Handle inventory quantity update (default action when no specific action is provided)
+      if (!action) {
+        if (!item_id && !resourceId) {
+          return res.status(400).json(failResponse('item_id is required'));
+        }
+
+        const result = await controller.updateInventoryQuantity(
+          organization_slug,
+          item_id || resourceId,
+          quantity,
+          average_cost
+        );
+
+        return res.status(200).json(okResponse(result.data));
+      }
+
+      return res.status(400).json(failResponse(`Invalid action: ${action}`));
+    }
+
+    // ========================================================================
+    // DELETE: Remove record
+    // ========================================================================
+    if (method === 'DELETE') {
+      const { type, id } = queryParams;
+
+      // Delete supplier (soft delete contact)
+      if (type === 'supplier' && id) {
+        const result = await controller.deleteSupplier(organization_slug, id);
+        return res.status(200).json(okResponse(result));
+      }
+
+      // Delete product unit
+      if (type === 'product-unit' && id) {
+        const result = await controller.deleteProductUnit(organization_slug, id);
+        return res.status(200).json(okResponse(result));
+      }
+
+      // Soft delete purchase order
+      if (type === 'purchase-order' && id) {
+        const result = await controller.softDeletePO(organization_slug, id);
+        return res.status(200).json(okResponse(result));
+      }
+
+      // Legacy: unit-conversion delete from body
+      const { action, conversion_id } = bodyParams;
+      if (action === 'unit-conversion' && conversion_id) {
+        const result = await controller.deleteUnitConversion(organization_slug, conversion_id);
+        return res.status(200).json(okResponse(result));
+      }
+
+      return res.status(400).json(failResponse('Invalid delete action'));
     }
 
     // ========================================================================
     // Method not allowed
     // ========================================================================
-    return res.status(405).json(failResponse('Method not allowed. Supported: GET, POST, PUT'));
+    return res.status(405).json(failResponse('Method not allowed. Supported: GET, POST, PUT, DELETE'));
 
   } catch (error) {
     console.error('Inventory API error:', error);

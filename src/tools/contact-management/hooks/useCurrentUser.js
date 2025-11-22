@@ -42,7 +42,6 @@ export function useCurrentUser() {
   }, []);
 
   const individualId = currentUser?.individual_id || null;
-  console.log('🎯 [useCurrentUser] Returning individualId:', individualId);
 
   return {
     currentUser,
