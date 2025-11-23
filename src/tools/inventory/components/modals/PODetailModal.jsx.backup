@@ -1,0 +1,336 @@
+import React from 'react';
+import { FileText, X, CheckCircle, Truck, Eye, Upload, Trash2 } from 'lucide-react';
+import { getPOStatusColor, getPOStatusLabel, getPOStatusIcon } from '../../utils/helpers';
+import { InventoryAPI } from '../../api/inventory';
+
+/**
+ * Purchase Order Detail Modal
+ * Shows full PO details with ability to:
+ * - Update status
+ * - Upload delivery order
+ * - Update expected delivery date
+ * - Delete PO (if not received)
+ */
+export default function PODetailModal({
+  isOpen,
+  selectedPO,
+  onClose,
+  organizationSlug,
+  onUpdateStatus,
+  onUploadDO,
+  onRefresh,
+  onDelete
+}) {
+  if (!isOpen || !selectedPO) return null;
+
+  const handleClose = () => {
+    onClose();
+  };
+
+  const handleUpdateStatus = async (newStatus) => {
+    try {
+      await onUpdateStatus(newStatus);
+    } catch (err) {
+      console.error('Failed to update PO status:', err);
+    }
+  };
+
+  const handleUploadDO = async (file) => {
+    try {
+      await onUploadDO(file);
+    } catch (err) {
+      console.error('Failed to upload DO:', err);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this purchase order? This action cannot be undone.')) {
+      try {
+        await onDelete(selectedPO.id);
+        handleClose();
+      } catch (err) {
+        alert(err.message || 'Failed to delete purchase order');
+      }
+    }
+  };
+
+  const handleViewDO = () => {
+    const url = selectedPO.delivery_order_url;
+    if (url.startsWith('data:')) {
+      // For base64 data URLs, create a blob and open
+      const byteString = atob(url.split(',')[1]);
+      const mimeType = url.split(',')[0].split(':')[1].split(';')[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleUpdateExpectedDate = async (newDate) => {
+    try {
+      await InventoryAPI.updatePO(organizationSlug, selectedPO.id, { expected_delivery_date: newDate || null });
+      await onRefresh();
+    } catch (err) {
+      console.error('Failed to update expected delivery date:', err);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto border border-gray-200/50 transform transition-all my-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 md:px-8 py-4 md:py-6 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">Purchase Order Details</h2>
+              <p className="text-sm text-gray-500">{selectedPO.po_number}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+          {/* PO Info Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Supplier</label>
+              <p className="text-lg font-semibold text-gray-900">{selectedPO.supplier?.name || 'N/A'}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+              <div className="flex items-center space-x-2">
+                <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getPOStatusColor(selectedPO.status)}`}>
+                  {React.createElement(getPOStatusIcon(selectedPO.status), { className: 'w-3.5 h-3.5' })}
+                  <span>{getPOStatusLabel(selectedPO.status)}</span>
+                </span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Order Date</label>
+              <p className="text-gray-900">{selectedPO.order_date ? new Date(selectedPO.order_date).toLocaleDateString() : 'N/A'}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Expected Delivery</label>
+              {selectedPO.status !== 'received' ? (
+                <input
+                  type="date"
+                  value={selectedPO.expected_delivery_date || ''}
+                  onChange={(e) => handleUpdateExpectedDate(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <p className="text-gray-900">{selectedPO.expected_delivery_date ? new Date(selectedPO.expected_delivery_date).toLocaleDateString() : 'TBD'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Managed By</label>
+              <p className="text-gray-900">{selectedPO.created_by?.display_name || '-'}</p>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {selectedPO.notes && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Notes</label>
+              <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{selectedPO.notes}</p>
+            </div>
+          )}
+
+          {/* Items List */}
+          <div>
+            <label className="block text-sm font-bold text-gray-900 mb-3">Order Items</label>
+            <div className="border-2 border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Product</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">Quantity</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">Unit Cost</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {selectedPO.items?.map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-semibold text-gray-900">{item.product_name}</p>
+                          <p className="text-xs text-gray-500">{item.product_sku}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-900">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">RM {item.unit_cost.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">RM {(item.quantity * item.unit_cost).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-gradient-to-r from-emerald-50 to-teal-50">
+                    <td colSpan="3" className="px-4 py-4 text-right font-bold text-gray-900">Total Amount:</td>
+                    <td className="px-4 py-4 text-right text-xl font-bold text-emerald-600">RM {(selectedPO.total_amount || 0).toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Status Update Section */}
+          <div className="border-t-2 border-gray-200 pt-6">
+            <label className="block text-sm font-bold text-gray-900 mb-3">Update Status</label>
+
+            {/* Warning when PO is received */}
+            {selectedPO.status === 'received' && (
+              <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">Stock Added to Inventory</p>
+                    <p className="text-xs text-emerald-700 mt-1">
+                      Status is locked. For returns or corrections, use Stock Out movements.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-4 gap-3">
+              <button
+                onClick={() => handleUpdateStatus('draft')}
+                disabled={selectedPO.status === 'draft' || selectedPO.status === 'received'}
+                className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                  selectedPO.status === 'draft' || selectedPO.status === 'received'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <FileText className="w-4 h-4 mx-auto mb-1" />
+                <span className="text-xs">Draft</span>
+              </button>
+              <button
+                onClick={() => handleUpdateStatus('ordered')}
+                disabled={selectedPO.status === 'ordered' || selectedPO.status === 'received'}
+                className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                  selectedPO.status === 'ordered' || selectedPO.status === 'received'
+                    ? 'bg-blue-100 text-blue-400 cursor-not-allowed'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4 mx-auto mb-1" />
+                <span className="text-xs">Ordered</span>
+              </button>
+              <button
+                onClick={() => handleUpdateStatus('in_transit')}
+                disabled={selectedPO.status === 'in_transit' || selectedPO.status === 'received'}
+                className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                  selectedPO.status === 'in_transit' || selectedPO.status === 'received'
+                    ? 'bg-yellow-100 text-yellow-400 cursor-not-allowed'
+                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                }`}
+              >
+                <Truck className="w-4 h-4 mx-auto mb-1" />
+                <span className="text-xs">In Transit</span>
+              </button>
+              <button
+                onClick={() => handleUpdateStatus('received')}
+                disabled={selectedPO.status === 'received' || !selectedPO.delivery_order_url}
+                title={!selectedPO.delivery_order_url && selectedPO.status !== 'received' ? 'Upload Delivery Order first' : ''}
+                className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                  selectedPO.status === 'received'
+                    ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
+                    : !selectedPO.delivery_order_url
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4 mx-auto mb-1" />
+                <span className="text-xs">Received</span>
+                {!selectedPO.delivery_order_url && selectedPO.status !== 'received' && (
+                  <span className="block text-[10px] text-gray-400">Upload DO first</span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Delivery Order Upload Section */}
+          <div className="border-t-2 border-gray-200 pt-6">
+            <label className="block text-sm font-bold text-gray-900 mb-3">Delivery Order (DO)</label>
+            {selectedPO.delivery_order_url ? (
+              <div className="flex items-center justify-between bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  <span className="text-emerald-800 font-medium">Delivery order uploaded</span>
+                </div>
+                <button
+                  onClick={handleViewDO}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center space-x-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>View</span>
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input
+                  type="file"
+                  id="do-upload"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleUploadDO(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="do-upload"
+                  className="flex items-center justify-center space-x-2 px-6 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer"
+                >
+                  <Upload className="w-5 h-5 text-gray-400" />
+                  <span className="text-gray-600 font-medium">Upload Delivery Order</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-2">Supported formats: PDF, JPG, PNG</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 md:px-8 py-4 flex flex-col-reverse sm:flex-row gap-2 sm:justify-between">
+          {selectedPO.status !== 'received' ? (
+            <button
+              onClick={handleDelete}
+              className="px-6 py-2.5 bg-red-100 text-red-700 font-semibold rounded-xl hover:bg-red-200 transition-all flex items-center space-x-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete</span>
+            </button>
+          ) : (
+            <div />
+          )}
+          <button
+            onClick={handleClose}
+            className="px-6 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

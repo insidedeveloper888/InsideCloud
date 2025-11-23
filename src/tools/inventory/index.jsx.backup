@@ -32,27 +32,6 @@ import { filterInventoryItems, sortInventoryItems } from './utils/filtering';
 import './index.css';
 
 /**
- * Custom hook for debouncing values
- * @param {any} value - Value to debounce
- * @param {number} delay - Delay in milliseconds (default: 300ms)
- */
-function useDebounce(value, delay = 300) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-/**
  * Inventory Management Product
  * Main component for inventory management system
  */
@@ -106,11 +85,6 @@ export default function InventoryProduct({ onBack }) {
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [movementSearchTerm, setMovementSearchTerm] = useState('');
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
-
-  // Debounced search terms (300ms delay) - reduces filtering operations
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const debouncedProductSearchTerm = useDebounce(productSearchTerm, 300);
-  const debouncedMovementSearchTerm = useDebounce(movementSearchTerm, 300);
 
   // Sort states
   const [movementSortBy, setMovementSortBy] = useState({ field: '', direction: '' });
@@ -279,7 +253,6 @@ export default function InventoryProduct({ onBack }) {
         setLocations(locationsRes.data || []);
       } catch (err) {
         console.error('Failed to fetch locations:', err);
-        setError(`Failed to load warehouses: ${err.message}. Please refresh the page.`);
       }
     };
     fetchLocations();
@@ -294,7 +267,6 @@ export default function InventoryProduct({ onBack }) {
         setSuppliers(suppliersRes.data || []);
       } catch (err) {
         console.error('Failed to fetch suppliers:', err);
-        setError(`Failed to load suppliers: ${err.message}. Please refresh the page.`);
       }
     };
     fetchSuppliers();
@@ -309,7 +281,6 @@ export default function InventoryProduct({ onBack }) {
         setProducts(productsRes.data || []);
       } catch (err) {
         console.error('Failed to fetch products:', err);
-        setError(`Failed to load products: ${err.message}. Please refresh the page.`);
       }
     };
     fetchProducts();
@@ -351,16 +322,16 @@ export default function InventoryProduct({ onBack }) {
         }
       } catch (err) {
         console.error('Failed to fetch settings:', err);
-        setError('Failed to load custom settings. Using system defaults. Some features may be limited.');
+        // Keep default value if fetch fails
       }
     };
     fetchSettings();
   }, [organizationSlug]);
 
-  // Reset pages when filters change (use debounced search terms)
-  useEffect(() => { setStockPage(1); }, [debouncedSearchTerm, showUnstocked, sortBy, filters]);
-  useEffect(() => { setMovementPage(1); }, [debouncedMovementSearchTerm, movementSortBy, filters]);
-  useEffect(() => { setProductPage(1); }, [debouncedProductSearchTerm, productSortBy]);
+  // Reset pages when filters change
+  useEffect(() => { setStockPage(1); }, [searchTerm, showUnstocked, sortBy, filters]);
+  useEffect(() => { setMovementPage(1); }, [movementSearchTerm, movementSortBy, filters]);
+  useEffect(() => { setProductPage(1); }, [productSearchTerm, productSortBy]);
 
   // ESC key to close modals
   useEffect(() => {
@@ -413,52 +384,17 @@ export default function InventoryProduct({ onBack }) {
 
   useEffect(() => {
     if (!organizationSlug) return;
-
-    // Create abort controller for cleanup
-    const abortController = new AbortController();
-    let isMounted = true;
-
-    const fetchDataWithCleanup = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        await fetchData(abortController.signal, isMounted);
-      } catch (err) {
-        // Don't set error if component unmounted or request aborted
-        if (isMounted && err.name !== 'AbortError') {
-          console.error('Failed to fetch inventory data:', err);
-          const tabName = {
-            'overview': 'stock overview',
-            'products': 'product catalog',
-            'movements': 'stock movements',
-            'purchase-orders': 'purchase orders',
-            'suppliers': 'suppliers',
-            'delivery-orders': 'delivery orders'
-          }[tab] || 'data';
-          setError(`Failed to load ${tabName}: ${err.message}. Please try refreshing the page.`);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchDataWithCleanup();
-
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationSlug, tab]);
 
-  const fetchData = async (signal, isMounted) => {
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
       if (tab === 'overview') {
-        const results = await Promise.allSettled([
+        const [itemsRes, productsRes, locationsRes] = await Promise.all([
           InventoryAPI.getItems(organizationSlug, {
             search: searchTerm
           }),
@@ -466,156 +402,55 @@ export default function InventoryProduct({ onBack }) {
           InventoryAPI.getLocations(organizationSlug)
         ]);
 
-        // Only update state if component is still mounted
-        if (isMounted) {
-          const [itemsResult, productsResult, locationsResult] = results;
-
-          if (itemsResult.status === 'fulfilled') {
-            setItems(itemsResult.value.data || []);
-          } else {
-            console.error('Failed to load items:', itemsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Stock items unavailable` : '• Stock items unavailable'));
-          }
-
-          if (productsResult.status === 'fulfilled') {
-            setProducts(productsResult.value.data || []);
-          } else {
-            console.error('Failed to load products:', productsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Products unavailable` : '• Products unavailable'));
-          }
-
-          if (locationsResult.status === 'fulfilled') {
-            setLocations(locationsResult.value.data || []);
-          } else {
-            console.error('Failed to load locations:', locationsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Warehouses unavailable` : '• Warehouses unavailable'));
-          }
-        }
+        setItems(itemsRes.data || []);
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
       } else if (tab === 'products') {
-        const results = await Promise.allSettled([
+        const [itemsRes, productsRes, locationsRes] = await Promise.all([
           InventoryAPI.getItems(organizationSlug),
           InventoryAPI.getProducts(organizationSlug),
           InventoryAPI.getLocations(organizationSlug)
         ]);
 
-        if (isMounted) {
-          const [itemsResult, productsResult, locationsResult] = results;
-
-          if (itemsResult.status === 'fulfilled') {
-            setItems(itemsResult.value.data || []);
-          } else {
-            console.error('Failed to load items:', itemsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Stock items unavailable` : '• Stock items unavailable'));
-          }
-
-          if (productsResult.status === 'fulfilled') {
-            setProducts(productsResult.value.data || []);
-          } else {
-            console.error('Failed to load products:', productsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Products unavailable` : '• Products unavailable'));
-          }
-
-          if (locationsResult.status === 'fulfilled') {
-            setLocations(locationsResult.value.data || []);
-          } else {
-            console.error('Failed to load locations:', locationsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Warehouses unavailable` : '• Warehouses unavailable'));
-          }
-        }
+        setItems(itemsRes.data || []);
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
       } else if (tab === 'movements') {
         const movementsRes = await InventoryAPI.getMovements(organizationSlug, { limit: 50 });
-        if (isMounted) {
-          setMovements(movementsRes.data || []);
-        }
+        setMovements(movementsRes.data || []);
       } else if (tab === 'purchase-orders') {
-        const results = await Promise.allSettled([
+        const [poRes, productsRes, locationsRes, suppliersRes] = await Promise.all([
           InventoryAPI.getPurchaseOrders(organizationSlug),
           InventoryAPI.getProducts(organizationSlug),
           InventoryAPI.getLocations(organizationSlug),
           InventoryAPI.getSuppliers(organizationSlug)
         ]);
-
-        if (isMounted) {
-          const [poResult, productsResult, locationsResult, suppliersResult] = results;
-
-          if (poResult.status === 'fulfilled') {
-            setPurchaseOrders(poResult.value.data || []);
-          } else {
-            console.error('Failed to load purchase orders:', poResult.reason);
-            setError(prev => (prev ? `${prev}\n• Purchase orders unavailable` : '• Purchase orders unavailable'));
-          }
-
-          if (productsResult.status === 'fulfilled') {
-            setProducts(productsResult.value.data || []);
-          } else {
-            console.error('Failed to load products:', productsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Products unavailable` : '• Products unavailable'));
-          }
-
-          if (locationsResult.status === 'fulfilled') {
-            setLocations(locationsResult.value.data || []);
-          } else {
-            console.error('Failed to load locations:', locationsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Warehouses unavailable` : '• Warehouses unavailable'));
-          }
-
-          if (suppliersResult.status === 'fulfilled') {
-            setSuppliers(suppliersResult.value.data || []);
-          } else {
-            console.error('Failed to load suppliers:', suppliersResult.reason);
-            setError(prev => (prev ? `${prev}\n• Suppliers unavailable` : '• Suppliers unavailable'));
-          }
-        }
+        setPurchaseOrders(poRes.data || []);
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
+        setSuppliers(suppliersRes.data || []);
       } else if (tab === 'suppliers') {
         const suppliersRes = await InventoryAPI.getSuppliers(organizationSlug);
-        if (isMounted) {
-          setSuppliers(suppliersRes.data || []);
-        }
+        setSuppliers(suppliersRes.data || []);
       } else if (tab === 'delivery-orders') {
-        const results = await Promise.allSettled([
+        const [doRes, productsRes, locationsRes, customersRes] = await Promise.all([
           InventoryAPI.getDeliveryOrders(organizationSlug),
           InventoryAPI.getProducts(organizationSlug),
           InventoryAPI.getLocations(organizationSlug),
           fetch(`${process.env.REACT_APP_API_BASE || ''}/api/contacts?organization_slug=${organizationSlug}`).then(r => r.json())
         ]);
-
-        if (isMounted) {
-          const [doResult, productsResult, locationsResult, customersResult] = results;
-
-          if (doResult.status === 'fulfilled') {
-            setDeliveryOrders(doResult.value.data || []);
-          } else {
-            console.error('Failed to load delivery orders:', doResult.reason);
-            setError(prev => (prev ? `${prev}\n• Delivery orders unavailable` : '• Delivery orders unavailable'));
-          }
-
-          if (productsResult.status === 'fulfilled') {
-            setProducts(productsResult.value.data || []);
-          } else {
-            console.error('Failed to load products:', productsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Products unavailable` : '• Products unavailable'));
-          }
-
-          if (locationsResult.status === 'fulfilled') {
-            setLocations(locationsResult.value.data || []);
-          } else {
-            console.error('Failed to load locations:', locationsResult.reason);
-            setError(prev => (prev ? `${prev}\n• Warehouses unavailable` : '• Warehouses unavailable'));
-          }
-
-          if (customersResult.status === 'fulfilled') {
-            // API returns array directly, filter for customers only
-            const allContacts = Array.isArray(customersResult.value) ? customersResult.value : [];
-            setCustomers(allContacts.filter(c => c.contact_type === 'customer'));
-          } else {
-            console.error('Failed to load customers:', customersResult.reason);
-            setError(prev => (prev ? `${prev}\n• Customers unavailable` : '• Customers unavailable'));
-          }
-        }
+        setDeliveryOrders(doRes.data || []);
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
+        // API returns array directly, filter for customers only
+        const allContacts = Array.isArray(customersRes) ? customersRes : [];
+        setCustomers(allContacts.filter(c => c.contact_type === 'customer'));
       }
     } catch (err) {
-      // Re-throw to be handled by wrapper
-      throw err;
+      console.error('Failed to fetch inventory data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -773,15 +608,15 @@ export default function InventoryProduct({ onBack }) {
     });
   }, [deliveryOrders]);
 
-  // Filter and sort items (use debounced search term for better performance)
+  // Filter and sort items
   const filteredItems = React.useMemo(() => {
     const filtered = filterInventoryItems(itemsWithUnstockedProducts, {
-      searchTerm: debouncedSearchTerm,
+      searchTerm,
       filters,
       showUnstocked
     });
     return sortInventoryItems(filtered, sortBy);
-  }, [itemsWithUnstockedProducts, debouncedSearchTerm, showUnstocked, sortBy, filters]);
+  }, [itemsWithUnstockedProducts, searchTerm, showUnstocked, sortBy, filters]);
 
   // Sort handlers
   const toggleSort = createToggleSort(setSortBy);
@@ -1266,28 +1101,16 @@ export default function InventoryProduct({ onBack }) {
       setError('Category already exists');
       return;
     }
-
-    const categoryToAdd = newCustomCategory.trim();
-    const previousCategories = [...customCategories];
-    const updatedCategories = [...customCategories, categoryToAdd];
-
-    // Optimistic update
+    const updatedCategories = [...customCategories, newCustomCategory.trim()];
     setCustomCategories(updatedCategories);
-    setNewProduct({ ...newProduct, category: categoryToAdd });
+    setNewProduct({ ...newProduct, category: newCustomCategory.trim() });
     setNewCustomCategory('');
     setShowAddCategoryModal(false);
-
     // Save to database
     try {
       await InventoryAPI.updateSettings(organizationSlug, { custom_categories: updatedCategories });
     } catch (err) {
       console.error('Failed to save categories:', err);
-      // Rollback optimistic update
-      setCustomCategories(previousCategories);
-      setError(`Failed to save category: ${err.message}. Please try again.`);
-      // Reopen modal so user can retry
-      setNewCustomCategory(categoryToAdd);
-      setShowAddCategoryModal(true);
     }
   };
 
@@ -1300,22 +1123,15 @@ export default function InventoryProduct({ onBack }) {
       setError('Unit already exists');
       return;
     }
-
     const unitName = newCustomUnit.trim();
-    const previousUnits = [...customUnits];
-    const previousConversions = [...unitConversions];
     const updatedUnits = [...customUnits, unitName];
-
-    // Optimistic update
     setCustomUnits(updatedUnits);
     setNewProduct({ ...newProduct, unit: unitName });
     setNewCustomUnit('');
     setShowAddUnitModal(false);
-
     // Save to database
     try {
       await InventoryAPI.updateSettings(organizationSlug, { custom_units: updatedUnits });
-
       // If conversion is provided, save it too
       if (newUnitConversion.to_unit && newUnitConversion.conversion_factor) {
         const res = await InventoryAPI.upsertUnitConversion(organizationSlug, {
@@ -1330,13 +1146,6 @@ export default function InventoryProduct({ onBack }) {
       setNewUnitConversion({ to_unit: '', conversion_factor: '' });
     } catch (err) {
       console.error('Failed to save units:', err);
-      // Rollback optimistic update
-      setCustomUnits(previousUnits);
-      setUnitConversions(previousConversions);
-      setError(`Failed to save unit: ${err.message}. Please try again.`);
-      // Reopen modal so user can retry
-      setNewCustomUnit(unitName);
-      setShowAddUnitModal(true);
     }
   };
 
