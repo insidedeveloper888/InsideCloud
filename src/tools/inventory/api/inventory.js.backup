@@ -633,31 +633,6 @@ export const InventoryAPI = {
   },
 
   /**
-   * Update product unit
-   * @param {string} organizationSlug
-   * @param {string} unitId
-   * @param {object} unitData
-   * @returns {Promise}
-   */
-  async updateProductUnit(organizationSlug, unitId, unitData) {
-    const response = await fetch(`${API_BASE}/api/inventory/${unitId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        organization_slug: organizationSlug,
-        action: 'update-product-unit',
-        data: unitData
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to update product unit: ${response.statusText}`);
-    }
-
-    return response.json();
-  },
-
-  /**
    * Delete product unit
    * @param {string} organizationSlug
    * @param {string} unitId

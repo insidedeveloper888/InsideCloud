@@ -223,6 +223,35 @@ class InventoryController {
   }
 
   /**
+   * Update a product unit
+   * @param {string} organizationSlug
+   * @param {string} unitId - UUID of the product unit
+   * @param {object} updateData - Fields to update { buying_price, selling_price, etc. }
+   * @returns {object}
+   */
+  async updateProductUnit(organizationSlug, unitId, updateData) {
+    try {
+      const org = await getOrganizationInfo(organizationSlug);
+      if (!org) throw new Error('Organization not found');
+
+      const { data, error } = await this.supabase
+        .from('inventory_product_units')
+        .update(updateData)
+        .eq('id', unitId)
+        .eq('organization_id', org.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error in updateProductUnit:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Soft delete a product (sets is_deleted = true)
    * @param {string} organizationSlug
    * @param {string} productId

@@ -31,43 +31,10 @@ export default function OverviewTab({
   setShowStockOutModal,
   handleItemClick,
   toggleSort,
-  SortIcon,
-  allProductUnits
+  SortIcon
 }) {
-  // Calculate total stock value based on buying prices
-  const calculateStockValue = () => {
-    let totalValue = 0;
-
-    items.forEach(item => {
-      if (!item.quantity || item.quantity <= 0) return;
-
-      // Find the base unit for this product
-      const baseUnit = allProductUnits?.find(u =>
-        u.product_id === item.product_id && u.is_base_unit
-      );
-
-      // Use buying_price from base unit, or fall back to average_cost
-      const pricePerUnit = baseUnit?.buying_price || item.average_cost || 0;
-      totalValue += item.quantity * pricePerUnit;
-    });
-
-    return totalValue.toFixed(2);
-  };
-
-  const stockValue = calculateStockValue();
-
   return (
     <div className="space-y-6">
-      {/* Stock Value Card - Full Width */}
-      <div className="group relative bg-gradient-to-br from-purple-600 to-indigo-600 border border-purple-200/60 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[4rem] opacity-50"></div>
-        <div className="relative">
-          <div className="text-xs font-bold text-purple-100 mb-2 uppercase tracking-wider">Total Stock Value</div>
-          <div className="text-5xl font-bold text-white mb-2">RM {stockValue}</div>
-          <div className="text-sm text-purple-100 font-medium">Based on buying prices (cost basis)</div>
-        </div>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="group relative bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1">

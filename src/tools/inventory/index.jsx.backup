@@ -98,7 +98,6 @@ export default function InventoryProduct({ onBack }) {
     doStatuses: [],     // For delivery orders tab
     states: [],         // For suppliers tab
     minQuantity: null,  // For overview tab - quantity range
-    itemType: 'selling', // For products tab - 'selling' or 'spare'
     maxQuantity: null,  // For overview tab - quantity range
   });
 
@@ -1550,8 +1549,8 @@ export default function InventoryProduct({ onBack }) {
                 className="group relative bg-gradient-to-r from-gray-900 to-gray-800 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl flex items-center justify-center space-x-1 md:space-x-2 hover:from-gray-800 hover:to-gray-700 transition-all duration-200 shadow-md text-xs md:text-sm"
               >
                 <Plus className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Add Item</span>
-                <span className="font-medium sm:hidden">Item</span>
+                <span className="font-medium hidden sm:inline">Add Product</span>
+                <span className="font-medium sm:hidden">Product</span>
               </button>
               <button
                 onClick={() => setShowAddPOModal(true)}
@@ -1610,7 +1609,7 @@ export default function InventoryProduct({ onBack }) {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Items</span>
+                <span className="relative z-10">Products</span>
                 {tab === 'products' && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
                 )}
@@ -1729,7 +1728,6 @@ export default function InventoryProduct({ onBack }) {
                 handleItemClick={handleItemClick}
                 toggleSort={toggleSort}
                 SortIcon={SortIcon}
-                allProductUnits={allProductUnits}
               />
             )}
 
@@ -1763,7 +1761,6 @@ export default function InventoryProduct({ onBack }) {
                 showFilters={showFilters}
                 setShowFilters={setShowFilters}
                 filters={filters}
-                setFilters={setFilters}
                 productPage={productPage}
                 setProductPage={setProductPage}
                 ITEMS_PER_PAGE={ITEMS_PER_PAGE}

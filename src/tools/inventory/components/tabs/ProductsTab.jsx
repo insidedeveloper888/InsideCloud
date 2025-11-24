@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Search, Filter, Settings, ChevronDown, Trash2, X } from 'lucide-react';
+import { Package, Search, Settings, ChevronDown, Trash2, X, Filter } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import Pagination from '../Pagination';
 import { InventoryAPI } from '../../api/inventory';
@@ -22,6 +22,7 @@ export default function ProductsTab({
   showFilters,
   setShowFilters,
   filters,
+  setFilters,
   productPage,
   setProductPage,
   ITEMS_PER_PAGE,
@@ -47,7 +48,7 @@ export default function ProductsTab({
     <div>
       <div className="bg-white border border-gray-200/60 rounded-2xl shadow-sm">
         <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200/70 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center rounded-t-2xl">
-          <h2 className="text-lg md:text-xl font-bold text-gray-900">Product Catalog</h2>
+          <h2 className="text-lg md:text-xl font-bold text-gray-900">Item Catalog</h2>
         </div>
         {/* Search Bar and Filter Button */}
         <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -56,7 +57,7 @@ export default function ProductsTab({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by SKU, product name, or category..."
+                placeholder="Search by SKU, item name, or category..."
                 value={productSearchTerm}
                 onChange={(e) => setProductSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
@@ -74,11 +75,11 @@ export default function ProductsTab({
             >
               <Filter size={14} />
               <span className="hidden sm:inline">Filter</span>
-              {(filters.categories.length > 0 || filters.showInactive) && (
+              {filters.itemType && (
                 <span className={`px-1.5 py-0.5 text-xs rounded-md font-semibold ${
                   showFilters.products ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
                 }`}>
-                  {filters.categories.length + (filters.showInactive ? 1 : 0)}
+                  1
                 </span>
               )}
             </button>
@@ -89,6 +90,10 @@ export default function ProductsTab({
           {(() => {
             let filteredProducts = products.filter(product => {
               if (product.is_deleted) return false;
+
+              // Item type filter
+              if (filters.itemType === 'selling' && !product.is_selling) return false;
+              if (filters.itemType === 'spare' && product.is_selling) return false;
 
               // Category filter
               if (filters.categories.length > 0 && !filters.categories.includes(product.category)) {
@@ -116,7 +121,7 @@ export default function ProductsTab({
                     <Package className="w-8 h-8 text-gray-400" />
                   </div>
                   <p className="text-gray-500 font-medium">
-                    {productSearchTerm ? 'No products match your search' : 'No products'}
+                    {productSearchTerm ? 'No items match your search' : 'No items'}
                   </p>
                 </div>
               );
@@ -176,10 +181,16 @@ export default function ProductsTab({
                   <span className="flex items-center space-x-1"><span>SKU</span><ProductSortIcon field="sku" /></span>
                 </th>
                 <th onClick={() => toggleProductSort('name')} className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none">
-                  <span className="flex items-center space-x-1"><span>Product Name</span><ProductSortIcon field="name" /></span>
+                  <span className="flex items-center space-x-1"><span>Item Name</span><ProductSortIcon field="name" /></span>
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Type
                 </th>
                 <th onClick={() => toggleProductSort('category')} className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none">
                   <span className="flex items-center space-x-1"><span>Category</span><ProductSortIcon field="category" /></span>
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Selling Price
                 </th>
                 <th onClick={() => toggleProductSort('unit')} className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none">
                   <span className="flex items-center space-x-1"><span>Base Unit</span><ProductSortIcon field="unit" /></span>
@@ -194,6 +205,10 @@ export default function ProductsTab({
                 // Filter products based on search term and exclude deleted
                 let filteredProducts = products.filter(product => {
                   if (product.is_deleted) return false;
+
+                  // Item type filter
+                  if (filters.itemType === 'selling' && !product.is_selling) return false;
+                  if (filters.itemType === 'spare' && product.is_selling) return false;
 
                   // Category filter
                   if (filters.categories.length > 0 && !filters.categories.includes(product.category)) {
@@ -246,6 +261,7 @@ export default function ProductsTab({
                   <>
                     {paginatedProducts.map((product) => {
                       const productUnits = (allProductUnits || []).filter(u => u.product_id === product.id);
+                      const baseUnit = productUnits.find(u => u.is_base_unit);
                       const isExpanded = expandedProductId === product.id;
                       return (
                         <React.Fragment key={product.id}>
@@ -256,8 +272,28 @@ export default function ProductsTab({
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {product.name}
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              {product.is_selling ? (
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700">
+                                  Selling
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                                  Non-Selling
+                                </span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {product.category}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              {baseUnit?.selling_price ? (
+                                <span className="font-semibold text-emerald-600">
+                                  RM {parseFloat(baseUnit.selling_price).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">-</span>
+                              )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {product.base_unit || product.unit || 'pcs'}
@@ -274,18 +310,18 @@ export default function ProductsTab({
                                 </button>
                                 <button
                                   onClick={async () => {
-                                    if (window.confirm(`Delete product "${product.name}"? This will remove it from inventory.`)) {
+                                    if (window.confirm(`Delete item "${product.name}"? This will remove it from inventory.`)) {
                                       try {
                                         await InventoryAPI.deleteProduct(organizationSlug, product.id);
                                         setProducts(products.filter(p => p.id !== product.id));
                                         setItems(items.filter(i => i.product_id !== product.id));
                                       } catch (err) {
-                                        setError('Failed to delete product');
+                                        setError('Failed to delete item');
                                       }
                                     }
                                   }}
                                   className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all"
-                                  title="Delete product"
+                                  title="Delete item"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -294,7 +330,7 @@ export default function ProductsTab({
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan="5" className="px-6 py-4 bg-gray-50 border-t border-b border-gray-200 overflow-visible">
+                              <td colSpan="7" className="px-6 py-4 bg-gray-50 border-t border-b border-gray-200 overflow-visible">
                                 <div className="space-y-4">
                                   {/* Base Unit & Threshold */}
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -336,15 +372,56 @@ export default function ProductsTab({
                                         onClick={async () => {
                                           setThresholdsSaving(true);
                                           try {
+                                            // Update product fields
                                             const updates = {
                                               low_stock_threshold: productThresholds[product.id] !== undefined ? productThresholds[product.id] : product.low_stock_threshold,
-                                              base_unit: productThresholds[`${product.id}_base_unit`] ?? product.base_unit ?? 'pcs'
+                                              base_unit: productThresholds[`${product.id}_base_unit`] ?? product.base_unit ?? 'pcs',
+                                              is_selling: productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true
                                             };
                                             await InventoryAPI.updateProduct(organizationSlug, product.id, updates);
                                             setProducts(products.map(p => p.id === product.id ? { ...p, ...updates } : p));
+
+                                            // Handle base unit pricing (create or update base unit record)
+                                            const baseUnitBuy = productThresholds[`${product.id}_base_buy`];
+                                            const baseUnitSell = productThresholds[`${product.id}_base_sell`];
+
+                                            if (baseUnitBuy !== undefined || baseUnitSell !== undefined) {
+                                              const existingBaseUnit = allProductUnits?.find(u =>
+                                                u.product_id === product.id && u.is_base_unit
+                                              );
+
+                                              const baseUnitData = {
+                                                product_id: product.id,
+                                                unit_name: updates.base_unit,
+                                                conversion_to_base: 1,
+                                                is_base_unit: true,
+                                                buying_price: baseUnitBuy !== undefined ? (baseUnitBuy === '' ? null : parseFloat(baseUnitBuy)) : existingBaseUnit?.buying_price,
+                                                selling_price: baseUnitSell !== undefined ? (baseUnitSell === '' ? null : parseFloat(baseUnitSell)) : existingBaseUnit?.selling_price
+                                              };
+
+                                              if (existingBaseUnit) {
+                                                // Update existing base unit
+                                                const result = await InventoryAPI.updateProductUnit(organizationSlug, existingBaseUnit.id, baseUnitData);
+                                                if (result.code === 0) {
+                                                  setAllProductUnits(allProductUnits.map(u =>
+                                                    u.id === existingBaseUnit.id ? { ...u, ...baseUnitData } : u
+                                                  ));
+                                                }
+                                              } else {
+                                                // Create new base unit
+                                                const res = await InventoryAPI.createProductUnit(organizationSlug, baseUnitData);
+                                                if (res.code === 0) {
+                                                  setAllProductUnits([...allProductUnits, res.data]);
+                                                }
+                                              }
+                                            }
+
                                             const newThresholds = { ...productThresholds };
                                             delete newThresholds[product.id];
                                             delete newThresholds[`${product.id}_base_unit`];
+                                            delete newThresholds[`${product.id}_is_selling`];
+                                            delete newThresholds[`${product.id}_base_buy`];
+                                            delete newThresholds[`${product.id}_base_sell`];
                                             setProductThresholds(newThresholds);
                                           } catch (err) {
                                             setError('Failed to save');
@@ -355,82 +432,235 @@ export default function ProductsTab({
                                         disabled={thresholdsSaving}
                                         className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
                                       >
-                                        {thresholdsSaving ? 'Saving...' : 'Save'}
+                                        {thresholdsSaving ? 'Saving...' : 'Save Settings'}
                                       </button>
                                     </div>
                                   </div>
 
-                                  {/* Unit Conversions */}
+                                  {/* Is Selling Toggle */}
                                   <div className="border-t border-gray-200 pt-4">
-                                    <h5 className="text-sm font-semibold text-gray-700 mb-2">Unit Conversions</h5>
-                                    {productUnits.length > 0 && (
-                                      <div className="flex flex-wrap gap-2 mb-3">
-                                        {productUnits.map((unit) => (
-                                          <div key={unit.id} className="flex items-center space-x-2 px-3 py-1 bg-white border border-gray-200 rounded-lg text-sm">
-                                            <span className="text-gray-900">1 {unit.unit_name} = {unit.conversion_to_base} {product.base_unit || 'pcs'}</span>
-                                            {!unit.is_base_unit && (
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true}
+                                        onChange={(e) => setProductThresholds({
+                                          ...productThresholds,
+                                          [`${product.id}_is_selling`]: e.target.checked
+                                        })}
+                                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                      />
+                                      <span className="text-sm font-semibold text-gray-700">This is a selling item (vs. non-selling item/accessory)</span>
+                                    </label>
+                                  </div>
+
+                                  {/* Base Unit Pricing - Only show for selling items */}
+                                  {(() => {
+                                    const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+                                    if (!isSelling) return null; // Hide for non-selling items
+
+                                    return (
+                                      <div className="border-t border-gray-200 pt-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h5 className="text-sm font-semibold text-gray-700">Base Unit ({product.base_unit || 'pcs'}) Pricing</h5>
+                                          <button
+                                            onClick={async () => {
+                                              setThresholdsSaving(true);
+                                              try {
+                                                const baseUnitSell = productThresholds[`${product.id}_base_sell`];
+
+                                                if (baseUnitSell !== undefined) {
+                                                  const existingBaseUnit = allProductUnits?.find(u =>
+                                                    u.product_id === product.id && u.is_base_unit
+                                                  );
+
+                                                  const baseUnitData = {
+                                                    product_id: product.id,
+                                                    unit_name: product.base_unit || 'pcs',
+                                                    conversion_to_base: 1,
+                                                    is_base_unit: true,
+                                                    buying_price: existingBaseUnit?.buying_price || null,
+                                                    selling_price: baseUnitSell === '' ? null : parseFloat(baseUnitSell)
+                                                  };
+
+                                                  if (existingBaseUnit) {
+                                                    const result = await InventoryAPI.updateProductUnit(organizationSlug, existingBaseUnit.id, baseUnitData);
+                                                    if (result.code === 0) {
+                                                      setAllProductUnits(allProductUnits.map(u =>
+                                                        u.id === existingBaseUnit.id ? { ...u, ...baseUnitData } : u
+                                                      ));
+                                                    }
+                                                  } else {
+                                                    const res = await InventoryAPI.createProductUnit(organizationSlug, baseUnitData);
+                                                    if (res.code === 0) {
+                                                      setAllProductUnits([...allProductUnits, res.data]);
+                                                    }
+                                                  }
+
+                                                  const newThresholds = { ...productThresholds };
+                                                  delete newThresholds[`${product.id}_base_sell`];
+                                                  setProductThresholds(newThresholds);
+                                                }
+                                              } catch (err) {
+                                                console.error('Save pricing error:', err);
+                                                setError('Failed to save pricing');
+                                              } finally {
+                                                setThresholdsSaving(false);
+                                              }
+                                            }}
+                                            disabled={thresholdsSaving}
+                                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                                          >
+                                            {thresholdsSaving ? 'Saving...' : 'Save Price'}
+                                          </button>
+                                        </div>
+                                        {(() => {
+                                          const baseUnit = productUnits.find(u => u.product_id === product.id && u.is_base_unit);
+
+                                          return (
+                                            <div className="flex items-center space-x-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                                              <span className="text-sm font-semibold text-gray-700">Selling Price:</span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={productThresholds[`${product.id}_base_sell`] ?? baseUnit?.selling_price ?? ''}
+                                                onChange={(e) => setProductThresholds({
+                                                  ...productThresholds,
+                                                  [`${product.id}_base_sell`]: e.target.value
+                                                })}
+                                                className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white font-semibold"
+                                                placeholder="50.00"
+                                              />
+                                              <span className="text-sm text-gray-600">RM per {product.base_unit || 'pcs'}</span>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {/* Unit Conversions with Pricing */}
+                                  <div className="border-t border-gray-200 pt-4">
+                                    <h5 className="text-sm font-semibold text-gray-700 mb-2">Additional Unit Conversions & Pricing</h5>
+                                    {(() => {
+                                      const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+                                      const nonBaseUnits = productUnits.filter(u => !u.is_base_unit);
+
+                                      return nonBaseUnits.length > 0 && (
+                                        <div className="space-y-2 mb-3">
+                                          {nonBaseUnits.map((unit) => (
+                                            <div key={unit.id} className="flex items-center space-x-3 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+                                              <span className="text-gray-900 flex-shrink-0">1 {unit.unit_name} = {unit.conversion_to_base} {product.base_unit || 'pcs'}</span>
+                                              <span className="text-gray-400">|</span>
+                                              {isSelling ? (
+                                                <span className="text-emerald-600 font-medium">Sell: RM {unit.selling_price || '-'}</span>
+                                              ) : (
+                                                <span className="text-blue-600 font-medium">Cost: RM {unit.buying_price || '-'}</span>
+                                              )}
                                               <button
                                                 onClick={async () => {
                                                   await InventoryAPI.deleteProductUnit(organizationSlug, unit.id);
                                                   setAllProductUnits(allProductUnits.filter(u => u.id !== unit.id));
                                                 }}
-                                                className="text-red-500 hover:text-red-700"
+                                                className="text-red-500 hover:text-red-700 ml-auto"
                                               >
                                                 <X className="w-3 h-3" />
                                               </button>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                    <div className="flex items-center space-x-2">
-                                      <input
-                                        type="text"
-                                        value={newProductUnit[product.id]?.unit_name || ''}
-                                        onChange={(e) => setNewProductUnit({
-                                          ...newProductUnit,
-                                          [product.id]: { ...newProductUnit[product.id], unit_name: e.target.value }
-                                        })}
-                                        className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
-                                        placeholder="box"
-                                      />
-                                      <span className="text-gray-400">=</span>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        value={newProductUnit[product.id]?.conversion || ''}
-                                        onChange={(e) => setNewProductUnit({
-                                          ...newProductUnit,
-                                          [product.id]: { ...newProductUnit[product.id], conversion: e.target.value }
-                                        })}
-                                        className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
-                                        placeholder="12"
-                                      />
-                                      <span className="text-sm text-gray-500">{product.base_unit || 'pcs'}</span>
-                                      <button
-                                        onClick={async () => {
-                                          const unitData = newProductUnit[product.id];
-                                          if (!unitData?.unit_name || !unitData?.conversion) return;
-                                          try {
-                                            const res = await InventoryAPI.createProductUnit(organizationSlug, {
-                                              product_id: product.id,
-                                              unit_name: unitData.unit_name,
-                                              conversion_to_base: parseFloat(unitData.conversion),
-                                              is_base_unit: false
-                                            });
-                                            if (res.code === 0) {
-                                              setAllProductUnits([...allProductUnits, res.data]);
-                                              setNewProductUnit({ ...newProductUnit, [product.id]: { unit_name: '', conversion: '' } });
-                                            }
-                                          } catch (err) {
-                                            setError(err.message);
-                                          }
-                                        }}
-                                        className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700"
-                                      >
-                                        Add
-                                      </button>
-                                    </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
+                                    {(() => {
+                                      const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+
+                                      return (
+                                        <div className="flex items-center space-x-2 flex-wrap gap-2">
+                                          <input
+                                            type="text"
+                                            value={newProductUnit[product.id]?.unit_name || ''}
+                                            onChange={(e) => setNewProductUnit({
+                                              ...newProductUnit,
+                                              [product.id]: { ...newProductUnit[product.id], unit_name: e.target.value }
+                                            })}
+                                            className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
+                                            placeholder="box"
+                                          />
+                                          <span className="text-gray-400">=</span>
+                                          <input
+                                            type="number"
+                                            min="1"
+                                            value={newProductUnit[product.id]?.conversion || ''}
+                                            onChange={(e) => setNewProductUnit({
+                                              ...newProductUnit,
+                                              [product.id]: { ...newProductUnit[product.id], conversion: e.target.value }
+                                            })}
+                                            className="w-16 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
+                                            placeholder="12"
+                                          />
+                                          <span className="text-sm text-gray-500">{product.base_unit || 'pcs'}</span>
+                                          <span className="text-gray-400">|</span>
+                                          {isSelling ? (
+                                            <>
+                                              <span className="text-xs text-gray-600">Sell RM:</span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={newProductUnit[product.id]?.selling_price || ''}
+                                                onChange={(e) => setNewProductUnit({
+                                                  ...newProductUnit,
+                                                  [product.id]: { ...newProductUnit[product.id], selling_price: e.target.value }
+                                                })}
+                                                className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
+                                                placeholder="110.00"
+                                              />
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span className="text-xs text-gray-600">Cost RM:</span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={newProductUnit[product.id]?.buying_price || ''}
+                                                onChange={(e) => setNewProductUnit({
+                                                  ...newProductUnit,
+                                                  [product.id]: { ...newProductUnit[product.id], buying_price: e.target.value }
+                                                })}
+                                                className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
+                                                placeholder="55.00"
+                                              />
+                                            </>
+                                          )}
+                                          <button
+                                            onClick={async () => {
+                                              const unitData = newProductUnit[product.id];
+                                              if (!unitData?.unit_name || !unitData?.conversion) return;
+                                              try {
+                                                const res = await InventoryAPI.createProductUnit(organizationSlug, {
+                                                  product_id: product.id,
+                                                  unit_name: unitData.unit_name,
+                                                  conversion_to_base: parseFloat(unitData.conversion),
+                                                  buying_price: unitData.buying_price ? parseFloat(unitData.buying_price) : null,
+                                                  selling_price: unitData.selling_price ? parseFloat(unitData.selling_price) : null,
+                                                  is_base_unit: false
+                                                });
+                                                if (res.code === 0) {
+                                                  setAllProductUnits([...allProductUnits, res.data]);
+                                                  setNewProductUnit({ ...newProductUnit, [product.id]: { unit_name: '', conversion: '', buying_price: '', selling_price: '' } });
+                                                }
+                                              } catch (err) {
+                                                setError(err.message);
+                                              }
+                                            }}
+                                            className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 whitespace-nowrap"
+                                          >
+                                            Add Unit
+                                          </button>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               </td>
@@ -439,7 +669,7 @@ export default function ProductsTab({
                         </React.Fragment>
                       );
                     })}
-                    <tr><td colSpan="5" className="p-0"><Pagination currentPage={productPage} totalItems={filteredProducts.length} onPageChange={setProductPage} itemsPerPage={ITEMS_PER_PAGE} /></td></tr>
+                    <tr><td colSpan="7" className="p-0"><Pagination currentPage={productPage} totalItems={filteredProducts.length} onPageChange={setProductPage} itemsPerPage={ITEMS_PER_PAGE} /></td></tr>
                   </>
                 );
               })()}

@@ -23,6 +23,7 @@ export default function FilterPanel({
   currentTab = 'overview'
 }) {
   const [expandedSections, setExpandedSections] = useState({
+    itemType: true,
     category: true,
     location: true,
     supplier: true,
@@ -101,6 +102,7 @@ export default function FilterPanel({
       doOrderDateFrom: '',
       doOrderDateTo: '',
       states: [],
+      itemType: 'selling',
     });
     // Clear search inputs
     setCategorySearch('');
@@ -216,6 +218,47 @@ export default function FilterPanel({
 
         {/* Filter Sections */}
         <div className="flex-1 overflow-y-auto">
+          {/* Item Type Filter - Only for products tab */}
+          {currentTab === 'products' && (
+            <div className="border-b border-gray-200">
+              <button
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                onClick={() => toggleSection('itemType')}
+              >
+                <span className="text-sm font-medium text-gray-900">Item Type</span>
+                {expandedSections.itemType ? (
+                  <ChevronDown size={16} className="text-gray-500" />
+                ) : (
+                  <ChevronRight size={16} className="text-gray-500" />
+                )}
+              </button>
+              {expandedSections.itemType && (
+                <div className="px-4 pb-3 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="itemType"
+                      checked={filters.itemType === 'selling'}
+                      onChange={() => onFiltersChange({ ...filters, itemType: 'selling' })}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-700">Selling Items</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="itemType"
+                      checked={filters.itemType === 'spare'}
+                      onChange={() => onFiltersChange({ ...filters, itemType: 'spare' })}
+                      className="w-4 h-4 text-gray-600 border-gray-300 focus:ring-2 focus:ring-gray-500"
+                    />
+                    <span className="text-sm text-gray-700">Non-Selling</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Category Filter - Only for overview and products tabs */}
           {categories.length > 0 && (currentTab === 'overview' || currentTab === 'products') && (
             <div className="border-b border-gray-200">
