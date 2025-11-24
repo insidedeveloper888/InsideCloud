@@ -1,5 +1,5 @@
-import React from 'react';
-import { Package, Plus, Minus, Search, Filter } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, Plus, Minus, Search, Filter, X, TrendingUp } from 'lucide-react';
 import { getStatusColor, getStatusLabel } from '../../utils/helpers';
 import Pagination from '../Pagination';
 
@@ -34,20 +34,16 @@ export default function OverviewTab({
   SortIcon,
   allProductUnits
 }) {
-  // Calculate total stock value based on buying prices
+  const [showValueBreakdown, setShowValueBreakdown] = useState(false);
+  // Calculate total stock value based on weighted average cost
   const calculateStockValue = () => {
     let totalValue = 0;
 
     items.forEach(item => {
       if (!item.quantity || item.quantity <= 0) return;
 
-      // Find the base unit for this product
-      const baseUnit = allProductUnits?.find(u =>
-        u.product_id === item.product_id && u.is_base_unit
-      );
-
-      // Use buying_price from base unit, or fall back to average_cost
-      const pricePerUnit = baseUnit?.buying_price || item.average_cost || 0;
+      // Use average_cost (weighted average) which is updated with each stock in transaction
+      const pricePerUnit = item.average_cost || 0;
       totalValue += item.quantity * pricePerUnit;
     });
 
@@ -58,15 +54,21 @@ export default function OverviewTab({
 
   return (
     <div className="space-y-6">
-      {/* Stock Value Card - Full Width */}
-      <div className="group relative bg-gradient-to-br from-purple-600 to-indigo-600 border border-purple-200/60 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
+      {/* Stock Value Card - Full Width - Clickable */}
+      <button
+        onClick={() => setShowValueBreakdown(true)}
+        className="w-full group relative bg-gradient-to-br from-purple-600 to-indigo-600 border border-purple-200/60 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-1 cursor-pointer text-left"
+      >
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[4rem] opacity-50"></div>
         <div className="relative">
-          <div className="text-xs font-bold text-purple-100 mb-2 uppercase tracking-wider">Total Stock Value</div>
+          <div className="text-xs font-bold text-purple-100 mb-2 uppercase tracking-wider flex items-center justify-between">
+            <span>Total Stock Value</span>
+            <TrendingUp className="w-5 h-5 text-purple-200 group-hover:scale-110 transition-transform" />
+          </div>
           <div className="text-5xl font-bold text-white mb-2">RM {stockValue}</div>
-          <div className="text-sm text-purple-100 font-medium">Based on buying prices (cost basis)</div>
+          <div className="text-sm text-purple-100 font-medium">Based on buying prices (cost basis) • Click to view breakdown</div>
         </div>
-      </div>
+      </button>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -204,8 +206,7 @@ export default function OverviewTab({
             filteredItems.slice((stockPage - 1) * ITEMS_PER_PAGE, stockPage * ITEMS_PER_PAGE).map((item) => (
               <div
                 key={item.id}
-                onClick={() => !item.isVirtual && handleItemClick(item)}
-                className={`bg-white border border-gray-200 rounded-xl p-4 shadow-sm ${!item.isVirtual ? 'cursor-pointer active:bg-gray-50' : ''}`}
+                className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
@@ -218,6 +219,16 @@ export default function OverviewTab({
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                   <div>
+                    <span className="text-gray-500">SKU:</span>
+                    <span className="ml-1 text-gray-900 font-semibold">{item.product?.sku}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Status:</span>
+                    <span className={`ml-1 text-xs font-bold ${getStatusColor(item.stock_status).includes('green') ? 'text-green-600' : getStatusColor(item.stock_status).includes('yellow') ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {getStatusLabel(item.stock_status)}
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-gray-500">Category:</span>
                     <span className="ml-1 text-gray-900">{item.product?.category || '-'}</span>
                   </div>
@@ -226,18 +237,17 @@ export default function OverviewTab({
                     <span className="ml-1 text-gray-900">{item.location?.name || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Qty:</span>
+                    <span className="text-gray-500">Quantity:</span>
                     <span className="ml-1 font-semibold text-gray-900">{item.quantity} {item.product?.base_unit || item.product?.unit}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Avail:</span>
-                    <span className={`ml-1 font-semibold ${item.isVirtual ? 'text-purple-600' : 'text-emerald-600'}`}>{item.available_quantity}</span>
+                    <span className="text-gray-500">Available:</span>
+                    <span className={`ml-1 font-semibold ${item.isVirtual ? 'text-purple-600' : 'text-emerald-600'}`}>{item.available_quantity} {item.product?.base_unit || item.product?.unit}</span>
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2 pt-2 border-t border-gray-100">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setSelectedStockItem(item);
                       setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '' });
                       setShowStockInModal(true);
@@ -248,8 +258,7 @@ export default function OverviewTab({
                   </button>
                   {!item.isVirtual && (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         setSelectedStockItem(item);
                         setStockOutData({ quantity: 1, notes: '' });
                         setShowStockOutModal(true);
@@ -300,7 +309,7 @@ export default function OverviewTab({
             <tbody className="bg-white divide-y divide-gray-100">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-16 text-center">
+                  <td colSpan="9" className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center space-y-3">
                       <div className="p-4 bg-gray-100 rounded-full">
                         <Package className="w-8 h-8 text-gray-400" />
@@ -315,11 +324,10 @@ export default function OverviewTab({
                 filteredItems.slice((stockPage - 1) * ITEMS_PER_PAGE, stockPage * ITEMS_PER_PAGE).map((item) => (
                   <tr
                     key={item.id}
-                    onClick={() => !item.isVirtual && handleItemClick(item)}
                     className={`hover:bg-gradient-to-r transition-colors duration-150 group ${
                       item.isVirtual
-                        ? 'hover:from-purple-50/40 hover:to-indigo-50/40 cursor-default'
-                        : 'hover:from-red-50/40 hover:to-orange-50/40 cursor-pointer'
+                        ? 'hover:from-purple-50/40 hover:to-indigo-50/40'
+                        : 'hover:from-gray-50/40 hover:to-gray-50/40'
                     }`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
@@ -340,13 +348,14 @@ export default function OverviewTab({
                         <span className="text-gray-400 font-normal text-xs ml-1">({(item.quantity / item.product.unit_conversion_factor).toFixed(1)} {item.product.unit})</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right flex items-center justify-end space-x-2">
-                      <span className={item.isVirtual ? 'text-purple-600' : 'text-emerald-600'}>{item.available_quantity}</span>
-                      <span className="text-gray-400 font-normal">{item.product?.base_unit || item.product?.unit}</span>
-                      {item.product?.unit !== item.product?.base_unit && item.product?.unit_conversion_factor > 1 && (
-                        <span className="text-gray-400 font-normal text-xs">({(item.available_quantity / item.product.unit_conversion_factor).toFixed(1)} {item.product.unit})</span>
-                      )}
-                      {!item.isVirtual && <Minus className="w-4 h-4 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <span className={item.isVirtual ? 'text-purple-600' : 'text-emerald-600'}>{item.available_quantity}</span>
+                        <span className="text-gray-400 font-normal">{item.product?.base_unit || item.product?.unit}</span>
+                        {item.product?.unit !== item.product?.base_unit && item.product?.unit_conversion_factor > 1 && (
+                          <span className="text-gray-400 font-normal text-xs">({(item.available_quantity / item.product.unit_conversion_factor).toFixed(1)} {item.product.unit})</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span
@@ -362,8 +371,7 @@ export default function OverviewTab({
                       <div className="flex items-center justify-center space-x-2">
                         {/* Stock In Button */}
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             setSelectedStockItem(item);
                             setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '' });
                             setShowStockInModal(true);
@@ -376,8 +384,7 @@ export default function OverviewTab({
                         {/* Stock Out Button - Only show if there's actual stock */}
                         {!item.isVirtual && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
                               setSelectedStockItem(item);
                               setStockOutData({ quantity: 1, notes: '' });
                               setShowStockOutModal(true);
@@ -398,6 +405,93 @@ export default function OverviewTab({
           <Pagination currentPage={stockPage} totalItems={filteredItems.length} onPageChange={setStockPage} itemsPerPage={ITEMS_PER_PAGE} />
         </div>
       </div>
+
+      {/* Stock Value Breakdown Modal */}
+      {showValueBreakdown && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowValueBreakdown(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Stock Value Breakdown</h2>
+                <p className="text-sm text-purple-100 mt-1">Detailed calculation of total stock value</p>
+              </div>
+              <button
+                onClick={() => setShowValueBreakdown(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="overflow-y-auto max-h-[calc(80vh-140px)]">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Product</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Location</th>
+                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Quantity</th>
+                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Average Unit Price</th>
+                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Total Value</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {items
+                    .filter(item => item.quantity > 0)
+                    .map((item) => {
+                      // Use average_cost (weighted average) from stock item, which is updated with each transaction
+                      const pricePerUnit = item.average_cost || 0;
+                      const totalValue = item.quantity * pricePerUnit;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm">
+                            <div className="font-medium text-gray-900">{item.product?.name}</div>
+                            <div className="text-xs text-gray-500">{item.product?.sku}</div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {item.location?.name || '-'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
+                            {item.quantity} <span className="text-gray-400 font-normal">{item.product?.base_unit || item.product?.unit}</span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right text-gray-600">
+                            RM {pricePerUnit.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
+                            RM {totalValue.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  {items.filter(item => item.quantity > 0).length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                        No stock items with value
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer - Total */}
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-t-2 border-purple-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total items with stock</p>
+                  <p className="text-xs text-gray-500">{items.filter(item => item.quantity > 0).length} items</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600 font-medium">Total Stock Value</p>
+                  <p className="text-3xl font-bold text-purple-600">RM {stockValue}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

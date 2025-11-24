@@ -102,7 +102,7 @@ export default function FilterPanel({
       doOrderDateFrom: '',
       doOrderDateTo: '',
       states: [],
-      itemType: 'selling',
+      itemType: null,
     });
     // Clear search inputs
     setCategorySearch('');
@@ -136,7 +136,8 @@ export default function FilterPanel({
     filters.createdBy?.length > 0 ||
     filters.doOrderDateFrom ||
     filters.doOrderDateTo ||
-    filters.states?.length > 0;
+    filters.states?.length > 0 ||
+    filters.itemType != null;
 
   // Filter options based on search
   const filteredCategories = categories.filter(cat =>
@@ -236,21 +237,31 @@ export default function FilterPanel({
                 <div className="px-4 pb-3 space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="radio"
-                      name="itemType"
+                      type="checkbox"
                       checked={filters.itemType === 'selling'}
-                      onChange={() => onFiltersChange({ ...filters, itemType: 'selling' })}
-                      className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onFiltersChange({ ...filters, itemType: 'selling' });
+                        } else if (filters.itemType === 'selling') {
+                          onFiltersChange({ ...filters, itemType: null });
+                        }
+                      }}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-2 focus:ring-emerald-500"
                     />
                     <span className="text-sm text-gray-700">Selling Items</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="radio"
-                      name="itemType"
+                      type="checkbox"
                       checked={filters.itemType === 'spare'}
-                      onChange={() => onFiltersChange({ ...filters, itemType: 'spare' })}
-                      className="w-4 h-4 text-gray-600 border-gray-300 focus:ring-2 focus:ring-gray-500"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onFiltersChange({ ...filters, itemType: 'spare' });
+                        } else if (filters.itemType === 'spare') {
+                          onFiltersChange({ ...filters, itemType: null });
+                        }
+                      }}
+                      className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-500"
                     />
                     <span className="text-sm text-gray-700">Non-Selling</span>
                   </label>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Search, Settings, ChevronDown, Trash2, X, Filter } from 'lucide-react';
+import { Package, Search, Settings, ChevronDown, Trash2, X, Filter, Plus, Info } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import Pagination from '../Pagination';
 import { InventoryAPI } from '../../api/inventory';
@@ -41,6 +41,8 @@ export default function ProductsTab({
   setAllProductUnits,
   newProductUnit,
   setNewProductUnit,
+  showAddUnitForm,
+  setShowAddUnitForm,
   setError,
   organizationSlug
 }) {
@@ -288,9 +290,12 @@ export default function ProductsTab({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                               {baseUnit?.selling_price ? (
-                                <span className="font-semibold text-emerald-600">
-                                  RM {parseFloat(baseUnit.selling_price).toFixed(2)}
-                                </span>
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-emerald-600">
+                                    RM {parseFloat(baseUnit.selling_price).toFixed(2)}
+                                  </span>
+                                  <span className="text-xs text-gray-500">per {product.base_unit || product.unit || 'pcs'}</span>
+                                </div>
                               ) : (
                                 <span className="text-gray-400 text-xs">-</span>
                               )}
@@ -335,7 +340,15 @@ export default function ProductsTab({
                                   {/* Base Unit & Threshold */}
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div>
-                                      <label className="block text-xs font-semibold text-gray-600 mb-1">Base Unit</label>
+                                      <div className="flex items-center gap-1 mb-1">
+                                        <label className="block text-xs font-semibold text-gray-600">Base Unit</label>
+                                        <div className="group relative">
+                                          <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+                                            The smallest unit you track in inventory (e.g., pcs, kg, L). All other units will convert to this base unit.
+                                          </div>
+                                        </div>
+                                      </div>
                                       <SearchableSelect
                                         value={productThresholds[`${product.id}_base_unit`] ?? product.base_unit ?? 'pcs'}
                                         onChange={(val) => setProductThresholds({
@@ -354,7 +367,15 @@ export default function ProductsTab({
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-semibold text-gray-600 mb-1">Low Stock Threshold</label>
+                                      <div className="flex items-center gap-1 mb-1">
+                                        <label className="block text-xs font-semibold text-gray-600">Low Stock Threshold</label>
+                                        <div className="group relative">
+                                          <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+                                            Get notified when available quantity falls below this number. Leave empty for no alerts.
+                                          </div>
+                                        </div>
+                                      </div>
                                       <input
                                         type="number"
                                         min="0"
@@ -386,12 +407,17 @@ export default function ProductsTab({
                                             const baseUnitSell = productThresholds[`${product.id}_base_sell`];
 
                                             if (baseUnitBuy !== undefined || baseUnitSell !== undefined) {
+                                              // Search for existing base unit - check by product_id AND unit_name match
                                               const existingBaseUnit = allProductUnits?.find(u =>
-                                                u.product_id === product.id && u.is_base_unit
+                                                u.product_id === product.id &&
+                                                u.unit_name === updates.base_unit &&
+                                                u.is_base_unit
                                               );
 
+                                              console.log('Looking for existing base unit:', { product_id: product.id, unit_name: updates.base_unit });
+                                              console.log('Found existing base unit:', existingBaseUnit);
+
                                               const baseUnitData = {
-                                                product_id: product.id,
                                                 unit_name: updates.base_unit,
                                                 conversion_to_base: 1,
                                                 is_base_unit: true,
@@ -401,17 +427,44 @@ export default function ProductsTab({
 
                                               if (existingBaseUnit) {
                                                 // Update existing base unit
+                                                console.log('Updating existing base unit:', existingBaseUnit.id, baseUnitData);
                                                 const result = await InventoryAPI.updateProductUnit(organizationSlug, existingBaseUnit.id, baseUnitData);
                                                 if (result.code === 0) {
                                                   setAllProductUnits(allProductUnits.map(u =>
                                                     u.id === existingBaseUnit.id ? { ...u, ...baseUnitData } : u
                                                   ));
+                                                } else {
+                                                  console.error('Failed to update base unit:', result);
+                                                  setError('Failed to update base unit pricing');
                                                 }
                                               } else {
                                                 // Create new base unit
-                                                const res = await InventoryAPI.createProductUnit(organizationSlug, baseUnitData);
+                                                console.log('Creating new base unit:', { product_id: product.id, ...baseUnitData });
+                                                const res = await InventoryAPI.createProductUnit(organizationSlug, { product_id: product.id, ...baseUnitData });
                                                 if (res.code === 0) {
                                                   setAllProductUnits([...allProductUnits, res.data]);
+                                                } else {
+                                                  console.error('Failed to create base unit:', res);
+                                                  setError('Failed to create base unit pricing');
+                                                }
+                                              }
+                                            }
+
+                                            // Handle non-base unit custom selling prices
+                                            const nonBaseUnits = allProductUnits.filter(u => u.product_id === product.id && !u.is_base_unit);
+                                            for (const unit of nonBaseUnits) {
+                                              const customPrice = productThresholds[`${unit.id}_unit_sell`];
+                                              if (customPrice !== undefined) {
+                                                const unitData = {
+                                                  selling_price: customPrice === '' ? null : parseFloat(customPrice)
+                                                };
+                                                const result = await InventoryAPI.updateProductUnit(organizationSlug, unit.id, unitData);
+                                                if (result.code === 0) {
+                                                  setAllProductUnits(allProductUnits.map(u =>
+                                                    u.id === unit.id ? { ...u, ...unitData } : u
+                                                  ));
+                                                } else {
+                                                  console.error('Failed to update unit selling price:', result);
                                                 }
                                               }
                                             }
@@ -422,6 +475,10 @@ export default function ProductsTab({
                                             delete newThresholds[`${product.id}_is_selling`];
                                             delete newThresholds[`${product.id}_base_buy`];
                                             delete newThresholds[`${product.id}_base_sell`];
+                                            // Delete all unit-specific selling prices for this product
+                                            nonBaseUnits.forEach(unit => {
+                                              delete newThresholds[`${unit.id}_unit_sell`];
+                                            });
                                             setProductThresholds(newThresholds);
                                           } catch (err) {
                                             setError('Failed to save');
@@ -432,14 +489,14 @@ export default function ProductsTab({
                                         disabled={thresholdsSaving}
                                         className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
                                       >
-                                        {thresholdsSaving ? 'Saving...' : 'Save Settings'}
+                                        {thresholdsSaving ? 'Saving...' : 'Save All'}
                                       </button>
                                     </div>
                                   </div>
 
                                   {/* Is Selling Toggle */}
                                   <div className="border-t border-gray-200 pt-4">
-                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                    <label className="flex items-center space-x-2 cursor-pointer group">
                                       <input
                                         type="checkbox"
                                         checked={productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true}
@@ -450,6 +507,12 @@ export default function ProductsTab({
                                         className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                                       />
                                       <span className="text-sm font-semibold text-gray-700">This is a selling item (vs. non-selling item/accessory)</span>
+                                      <div className="relative">
+                                        <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+                                          Check this if you sell this item to customers. Uncheck for internal use items, spare parts, or accessories that aren't sold separately.
+                                        </div>
+                                      </div>
                                     </label>
                                   </div>
 
@@ -460,58 +523,14 @@ export default function ProductsTab({
 
                                     return (
                                       <div className="border-t border-gray-200 pt-4">
-                                        <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2 mb-2">
                                           <h5 className="text-sm font-semibold text-gray-700">Base Unit ({product.base_unit || 'pcs'}) Pricing</h5>
-                                          <button
-                                            onClick={async () => {
-                                              setThresholdsSaving(true);
-                                              try {
-                                                const baseUnitSell = productThresholds[`${product.id}_base_sell`];
-
-                                                if (baseUnitSell !== undefined) {
-                                                  const existingBaseUnit = allProductUnits?.find(u =>
-                                                    u.product_id === product.id && u.is_base_unit
-                                                  );
-
-                                                  const baseUnitData = {
-                                                    product_id: product.id,
-                                                    unit_name: product.base_unit || 'pcs',
-                                                    conversion_to_base: 1,
-                                                    is_base_unit: true,
-                                                    buying_price: existingBaseUnit?.buying_price || null,
-                                                    selling_price: baseUnitSell === '' ? null : parseFloat(baseUnitSell)
-                                                  };
-
-                                                  if (existingBaseUnit) {
-                                                    const result = await InventoryAPI.updateProductUnit(organizationSlug, existingBaseUnit.id, baseUnitData);
-                                                    if (result.code === 0) {
-                                                      setAllProductUnits(allProductUnits.map(u =>
-                                                        u.id === existingBaseUnit.id ? { ...u, ...baseUnitData } : u
-                                                      ));
-                                                    }
-                                                  } else {
-                                                    const res = await InventoryAPI.createProductUnit(organizationSlug, baseUnitData);
-                                                    if (res.code === 0) {
-                                                      setAllProductUnits([...allProductUnits, res.data]);
-                                                    }
-                                                  }
-
-                                                  const newThresholds = { ...productThresholds };
-                                                  delete newThresholds[`${product.id}_base_sell`];
-                                                  setProductThresholds(newThresholds);
-                                                }
-                                              } catch (err) {
-                                                console.error('Save pricing error:', err);
-                                                setError('Failed to save pricing');
-                                              } finally {
-                                                setThresholdsSaving(false);
-                                              }
-                                            }}
-                                            disabled={thresholdsSaving}
-                                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
-                                          >
-                                            {thresholdsSaving ? 'Saving...' : 'Save Price'}
-                                          </button>
+                                          <div className="group relative">
+                                            <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                                            <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+                                              Set the selling price for one base unit. Prices for other units (box, carton, etc.) will be calculated automatically based on conversion factors.
+                                            </div>
+                                          </div>
                                         </div>
                                         {(() => {
                                           const baseUnit = productUnits.find(u => u.product_id === product.id && u.is_base_unit);
@@ -541,123 +560,228 @@ export default function ProductsTab({
 
                                   {/* Unit Conversions with Pricing */}
                                   <div className="border-t border-gray-200 pt-4">
-                                    <h5 className="text-sm font-semibold text-gray-700 mb-2">Additional Unit Conversions & Pricing</h5>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <h5 className="text-sm font-semibold text-gray-700">Additional Unit Conversions & Pricing</h5>
+                                      <div className="group relative">
+                                        <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-80 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+                                          Define how larger units relate to your base unit. Example: "1 box = 12 pcs". Selling prices are auto-calculated from your base unit price, or you can override with a custom discount price (e.g., RM 580 per box instead of RM 600).
+                                        </div>
+                                      </div>
+                                    </div>
                                     {(() => {
-                                      const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
                                       const nonBaseUnits = productUnits.filter(u => !u.is_base_unit);
 
                                       return nonBaseUnits.length > 0 && (
                                         <div className="space-y-2 mb-3">
-                                          {nonBaseUnits.map((unit) => (
-                                            <div key={unit.id} className="flex items-center space-x-3 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm">
-                                              <span className="text-gray-900 flex-shrink-0">1 {unit.unit_name} = {unit.conversion_to_base} {product.base_unit || 'pcs'}</span>
-                                              <span className="text-gray-400">|</span>
-                                              {isSelling ? (
-                                                <span className="text-emerald-600 font-medium">Sell: RM {unit.selling_price || '-'}</span>
-                                              ) : (
-                                                <span className="text-blue-600 font-medium">Cost: RM {unit.buying_price || '-'}</span>
-                                              )}
-                                              <button
-                                                onClick={async () => {
-                                                  await InventoryAPI.deleteProductUnit(organizationSlug, unit.id);
-                                                  setAllProductUnits(allProductUnits.filter(u => u.id !== unit.id));
-                                                }}
-                                                className="text-red-500 hover:text-red-700 ml-auto"
-                                              >
-                                                <X className="w-3 h-3" />
-                                              </button>
-                                            </div>
-                                          ))}
+                                          {nonBaseUnits.map((unit) => {
+                                            const baseUnit = productUnits.find(u => u.product_id === product.id && u.is_base_unit);
+                                            const baseSellingPrice = productThresholds[`${product.id}_base_sell`] ?? baseUnit?.selling_price ?? 0;
+                                            const calculatedPrice = baseSellingPrice * unit.conversion_to_base;
+                                            const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+                                            const currentSellingPrice = productThresholds[`${unit.id}_unit_sell`] ?? unit.selling_price;
+
+                                            return (
+                                              <div key={unit.id} className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm space-y-2">
+                                                <div className="flex items-center space-x-3">
+                                                  <span className="text-gray-900 flex-shrink-0">1 {unit.unit_name} = {unit.conversion_to_base} {product.base_unit || 'pcs'}</span>
+                                                  <button
+                                                    onClick={async () => {
+                                                      await InventoryAPI.deleteProductUnit(organizationSlug, unit.id);
+                                                      setAllProductUnits(allProductUnits.filter(u => u.id !== unit.id));
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 ml-auto"
+                                                  >
+                                                    <X className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                                {isSelling && baseSellingPrice > 0 && (
+                                                  <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-2 rounded-lg">
+                                                    <span className="text-xs text-gray-600 flex-shrink-0">Selling Price:</span>
+                                                    <input
+                                                      type="number"
+                                                      min="0"
+                                                      step="0.01"
+                                                      value={currentSellingPrice ?? ''}
+                                                      onChange={(e) => setProductThresholds({
+                                                        ...productThresholds,
+                                                        [`${unit.id}_unit_sell`]: e.target.value
+                                                      })}
+                                                      className="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-gray-900 bg-white font-semibold"
+                                                      placeholder={calculatedPrice.toFixed(2)}
+                                                    />
+                                                    <span className="text-xs text-gray-600">RM / {unit.unit_name}</span>
+                                                    {!currentSellingPrice && (
+                                                      <span className="text-xs text-emerald-600 italic">
+                                                        (auto: RM {calculatedPrice.toFixed(2)})
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
                                         </div>
                                       );
                                     })()}
                                     {(() => {
-                                      const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+                                      const isFormVisible = showAddUnitForm[product.id] || false;
 
                                       return (
-                                        <div className="flex items-center space-x-2 flex-wrap gap-2">
-                                          <input
-                                            type="text"
-                                            value={newProductUnit[product.id]?.unit_name || ''}
-                                            onChange={(e) => setNewProductUnit({
-                                              ...newProductUnit,
-                                              [product.id]: { ...newProductUnit[product.id], unit_name: e.target.value }
-                                            })}
-                                            className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
-                                            placeholder="box"
-                                          />
-                                          <span className="text-gray-400">=</span>
-                                          <input
-                                            type="number"
-                                            min="1"
-                                            value={newProductUnit[product.id]?.conversion || ''}
-                                            onChange={(e) => setNewProductUnit({
-                                              ...newProductUnit,
-                                              [product.id]: { ...newProductUnit[product.id], conversion: e.target.value }
-                                            })}
-                                            className="w-16 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
-                                            placeholder="12"
-                                          />
-                                          <span className="text-sm text-gray-500">{product.base_unit || 'pcs'}</span>
-                                          <span className="text-gray-400">|</span>
-                                          {isSelling ? (
-                                            <>
-                                              <span className="text-xs text-gray-600">Sell RM:</span>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={newProductUnit[product.id]?.selling_price || ''}
-                                                onChange={(e) => setNewProductUnit({
-                                                  ...newProductUnit,
-                                                  [product.id]: { ...newProductUnit[product.id], selling_price: e.target.value }
-                                                })}
-                                                className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
-                                                placeholder="110.00"
-                                              />
-                                            </>
-                                          ) : (
-                                            <>
-                                              <span className="text-xs text-gray-600">Cost RM:</span>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={newProductUnit[product.id]?.buying_price || ''}
-                                                onChange={(e) => setNewProductUnit({
-                                                  ...newProductUnit,
-                                                  [product.id]: { ...newProductUnit[product.id], buying_price: e.target.value }
-                                                })}
-                                                className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
-                                                placeholder="55.00"
-                                              />
-                                            </>
+                                        <div className="space-y-3">
+                                          {/* Add New Unit Button (collapsed state) */}
+                                          {!isFormVisible && (
+                                            <button
+                                              onClick={() => setShowAddUnitForm({ ...showAddUnitForm, [product.id]: true })}
+                                              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg border-2 border-dashed border-emerald-300 hover:border-emerald-400 transition-all w-full justify-center"
+                                            >
+                                              <Plus className="w-4 h-4" />
+                                              <span>Add New Unit Conversion</span>
+                                            </button>
                                           )}
-                                          <button
-                                            onClick={async () => {
-                                              const unitData = newProductUnit[product.id];
-                                              if (!unitData?.unit_name || !unitData?.conversion) return;
-                                              try {
-                                                const res = await InventoryAPI.createProductUnit(organizationSlug, {
-                                                  product_id: product.id,
-                                                  unit_name: unitData.unit_name,
-                                                  conversion_to_base: parseFloat(unitData.conversion),
-                                                  buying_price: unitData.buying_price ? parseFloat(unitData.buying_price) : null,
-                                                  selling_price: unitData.selling_price ? parseFloat(unitData.selling_price) : null,
-                                                  is_base_unit: false
-                                                });
-                                                if (res.code === 0) {
-                                                  setAllProductUnits([...allProductUnits, res.data]);
-                                                  setNewProductUnit({ ...newProductUnit, [product.id]: { unit_name: '', conversion: '', buying_price: '', selling_price: '' } });
-                                                }
-                                              } catch (err) {
-                                                setError(err.message);
-                                              }
-                                            }}
-                                            className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 whitespace-nowrap"
-                                          >
-                                            Add Unit
-                                          </button>
+
+                                          {/* Add New Unit Form (expanded state) */}
+                                          {isFormVisible && (
+                                            <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-lg space-y-3">
+                                              <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-semibold text-gray-700">New Unit Conversion</span>
+                                                <button
+                                                  onClick={() => {
+                                                    setShowAddUnitForm({ ...showAddUnitForm, [product.id]: false });
+                                                    setNewProductUnit({ ...newProductUnit, [product.id]: { unit_name: '', conversion: '', buying_price: '', selling_price: '' } });
+                                                  }}
+                                                  className="text-gray-400 hover:text-gray-600"
+                                                >
+                                                  <X className="w-4 h-4" />
+                                                </button>
+                                              </div>
+
+                                              <div className="flex items-center space-x-2 flex-wrap gap-2">
+                                                <div className="flex flex-col">
+                                                  <label className="text-xs text-gray-600 mb-1">Unit Name</label>
+                                                  <SearchableSelect
+                                                    value={newProductUnit[product.id]?.unit_name || ''}
+                                                    onChange={(value) => setNewProductUnit({
+                                                      ...newProductUnit,
+                                                      [product.id]: { ...newProductUnit[product.id], unit_name: value }
+                                                    })}
+                                                    options={(() => {
+                                                      // Get unique unit names from all product units
+                                                      const uniqueUnits = [...new Set(allProductUnits.map(u => u.unit_name))];
+                                                      return uniqueUnits.map(unit => ({ value: unit, label: unit }));
+                                                    })()}
+                                                    placeholder="Select or type..."
+                                                    className="w-36"
+                                                    allowAddNew={true}
+                                                    onAddNew={(newValue) => {
+                                                      setNewProductUnit({
+                                                        ...newProductUnit,
+                                                        [product.id]: { ...newProductUnit[product.id], unit_name: newValue }
+                                                      });
+                                                    }}
+                                                    addNewLabel="+ Add New Unit..."
+                                                  />
+                                                </div>
+                                                <span className="text-gray-400 mt-6">=</span>
+                                                <div className="flex flex-col">
+                                                  <label className="text-xs text-gray-600 mb-1">Quantity</label>
+                                                  <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={newProductUnit[product.id]?.conversion || ''}
+                                                    onChange={(e) => setNewProductUnit({
+                                                      ...newProductUnit,
+                                                      [product.id]: { ...newProductUnit[product.id], conversion: e.target.value }
+                                                    })}
+                                                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                    placeholder="12"
+                                                  />
+                                                </div>
+                                                <span className="text-sm text-gray-500 mt-6">{product.base_unit || 'pcs'}</span>
+                                              </div>
+
+                                              <div className="flex items-center space-x-2 pt-2">
+                                                <button
+                                                  onClick={async () => {
+                                                    const unitData = newProductUnit[product.id];
+
+                                                    // Validation with user feedback
+                                                    if (!unitData?.unit_name?.trim()) {
+                                                      alert('Please enter a unit name (e.g., box, carton)');
+                                                      return;
+                                                    }
+                                                    if (!unitData?.conversion || parseFloat(unitData.conversion) <= 0) {
+                                                      alert('Please enter a valid conversion value (e.g., 12)');
+                                                      return;
+                                                    }
+
+                                                    // Check for duplicate unit name for this product
+                                                    const existingUnit = allProductUnits.find(u =>
+                                                      u.product_id === product.id &&
+                                                      u.unit_name.toLowerCase() === unitData.unit_name.trim().toLowerCase()
+                                                    );
+                                                    if (existingUnit) {
+                                                      alert(`Unit "${unitData.unit_name.trim()}" already exists for this product. Please use a different unit name.`);
+                                                      return;
+                                                    }
+
+                                                    try {
+                                                      const res = await InventoryAPI.createProductUnit(organizationSlug, {
+                                                        product_id: product.id,
+                                                        unit_name: unitData.unit_name.trim(),
+                                                        conversion_to_base: parseFloat(unitData.conversion),
+                                                        buying_price: null,
+                                                        selling_price: null,
+                                                        is_base_unit: false
+                                                      });
+                                                      if (res.code === 0) {
+                                                        // Update the product units list with the new unit
+                                                        console.log('Unit created successfully:', res.data);
+                                                        console.log('Selling price in response:', res.data.selling_price);
+                                                        console.log('Buying price in response:', res.data.buying_price);
+
+                                                        // Ensure prices are properly formatted in the data we store
+                                                        const newUnit = {
+                                                          ...res.data,
+                                                          selling_price: res.data.selling_price !== null ? parseFloat(res.data.selling_price) : null,
+                                                          buying_price: res.data.buying_price !== null ? parseFloat(res.data.buying_price) : null
+                                                        };
+                                                        console.log('Formatted unit to store:', newUnit);
+
+                                                        setAllProductUnits([...allProductUnits, newUnit]);
+                                                        // Clear the input form and hide it
+                                                        setNewProductUnit({ ...newProductUnit, [product.id]: { unit_name: '', conversion: '' } });
+                                                        setShowAddUnitForm({ ...showAddUnitForm, [product.id]: false });
+                                                      } else {
+                                                        alert(`Failed to add unit: ${res.msg || 'Unknown error'}`);
+                                                      }
+                                                    } catch (err) {
+                                                      console.error('Error adding unit:', err);
+                                                      // Check if it's a duplicate unit error from backend
+                                                      if (err.message?.includes('already exists') || err.message?.includes('duplicate')) {
+                                                        alert(`Unit "${unitData.unit_name.trim()}" already exists for this product. Please use a different unit name.`);
+                                                      } else {
+                                                        alert(`Error adding unit: ${err.message}`);
+                                                      }
+                                                      setError(err.message);
+                                                    }
+                                                  }}
+                                                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                                                >
+                                                  Add Unit
+                                                </button>
+                                                <button
+                                                  onClick={() => {
+                                                    setShowAddUnitForm({ ...showAddUnitForm, [product.id]: false });
+                                                    setNewProductUnit({ ...newProductUnit, [product.id]: { unit_name: '', conversion: '' } });
+                                                  }}
+                                                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       );
                                     })()}

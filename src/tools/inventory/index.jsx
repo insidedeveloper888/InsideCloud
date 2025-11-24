@@ -270,6 +270,7 @@ export default function InventoryProduct({ onBack }) {
   const [expandedProductId, setExpandedProductId] = useState(null);
   const [allProductUnits, setAllProductUnits] = useState([]);
   const [newProductUnit, setNewProductUnit] = useState({}); // { productId: { unit_name, conversion } }
+  const [showAddUnitForm, setShowAddUnitForm] = useState({}); // { productId: boolean }
 
   // Load locations on mount (needed for Add Product modal and PO)
   useEffect(() => {
@@ -338,6 +339,9 @@ export default function InventoryProduct({ onBack }) {
           }
           if (settingsRes.data.custom_units) {
             setCustomUnits(settingsRes.data.custom_units);
+          }
+          if (settingsRes.data.custom_stock_in_types) {
+            setCustomStockInTypes(settingsRes.data.custom_stock_in_types);
           }
         }
         // Load unit conversions
@@ -456,7 +460,7 @@ export default function InventoryProduct({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationSlug, tab]);
 
-  const fetchData = async (signal, isMounted) => {
+  const fetchData = async (signal, isMounted = true) => {
     try {
       if (tab === 'overview') {
         const results = await Promise.allSettled([
@@ -803,8 +807,41 @@ export default function InventoryProduct({ onBack }) {
         setModalError('SKU is required');
         return;
       }
+
+      // Check for duplicate SKU (only active products)
+      const duplicateSKU = products.find(p =>
+        !p.is_deleted && p.sku?.toLowerCase() === newProduct.sku.trim().toLowerCase()
+      );
+      if (duplicateSKU) {
+        setModalError(`SKU "${newProduct.sku.trim()}" already exists for an active product. Please use a different SKU.`);
+        return;
+      }
+
+      // Check if SKU exists in a soft-deleted product
+      const softDeletedSKU = products.find(p =>
+        p.is_deleted && p.sku?.toLowerCase() === newProduct.sku.trim().toLowerCase()
+      );
+      if (softDeletedSKU) {
+        console.warn(`SKU "${newProduct.sku.trim()}" exists in soft-deleted product. Attempting to reuse...`);
+      }
+
       if (!newProduct.name?.trim()) {
         setModalError('Product name is required');
+        return;
+      }
+
+      // Helper function to normalize product name (remove spaces, symbols, lowercase)
+      const normalizeProductName = (name) => {
+        return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      };
+
+      // Check for duplicate product name (only active products, normalized)
+      const normalizedNewName = normalizeProductName(newProduct.name.trim());
+      const duplicateName = products.find(p =>
+        !p.is_deleted && normalizeProductName(p.name) === normalizedNewName
+      );
+      if (duplicateName) {
+        setModalError(`A product with similar name "${duplicateName.name}" already exists. Product names must be unique (ignoring spaces, symbols, and case).`);
         return;
       }
 
@@ -870,15 +907,32 @@ export default function InventoryProduct({ onBack }) {
       } else {
         // Show error in modal
         const errorMsg = result.msg || 'Failed to create product';
-        if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
-          setModalError('A product with this SKU already exists');
+        console.error('Product creation error:', errorMsg);
+
+        if (errorMsg.includes('duplicate') || errorMsg.includes('already exists') || errorMsg.includes('unique constraint')) {
+          // Check if it's a soft-deleted product
+          const softDeletedProduct = products.find(p =>
+            p.is_deleted && p.sku?.toLowerCase() === newProduct.sku.trim().toLowerCase()
+          );
+
+          if (softDeletedProduct) {
+            setModalError(`SKU "${newProduct.sku.trim()}" exists in a deleted product. The database has a unique constraint on SKU. Please contact your administrator to permanently delete the old product or use a different SKU.`);
+          } else {
+            setModalError(`SKU "${newProduct.sku.trim()}" already exists. Please use a different SKU.`);
+          }
         } else {
           setModalError(errorMsg);
         }
       }
     } catch (err) {
       console.error('Failed to add product:', err);
-      setModalError(err.message || 'Failed to create product');
+      const errorMsg = err.message || 'Failed to create product';
+
+      if (errorMsg.includes('duplicate') || errorMsg.includes('already exists') || errorMsg.includes('unique constraint')) {
+        setModalError(`SKU "${newProduct.sku.trim()}" already exists. Please use a different SKU or contact your administrator.`);
+      } else {
+        setModalError(errorMsg);
+      }
     }
   };
 
@@ -1363,6 +1417,17 @@ export default function InventoryProduct({ onBack }) {
     }
   };
 
+  // Save custom stock in types to database
+  const saveCustomStockInTypes = async (newTypes) => {
+    try {
+      await InventoryAPI.updateSettings(organizationSlug, {
+        custom_stock_in_types: newTypes
+      });
+    } catch (err) {
+      console.error('Failed to save stock in types:', err);
+    }
+  };
+
   const handleOpenPODetail = (po) => {
     setSelectedPO(po);
     setShowPODetailModal(true);
@@ -1782,6 +1847,8 @@ export default function InventoryProduct({ onBack }) {
                 setAllProductUnits={setAllProductUnits}
                 newProductUnit={newProductUnit}
                 setNewProductUnit={setNewProductUnit}
+                showAddUnitForm={showAddUnitForm}
+                setShowAddUnitForm={setShowAddUnitForm}
                 setError={setError}
                 organizationSlug={organizationSlug}
               />
@@ -1905,6 +1972,7 @@ export default function InventoryProduct({ onBack }) {
         allProductUnits={allProductUnits}
         customStockInTypes={customStockInTypes}
         setCustomStockInTypes={setCustomStockInTypes}
+        onSaveStockInTypes={saveCustomStockInTypes}
       />
 
       {/* Create Purchase Order Modal */}

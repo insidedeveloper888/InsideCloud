@@ -65,10 +65,15 @@ const SearchableSelect = ({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Type to search..."
+              placeholder={allowAddNew ? "Type to search or add new..." : "Type to search..."}
               className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               autoFocus
             />
+            {allowAddNew && !search.trim() && (
+              <p className="mt-1 text-xs text-gray-500 italic">
+                💡 Tip: Type a new value and click "Add" to create it
+              </p>
+            )}
           </div>
           <div className="max-h-40 overflow-y-auto bg-white">
             {filteredOptions.map((opt) => (
@@ -94,9 +99,14 @@ const SearchableSelect = ({
               <button
                 type="button"
                 onClick={handleAddNew}
-                className="w-full px-3 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 font-medium border-t border-gray-100"
+                disabled={!search.trim()}
+                className={`w-full px-3 py-2 text-left text-sm font-medium border-t border-gray-100 transition-colors ${
+                  search.trim()
+                    ? 'text-emerald-600 hover:bg-emerald-50 cursor-pointer'
+                    : 'text-gray-400 cursor-not-allowed bg-gray-50'
+                }`}
               >
-                {search.trim() ? `+ Add "${search.trim()}"` : addNewLabel}
+                {search.trim() ? `✓ Add "${search.trim()}"` : '⚠ Type a value above to add new'}
               </button>
             )}
           </div>

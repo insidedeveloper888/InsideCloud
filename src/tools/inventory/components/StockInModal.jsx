@@ -21,7 +21,8 @@ export default function StockInModal({
   locations,
   allProductUnits,
   customStockInTypes,
-  setCustomStockInTypes
+  setCustomStockInTypes,
+  onSaveStockInTypes
 }) {
   const handleClose = () => {
     onClose();
@@ -151,7 +152,12 @@ export default function StockInModal({
             onAddNew={(newType) => {
               const trimmedType = newType.trim();
               if (trimmedType && !customStockInTypes.includes(trimmedType)) {
-                setCustomStockInTypes([...customStockInTypes, trimmedType]);
+                const updatedTypes = [...customStockInTypes, trimmedType];
+                setCustomStockInTypes(updatedTypes);
+                // Save to database
+                if (onSaveStockInTypes) {
+                  onSaveStockInTypes(updatedTypes);
+                }
               }
               setStockInData({ ...stockInData, reference_type: trimmedType });
             }}

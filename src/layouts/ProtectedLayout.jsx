@@ -230,7 +230,7 @@ function ProtectedLayout({
       )}>
         <div
           className={cn(
-            activeView === "strategic_map" || activeView === "strategic_map_v2" || activeView === "inventory"
+            activeView === "strategic_map" || activeView === "strategic_map_v2" || activeView === "inventory" || activeView === "project_management"
               ? "p-0"
               : "px-4 sm:px-6 md:px-8 py-5 md:py-7"
           )}

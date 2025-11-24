@@ -88,7 +88,7 @@ export default function MovementsTab({
                   <span className="flex items-center space-x-1"><span>Type</span><MovementSortIcon field="type" /></span>
                 </th>
                 <th onClick={() => toggleMovementSort('product')} className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none">
-                  <span className="flex items-center space-x-1"><span>Product</span><MovementSortIcon field="product" /></span>
+                  <span className="flex items-center space-x-1"><span>Item</span><MovementSortIcon field="product" /></span>
                 </th>
                 <th onClick={() => toggleMovementSort('warehouse')} className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none">
                   <span className="flex items-center space-x-1"><span>Warehouse</span><MovementSortIcon field="warehouse" /></span>
