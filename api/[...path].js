@@ -40,6 +40,7 @@ const inventory = require('../server/api_handlers/inventory');
 const userDepartment = require('../server/api_handlers/user_department');
 const tenantInfo = require('../server/api_handlers/tenant_info');
 const calendarEvents = require('../server/api_handlers/calendar_events');
+const healthLark = require('../server/api_handlers/health_lark');
 
 /**
  * Route mapping: path -> handler
@@ -71,6 +72,7 @@ const routes = {
   '/api/user_department': userDepartment,
   '/api/tenant_info': tenantInfo,
   '/api/calendar/events': calendarEvents,
+  '/api/health/lark': healthLark,
 };
 
 /**
