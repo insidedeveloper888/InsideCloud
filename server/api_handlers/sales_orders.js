@@ -301,7 +301,7 @@ module.exports = async function handler(req, res) {
           .select(`
             *,
             customer:contacts!customer_contact_id (id, first_name, last_name, company_name),
-            sales_person:individuals!sales_person_individual_id (id, name, email)
+            sales_person:individuals!sales_person_individual_id (id, display_name, primary_email, avatar_url)
           `)
           .eq('organization_id', organizationId)
           .eq('is_deleted', false);
