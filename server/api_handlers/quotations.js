@@ -56,49 +56,54 @@ async function getOrganizationId(organizationSlug) {
 }
 
 /**
- * Apply visibility filter based on organization settings
+ * Get team member IDs for visibility filtering
+ * Returns array of individual IDs that should be visible to current user
  */
-async function applyVisibilityFilter(query, organizationId, currentIndividualId) {
-  const { data: settings } = await supabase
-    .from('sales_document_settings')
-    .select('sales_order_visibility, enable_sales_teams')
+async function getTeamMemberIds(organizationId, currentIndividualId) {
+  // Get teams where current user is the lead
+  const { data: ledTeams } = await supabase
+    .from('sales_teams')
+    .select('id')
     .eq('organization_id', organizationId)
-    .eq('document_type', 'quotation')
-    .single();
+    .eq('team_lead_individual_id', currentIndividualId)
+    .eq('is_active', true);
 
-  const visibility = settings?.sales_order_visibility || 'organization';
+  // Get teams where current user is a member
+  const { data: memberTeams } = await supabase
+    .from('sales_team_members')
+    .select('sales_team_id')
+    .eq('individual_id', currentIndividualId);
 
-  switch (visibility) {
-    case 'assigned_only':
-      return query.eq('sales_person_individual_id', currentIndividualId);
+  // Combine all team IDs
+  const teamIds = new Set([
+    ...(ledTeams || []).map(t => t.id),
+    ...(memberTeams || []).map(t => t.sales_team_id)
+  ]);
 
-    case 'team_based':
-      if (settings?.enable_sales_teams) {
-        const { data: ledTeams } = await supabase
-          .from('sales_teams')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('team_lead_individual_id', currentIndividualId);
-
-        if (ledTeams && ledTeams.length > 0) {
-          const teamIds = ledTeams.map((t) => t.id);
-          const { data: members } = await supabase
-            .from('sales_team_members')
-            .select('individual_id')
-            .in('sales_team_id', teamIds);
-
-          const memberIds = members?.map((m) => m.individual_id) || [];
-          const visibleIds = [currentIndividualId, ...memberIds];
-
-          return query.in('sales_person_individual_id', visibleIds);
-        }
-      }
-      return query.eq('sales_person_individual_id', currentIndividualId);
-
-    case 'organization':
-    default:
-      return query;
+  if (teamIds.size === 0) {
+    return [currentIndividualId];
   }
+
+  // Get all members from these teams
+  const { data: allMembers } = await supabase
+    .from('sales_team_members')
+    .select('individual_id')
+    .in('sales_team_id', Array.from(teamIds));
+
+  // Get all leads from these teams
+  const { data: allLeads } = await supabase
+    .from('sales_teams')
+    .select('team_lead_individual_id')
+    .in('id', Array.from(teamIds));
+
+  // Combine all individual IDs
+  const individualIds = new Set([
+    currentIndividualId,
+    ...(allMembers || []).map(m => m.individual_id),
+    ...(allLeads || []).map(l => l.team_lead_individual_id)
+  ]);
+
+  return Array.from(individualIds).filter(Boolean);
 }
 
 /**
@@ -281,7 +286,15 @@ module.exports = async function handler(req, res) {
         const { status, customer_id, sales_person_id, date_from, date_to } = query;
         const currentIndividualId = req.session?.individual_id;
 
-        let queryBuilder = supabase
+        // Fetch settings for visibility control
+        const { data: settings } = await supabase
+          .from('sales_document_settings')
+          .select('sales_order_visibility, enable_sales_teams')
+          .eq('organization_id', organizationId)
+          .eq('document_type', 'quotation')
+          .single();
+
+        let query = supabase
           .from('sales_quotations')
           .select(`
             *,
@@ -291,18 +304,26 @@ module.exports = async function handler(req, res) {
           .eq('organization_id', organizationId)
           .eq('is_deleted', false);
 
-        // Apply visibility filter - use .then() to avoid double-awaiting the thenable query builder
-        const { data, error } = await applyVisibilityFilter(queryBuilder, organizationId, currentIndividualId).then(qb => {
-          // Apply additional filters
-          if (status) qb = qb.eq('status', status);
-          if (customer_id) qb = qb.eq('customer_contact_id', customer_id);
-          if (sales_person_id) qb = qb.eq('sales_person_individual_id', sales_person_id);
-          if (date_from) qb = qb.gte('quotation_date', date_from);
-          if (date_to) qb = qb.lte('quotation_date', date_to);
+        // Apply visibility filtering
+        const visibility = settings?.sales_order_visibility || 'organization';
+        if (visibility === 'team_based' && currentIndividualId) {
+          const teamMemberIds = await getTeamMemberIds(organizationId, currentIndividualId);
+          query = query.in('sales_person_individual_id', teamMemberIds);
+        } else if (visibility === 'assigned_only' && currentIndividualId) {
+          query = query.eq('sales_person_individual_id', currentIndividualId);
+        }
 
-          // Apply ordering and execute query
-          return qb.order('quotation_date', { ascending: false });
-        });
+        // Apply additional filters
+        if (status) query = query.eq('status', status);
+        if (customer_id) query = query.eq('customer_contact_id', customer_id);
+        if (sales_person_id) query = query.eq('sales_person_individual_id', sales_person_id);
+        if (date_from) query = query.gte('quotation_date', date_from);
+        if (date_to) query = query.lte('quotation_date', date_to);
+
+        // Apply ordering and execute query
+        query = query.order('quotation_date', { ascending: false });
+
+        const { data, error } = await query;
         if (error) throw error;
 
         return res.status(200).json(data || []);
