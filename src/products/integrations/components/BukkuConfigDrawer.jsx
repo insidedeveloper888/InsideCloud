@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 
 const BukkuConfigDrawer = ({ isOpen, onClose, onConnect, isConnecting, error }) => {

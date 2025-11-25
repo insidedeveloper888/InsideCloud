@@ -15,7 +15,7 @@ export default function SalesOrderListView({
   salesPersons = [],
   organizationSlug,
 }) {
-  const { statuses, getStatusMaps } = useSalesOrderStatuses(organizationSlug);
+  const { getStatusMaps } = useSalesOrderStatuses(organizationSlug);
   const { colorMap, labelMap } = getStatusMaps();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);

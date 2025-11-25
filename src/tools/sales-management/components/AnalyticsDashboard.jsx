@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Calendar, User, ArrowRight, ShoppingCart, Truck, Receipt, ChevronDown, ChevronUp, BarChart3, Users, TrendingUp, Package, Award, UserCheck } from 'lucide-react';
+import { FileText, User, ShoppingCart, Truck, Receipt, ChevronDown, ChevronUp, BarChart3, Users, TrendingUp, Package, Award, UserCheck } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
-import { Bar, Doughnut, Pie } from 'react-chartjs-2';
+import { Bar, Pie } from 'react-chartjs-2';
 import { useQuotationStatuses } from '../hooks/useQuotationStatuses';
 import { useSalesOrderStatuses } from '../hooks/useSalesOrderStatuses';
 import { useDeliveryOrderStatuses } from '../hooks/useDeliveryOrderStatuses';

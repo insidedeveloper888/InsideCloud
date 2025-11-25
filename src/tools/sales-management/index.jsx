@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, BarChart3, Settings, List, FileText, Users, Truck, Receipt } from 'lucide-react';
+import { BarChart3, Settings, List, FileText, Users, Truck, Receipt } from 'lucide-react';
 import { useSalesOrders } from './hooks/useSalesOrders';
 import { useQuotations } from './hooks/useQuotations';
 import { useDeliveryOrders } from './hooks/useDeliveryOrders';
@@ -71,23 +71,19 @@ export default function SalesManagementApp({ organizationSlug }) {
   const {
     salesOrders,
     loading: ordersLoading,
-    error: ordersError,
     createSalesOrder,
     updateSalesOrder,
     deleteSalesOrder,
     getSalesOrder,
-    refetch: refetchOrders,
   } = useSalesOrders(organizationSlug);
 
   const {
     quotations,
     loading: quotationsLoading,
-    error: quotationsError,
     createQuotation,
     updateQuotation,
     deleteQuotation,
     getQuotation,
-    refetch: refetchQuotations,
   } = useQuotations(organizationSlug);
 
   // Stable empty filters to prevent continuous refetching
@@ -115,7 +111,6 @@ export default function SalesManagementApp({ organizationSlug }) {
 
   const {
     settings,
-    loading: settingsLoading,
     updateSettings,
     previewFormat,
   } = useSalesSettings(organizationSlug);

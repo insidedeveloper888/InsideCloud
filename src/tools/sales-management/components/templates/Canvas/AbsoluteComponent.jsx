@@ -92,6 +92,9 @@ export function AbsoluteComponent({
           case 'n': // Top
             newHeight = initialSize.current.height - deltaY;
             break;
+          default:
+            // No resize for unknown handle
+            break;
         }
 
         onResize(component.id, newWidth, newHeight);

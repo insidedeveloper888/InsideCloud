@@ -15,7 +15,7 @@ export default function QuotationsListView({
   salesPersons = [],
   organizationSlug,
 }) {
-  const { statuses, getStatusMaps } = useQuotationStatuses(organizationSlug);
+  const { getStatusMaps } = useQuotationStatuses(organizationSlug);
   const { colorMap, labelMap } = getStatusMaps();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);

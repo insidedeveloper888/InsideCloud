@@ -9,10 +9,10 @@
  * - Resize handles
  * - Alignment guides
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { AbsoluteComponent } from './AbsoluteComponent';
-import { FileQuestion, Grid, Ruler } from 'lucide-react';
+import { FileQuestion } from 'lucide-react';
 
 // A4 dimensions at 96 DPI (pixels)
 const A4_WIDTH = 794;  // 210mm
@@ -28,11 +28,10 @@ export function AbsoluteCanvas({
   showGrid,
   showRuler
 }) {
-  const canvasRef = useRef(null);
   const { setNodeRef } = useDroppable({ id: 'absolute-canvas' });
 
   const [alignmentGuides, setAlignmentGuides] = useState([]);
-  const [scale, setScale] = useState(1); // For zoom in/out
+  const scale = 1; // Fixed scale (zoom not implemented yet)
 
   // Snap value to grid
   const snapToGrid = (value) => {
