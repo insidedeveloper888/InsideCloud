@@ -10,7 +10,7 @@ const {
   validateFormat,
   previewFormat,
   getNextCounter,
-} = require('../utils/quotation_code_generator');
+} = require('../utils/order_code_generator');
 
 // Initialize Supabase
 const supabase = createClient(
