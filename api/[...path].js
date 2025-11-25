@@ -83,6 +83,7 @@ const routes = {
   '/api/sales_order_statuses': salesOrders,
   '/api/sales_orders': salesOrders,
   '/api/sales_teams': salesOrders,
+  '/api/sales_management/members': salesOrders,
   '/api/quotation_settings': quotations,
   '/api/quotation_statuses': quotations,
   '/api/sales_quotations': quotations,

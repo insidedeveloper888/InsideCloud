@@ -584,6 +584,84 @@ module.exports = async function handler(req, res) {
         if (error) throw error;
         return res.status(200).json(data);
       }
+
+      // POST /api/sales_teams/:id/members - Add team member
+      if (method === 'POST' && id && req.url.includes('/members')) {
+        const { individual_id, role = 'member' } = req.body;
+
+        const { data, error } = await supabase
+          .from('sales_team_members')
+          .insert({
+            sales_team_id: id,
+            individual_id,
+            role,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(200).json(data);
+      }
+
+      // DELETE /api/sales_teams/:id/members/:individualId - Remove team member
+      if (method === 'DELETE' && id && req.url.includes('/members/')) {
+        const memberMatch = req.url.match(/\/members\/([a-f0-9-]+)/);
+        const individualId = memberMatch ? memberMatch[1] : null;
+
+        if (!individualId) {
+          return res.status(400).json({ error: 'Missing individual_id' });
+        }
+
+        const { error } = await supabase
+          .from('sales_team_members')
+          .delete()
+          .eq('sales_team_id', id)
+          .eq('individual_id', individualId);
+
+        if (error) throw error;
+        return res.status(200).json({ success: true });
+      }
+    }
+
+    // GET /api/sales_management/members - Get organization members for dropdowns
+    if (method === 'GET' && path === '/api/sales_management/members') {
+      const { organization_slug } = query;
+
+      if (!organization_slug) {
+        return res.status(400).json({ error: 'Missing organization_slug' });
+      }
+
+      const organizationId = await getOrganizationId(organization_slug);
+      if (!organizationId) {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+
+      const { data: members, error } = await supabase
+        .from('organization_members')
+        .select(`
+          individual_id,
+          role_code,
+          individuals!individual_id(
+            id,
+            display_name,
+            avatar_url,
+            primary_email
+          )
+        `)
+        .eq('organization_id', organizationId);
+
+      if (error) throw error;
+
+      // Transform to flat structure
+      const individuals = members.map((member) => ({
+        id: member.individuals.id,
+        display_name: member.individuals.display_name,
+        avatar_url: member.individuals.avatar_url,
+        primary_email: member.individuals.primary_email,
+        role_code: member.role_code,
+      }));
+
+      return res.status(200).json(individuals);
     }
 
     res.status(404).json({ error: 'Not found' });
