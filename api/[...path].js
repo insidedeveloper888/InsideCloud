@@ -42,6 +42,8 @@ const tenantInfo = require('../server/api_handlers/tenant_info');
 const calendarEvents = require('../server/api_handlers/calendar_events');
 const salesOrders = require('../server/api_handlers/sales_orders');
 const quotations = require('../server/api_handlers/quotations');
+const deliveryOrders = require('../server/api_handlers/delivery_orders');
+const invoices = require('../server/api_handlers/invoices');
 const integrations = require('../server/api_handlers/integrations');
 const templates = require('../server/api_handlers/templates');
 const pdfGeneration = require('../server/api_handlers/pdf_generation');
@@ -84,6 +86,12 @@ const routes = {
   '/api/quotation_settings': quotations,
   '/api/quotation_statuses': quotations,
   '/api/sales_quotations': quotations,
+  '/api/delivery_order_settings': deliveryOrders,
+  '/api/delivery_order_statuses': deliveryOrders,
+  '/api/delivery_orders': deliveryOrders,
+  '/api/invoice_settings': invoices,
+  '/api/invoice_statuses': invoices,
+  '/api/invoices': invoices,
   '/api/integrations': integrations,
   '/api/templates': templates,
   '/api/documents/pdf/generate': pdfGeneration,
