@@ -70,7 +70,7 @@ export default function AddProductModal({
         <FormField
           label="SKU"
           value={newProduct.sku}
-          onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+          onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value.toUpperCase() })}
           placeholder="e.g., CCTV-001"
           focusColor="focus:ring-emerald-500 focus:border-emerald-500"
         />

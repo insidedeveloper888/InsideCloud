@@ -25,9 +25,10 @@ export const filterInventoryItems = (items, {
       (item.product?.category && filters.categories.includes(item.product.category));
 
     // Location filter
+    // When a warehouse filter is active, exclude virtual items without a location
+    // (those showing "Select location" should not appear when filtering by specific warehouse)
     const matchesLocation = !filters.locations?.length ||
-      filters.locations.includes(item.location_id) ||
-      (item.isVirtual && !item.location_id);
+      filters.locations.includes(item.location_id);
 
     // Stock Status filter
     const matchesStockStatus = !filters.stockStatuses?.length ||

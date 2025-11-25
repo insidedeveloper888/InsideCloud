@@ -76,7 +76,7 @@ export default function OverviewTab({
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-bl-3xl opacity-50"></div>
           <div className="relative">
             <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Total Products</div>
-            <div className="text-4xl font-bold text-gray-900 mb-1">{products.length}</div>
+            <div className="text-4xl font-bold text-gray-900 mb-1">{products.filter(p => !p.is_deleted).length}</div>
             <div className="text-xs text-emerald-600 font-medium">In catalog</div>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function OverviewTab({
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-cyan-100 to-cyan-50 rounded-bl-3xl opacity-50"></div>
           <div className="relative">
             <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Stock Items</div>
-            <div className="text-4xl font-bold text-gray-900 mb-1">{items.length}</div>
+            <div className="text-4xl font-bold text-gray-900 mb-1">{items.filter(i => i.quantity > 0).length}</div>
             <div className="text-xs text-cyan-600 font-medium">In inventory</div>
           </div>
         </div>

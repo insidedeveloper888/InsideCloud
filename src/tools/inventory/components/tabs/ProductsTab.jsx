@@ -289,16 +289,21 @@ export default function ProductsTab({
                               {product.category}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              {baseUnit?.selling_price ? (
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-emerald-600">
-                                    RM {parseFloat(baseUnit.selling_price).toFixed(2)}
-                                  </span>
-                                  <span className="text-xs text-gray-500">per {product.base_unit || product.unit || 'pcs'}</span>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 text-xs">-</span>
-                              )}
+                              {/* Only show price if product is a selling item AND has a price */}
+                              {(() => {
+                                // Check both saved state and unsaved local state
+                                const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling;
+                                return isSelling && baseUnit?.selling_price ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-emerald-600">
+                                      RM {parseFloat(baseUnit.selling_price).toFixed(2)}
+                                    </span>
+                                    <span className="text-xs text-gray-500">per {product.base_unit || product.unit || 'pcs'}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">-</span>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {product.base_unit || product.unit || 'pcs'}
@@ -351,10 +356,56 @@ export default function ProductsTab({
                                       </div>
                                       <SearchableSelect
                                         value={productThresholds[`${product.id}_base_unit`] ?? product.base_unit ?? 'pcs'}
-                                        onChange={(val) => setProductThresholds({
-                                          ...productThresholds,
-                                          [`${product.id}_base_unit`]: val
-                                        })}
+                                        onChange={async (val) => {
+                                          // Check if there are existing non-base unit conversions for this product
+                                          const existingConversions = allProductUnits.filter(u =>
+                                            u.product_id === product.id && !u.is_base_unit
+                                          );
+                                          const currentBaseUnit = productThresholds[`${product.id}_base_unit`] ?? product.base_unit ?? 'pcs';
+
+                                          if (existingConversions.length > 0 && val !== currentBaseUnit) {
+                                            const confirmed = window.confirm(
+                                              `This product has ${existingConversions.length} unit conversion(s) based on the current base unit "${currentBaseUnit}".\n\n` +
+                                              `Changing the base unit to "${val}" will DELETE all existing conversions and save immediately:\n` +
+                                              existingConversions.map(u => `• ${u.unit_name} (${u.conversion_to_base} ${currentBaseUnit})`).join('\n') +
+                                              `\n\nDo you want to proceed?`
+                                            );
+                                            if (!confirmed) return;
+
+                                            try {
+                                              // Delete all existing conversions
+                                              await Promise.all(existingConversions.map(unit =>
+                                                InventoryAPI.deleteProductUnit(organizationSlug, unit.id)
+                                              ));
+
+                                              // Save the base unit change immediately
+                                              await InventoryAPI.updateProduct(organizationSlug, product.id, { base_unit: val });
+
+                                              // Update local state
+                                              setAllProductUnits(allProductUnits.filter(u =>
+                                                !(u.product_id === product.id && !u.is_base_unit)
+                                              ));
+                                              setProducts(products.map(p =>
+                                                p.id === product.id ? { ...p, base_unit: val } : p
+                                              ));
+
+                                              // Clear the local threshold since we've saved
+                                              const newThresholds = { ...productThresholds };
+                                              delete newThresholds[`${product.id}_base_unit`];
+                                              setProductThresholds(newThresholds);
+                                            } catch (err) {
+                                              console.error('Failed to update base unit:', err);
+                                              alert('Failed to update base unit. Please try again.');
+                                            }
+                                            return;
+                                          }
+
+                                          // No conversions to delete - just update local state
+                                          setProductThresholds({
+                                            ...productThresholds,
+                                            [`${product.id}_base_unit`]: val
+                                          });
+                                        }}
                                         options={customUnits.map(u => ({ value: u, label: u }))}
                                         placeholder="Select unit..."
                                         allowAddNew={true}
@@ -397,7 +448,7 @@ export default function ProductsTab({
                                             const updates = {
                                               low_stock_threshold: productThresholds[product.id] !== undefined ? productThresholds[product.id] : product.low_stock_threshold,
                                               base_unit: productThresholds[`${product.id}_base_unit`] ?? product.base_unit ?? 'pcs',
-                                              is_selling: productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true
+                                              is_selling: productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? false
                                             };
                                             await InventoryAPI.updateProduct(organizationSlug, product.id, updates);
                                             setProducts(products.map(p => p.id === product.id ? { ...p, ...updates } : p));
@@ -406,17 +457,30 @@ export default function ProductsTab({
                                             const baseUnitBuy = productThresholds[`${product.id}_base_buy`];
                                             const baseUnitSell = productThresholds[`${product.id}_base_sell`];
 
-                                            if (baseUnitBuy !== undefined || baseUnitSell !== undefined) {
-                                              // Search for existing base unit - check by product_id AND unit_name match
-                                              const existingBaseUnit = allProductUnits?.find(u =>
+                                            // Search for existing base unit - first try exact match, then any base unit for this product
+                                            let existingBaseUnit = allProductUnits?.find(u =>
+                                              u.product_id === product.id &&
+                                              u.unit_name === updates.base_unit &&
+                                              u.is_base_unit
+                                            );
+
+                                            // If no exact match, check for any base unit for this product (might have different unit_name)
+                                            if (!existingBaseUnit) {
+                                              existingBaseUnit = allProductUnits?.find(u =>
                                                 u.product_id === product.id &&
-                                                u.unit_name === updates.base_unit &&
                                                 u.is_base_unit
                                               );
+                                            }
 
-                                              console.log('Looking for existing base unit:', { product_id: product.id, unit_name: updates.base_unit });
-                                              console.log('Found existing base unit:', existingBaseUnit);
+                                            console.log('Looking for existing base unit:', { product_id: product.id, unit_name: updates.base_unit });
+                                            console.log('Found existing base unit:', existingBaseUnit);
 
+                                            // Always process base unit if:
+                                            // 1. User changed pricing values, OR
+                                            // 2. Product is selling item and we need to ensure base unit exists
+                                            const shouldProcessBaseUnit = baseUnitBuy !== undefined || baseUnitSell !== undefined || updates.is_selling;
+
+                                            if (shouldProcessBaseUnit) {
                                               const baseUnitData = {
                                                 unit_name: updates.base_unit,
                                                 conversion_to_base: 1,
@@ -437,8 +501,8 @@ export default function ProductsTab({
                                                   console.error('Failed to update base unit:', result);
                                                   setError('Failed to update base unit pricing');
                                                 }
-                                              } else {
-                                                // Create new base unit
+                                              } else if (baseUnitBuy !== undefined || baseUnitSell !== undefined) {
+                                                // Only create new base unit if user actually entered pricing values
                                                 console.log('Creating new base unit:', { product_id: product.id, ...baseUnitData });
                                                 const res = await InventoryAPI.createProductUnit(organizationSlug, { product_id: product.id, ...baseUnitData });
                                                 if (res.code === 0) {
@@ -499,7 +563,7 @@ export default function ProductsTab({
                                     <label className="flex items-center space-x-2 cursor-pointer group">
                                       <input
                                         type="checkbox"
-                                        checked={productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true}
+                                        checked={productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? false}
                                         onChange={(e) => setProductThresholds({
                                           ...productThresholds,
                                           [`${product.id}_is_selling`]: e.target.checked
@@ -518,7 +582,7 @@ export default function ProductsTab({
 
                                   {/* Base Unit Pricing - Only show for selling items */}
                                   {(() => {
-                                    const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+                                    const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? false;
                                     if (!isSelling) return null; // Hide for non-selling items
 
                                     return (
@@ -578,7 +642,7 @@ export default function ProductsTab({
                                             const baseUnit = productUnits.find(u => u.product_id === product.id && u.is_base_unit);
                                             const baseSellingPrice = productThresholds[`${product.id}_base_sell`] ?? baseUnit?.selling_price ?? 0;
                                             const calculatedPrice = baseSellingPrice * unit.conversion_to_base;
-                                            const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? true;
+                                            const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling ?? false;
                                             const currentSellingPrice = productThresholds[`${unit.id}_unit_sell`] ?? unit.selling_price;
 
                                             return (
@@ -666,9 +730,11 @@ export default function ProductsTab({
                                                       [product.id]: { ...newProductUnit[product.id], unit_name: value }
                                                     })}
                                                     options={(() => {
-                                                      // Get unique unit names from all product units
-                                                      const uniqueUnits = [...new Set(allProductUnits.map(u => u.unit_name))];
-                                                      return uniqueUnits.map(unit => ({ value: unit, label: unit }));
+                                                      // Combine customUnits (from Base Unit dropdown) with existing product units
+                                                      // This ensures newly added units from Base Unit selector appear immediately
+                                                      const existingUnitNames = allProductUnits.map(u => u.unit_name);
+                                                      const allUnitNames = [...new Set([...customUnits, ...existingUnitNames])];
+                                                      return allUnitNames.map(unit => ({ value: unit, label: unit }));
                                                     })()}
                                                     placeholder="Select or type..."
                                                     className="w-36"
@@ -715,13 +781,24 @@ export default function ProductsTab({
                                                       return;
                                                     }
 
-                                                    // Check for duplicate unit name for this product
+                                                    // Check for ANY existing unit with this name for this product
+                                                    // This includes both base units and conversions in the database
                                                     const existingUnit = allProductUnits.find(u =>
                                                       u.product_id === product.id &&
                                                       u.unit_name.toLowerCase() === unitData.unit_name.trim().toLowerCase()
                                                     );
                                                     if (existingUnit) {
-                                                      alert(`Unit "${unitData.unit_name.trim()}" already exists for this product. Please use a different unit name.`);
+                                                      if (existingUnit.is_base_unit) {
+                                                        alert(`Cannot add "${unitData.unit_name.trim()}" as a conversion - it's already the base unit for this product.`);
+                                                      } else {
+                                                        alert(`Unit conversion "${unitData.unit_name.trim()}" already exists for this product. Please use a different unit name.`);
+                                                      }
+                                                      return;
+                                                    }
+                                                    // Also check against product.base_unit in case it's not yet in allProductUnits
+                                                    const baseUnitName = product.base_unit || 'pcs';
+                                                    if (unitData.unit_name.trim().toLowerCase() === baseUnitName.toLowerCase()) {
+                                                      alert(`Cannot add "${unitData.unit_name.trim()}" as a conversion - it's already the base unit for this product.`);
                                                       return;
                                                     }
 

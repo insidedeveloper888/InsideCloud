@@ -112,7 +112,7 @@ export default function StockInModal({
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
             >
               <option value="">Select product...</option>
-              {products.map((product) => (
+              {products.filter(p => !p.is_deleted).map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.name} ({product.sku})
                 </option>

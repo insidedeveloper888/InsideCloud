@@ -180,6 +180,7 @@ export default function InventoryProduct({ onBack }) {
     base_unit: '',
     unit_conversion_factor: 1,
     description: '',
+    is_selling: false, // Default to not a selling item - user can enable in Items tab
     // Optional initial stock fields
     initial_location_id: '',
     initial_quantity: 0,
@@ -629,15 +630,18 @@ export default function InventoryProduct({ onBack }) {
   // 1. Stock-in products that were added without initial stock
   // 2. Stock-in existing products to different warehouses
   const itemsWithUnstockedProducts = React.useMemo(() => {
+    // Filter out soft-deleted products first
+    const activeProducts = products.filter(p => !p.is_deleted);
+
     // For each product, find which locations DON'T have stock yet
     // This creates virtual items for product+location combinations that don't exist
     const existingCombinations = new Set(
       items.map(item => `${item.product_id}-${item.location_id}`)
     );
 
-    // Create virtual items for each product in locations where it doesn't exist yet
+    // Create virtual items for each active product in locations where it doesn't exist yet
     const virtualItems = [];
-    products.forEach(product => {
+    activeProducts.forEach(product => {
       // Check if this product has ANY stock anywhere
       const hasAnyStock = items.some(item => item.product_id === product.id);
 
@@ -682,18 +686,25 @@ export default function InventoryProduct({ onBack }) {
     // Recalculate stock status based on per-product threshold
     // Only trigger low stock if threshold is explicitly set (not null)
     // Use latest product data from products state (not the snapshot in item.product)
-    const itemsWithUpdatedStatus = items.map(item => {
-      const available = item.quantity - (item.reserved_quantity || 0);
-      const latestProduct = products.find(p => p.id === item.product_id);
-      const threshold = latestProduct?.low_stock_threshold; // null means no alert
-      let status = 'normal';
-      if (available === 0) {
-        status = 'out_of_stock';
-      } else if (threshold !== null && threshold !== undefined && available <= threshold) {
-        status = 'low_stock';
-      }
-      return { ...item, stock_status: status, available_quantity: available, product: latestProduct || item.product };
-    });
+    // Also filter out items belonging to soft-deleted products
+    const itemsWithUpdatedStatus = items
+      .filter(item => {
+        const latestProduct = products.find(p => p.id === item.product_id);
+        // Exclude items whose product is soft-deleted
+        return latestProduct && !latestProduct.is_deleted;
+      })
+      .map(item => {
+        const available = item.quantity - (item.reserved_quantity || 0);
+        const latestProduct = products.find(p => p.id === item.product_id);
+        const threshold = latestProduct?.low_stock_threshold; // null means no alert
+        let status = 'normal';
+        if (available === 0) {
+          status = 'out_of_stock';
+        } else if (threshold !== null && threshold !== undefined && available <= threshold) {
+          status = 'low_stock';
+        }
+        return { ...item, stock_status: status, available_quantity: available, product: latestProduct || item.product };
+      });
 
     return [...itemsWithUpdatedStatus, ...virtualItems];
   }, [items, products, locations]);
@@ -853,7 +864,8 @@ export default function InventoryProduct({ onBack }) {
         unit: newProduct.unit,
         base_unit: newProduct.base_unit || 'pcs',
         unit_conversion_factor: newProduct.unit_conversion_factor || 1,
-        description: newProduct.description
+        description: newProduct.description,
+        is_selling: newProduct.is_selling || false // Default to not a selling item
       };
 
       console.log('Creating product:', productData);
@@ -899,6 +911,7 @@ export default function InventoryProduct({ onBack }) {
           base_unit: 'pcs',
           unit_conversion_factor: 1,
           description: '',
+          is_selling: false,
           initial_location_id: '',
           initial_quantity: 0,
           initial_unit_cost: 0
