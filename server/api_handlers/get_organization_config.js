@@ -1,5 +1,18 @@
-const { handleCors, okResponse, failResponse } = require('../../api/_utils');
-const { supabase, getLarkCredentials } = require('../../api/_supabase_helper');
+let handleCors, okResponse, failResponse, supabase, getLarkCredentials;
+
+try {
+  const utils = require('../../api/_utils');
+  handleCors = utils.handleCors;
+  okResponse = utils.okResponse;
+  failResponse = utils.failResponse;
+
+  const supabaseHelper = require('../../api/_supabase_helper');
+  supabase = supabaseHelper.supabase;
+  getLarkCredentials = supabaseHelper.getLarkCredentials;
+} catch (initError) {
+  console.error('❌ [INIT] Failed to load dependencies:', initError);
+  console.error('Init error stack:', initError.stack);
+}
 
 /**
  * Validate that an organization exists and is active
@@ -56,11 +69,21 @@ async function getOrganizationInfo(orgSlug) {
 }
 
 module.exports = async function handler(req, res) {
+  // Check if dependencies loaded successfully
+  if (!handleCors || !okResponse || !failResponse) {
+    console.error('❌ [HANDLER] Dependencies not loaded - utils missing');
+    res.status(500).json({
+      success: false,
+      error: 'Server initialization error - utils not loaded'
+    });
+    return;
+  }
+
   // Handle CORS
   if (handleCors(req, res)) return;
 
   console.log("\n-------------------[获取组织配置 BEGIN]-----------------------------");
-  
+
   if (!supabase) {
     console.error('Supabase not configured');
     res.status(500).json(failResponse('Supabase configuration missing'));
