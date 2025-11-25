@@ -90,23 +90,27 @@ module.exports = async function handler(req, res) {
     }
     
     // Get Lark credentials to verify they're configured
-    let larkCredentials;
+    // Note: Lark credentials are optional - some features work without them
+    let larkCredentials = null;
     try {
       larkCredentials = await getLarkCredentials(organizationSlug);
       if (!larkCredentials) {
-        console.warn(`⚠️  No Lark credentials found for organization: ${organizationSlug}`);
-        res.status(404).json(failResponse(`Lark credentials not configured for organization '${organizationSlug}'`));
-        return;
+        console.warn(`⚠️  No Lark credentials found for organization: ${organizationSlug} - will continue with limited features`);
       }
     } catch (credError) {
       console.error('❌ Error fetching Lark credentials:', credError);
       console.error('Credential error details:', {
         message: credError.message,
         stack: credError.stack,
-        organizationSlug
+        organizationSlug,
+        supabaseConfigured: !!supabase,
+        env: {
+          hasSupabaseUrl: !!process.env.SUPABASE_URL,
+          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        }
       });
-      res.status(500).json(failResponse(`Failed to fetch Lark credentials: ${credError.message || 'Unknown error'}`));
-      return;
+      // Don't fail - continue without Lark credentials
+      console.warn(`⚠️  Continuing without Lark credentials for organization: ${organizationSlug}`);
     }
     
     // ALWAYS query fresh from Supabase - check user's actual role
@@ -199,9 +203,9 @@ module.exports = async function handler(req, res) {
       organization_slug: orgInfo.slug,
       organization_name: orgInfo.name,
       organization_id: orgInfo.id,
-      lark_app_id: larkCredentials.lark_app_id, // Safe to return app_id
+      lark_app_id: larkCredentials?.lark_app_id || null, // Safe to return app_id (null if not configured)
       is_active: orgInfo.is_active,
-      is_admin: isAdmin // Always return false for now until we can properly get user from API context
+      is_admin: isAdmin
     };
     
     console.log(`✅ Organization config retrieved for: ${organizationSlug}`);
