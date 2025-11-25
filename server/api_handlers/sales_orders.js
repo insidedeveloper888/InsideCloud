@@ -296,7 +296,7 @@ module.exports = async function handler(req, res) {
           .eq('document_type', 'sales_order')
           .single();
 
-        let query = supabase
+        let queryBuilder = supabase
           .from('sales_orders')
           .select(`
             *,
@@ -310,22 +310,22 @@ module.exports = async function handler(req, res) {
         const visibility = settings?.sales_order_visibility || 'organization';
         if (visibility === 'team_based' && currentIndividualId) {
           const teamMemberIds = await getTeamMemberIds(organizationId, currentIndividualId);
-          query = query.in('sales_person_individual_id', teamMemberIds);
+          queryBuilder = queryBuilder.in('sales_person_individual_id', teamMemberIds);
         } else if (visibility === 'assigned_only' && currentIndividualId) {
-          query = query.eq('sales_person_individual_id', currentIndividualId);
+          queryBuilder = queryBuilder.eq('sales_person_individual_id', currentIndividualId);
         }
 
         // Apply additional filters
-        if (status) query = query.eq('status', status);
-        if (customer_id) query = query.eq('customer_contact_id', customer_id);
-        if (sales_person_id) query = query.eq('sales_person_individual_id', sales_person_id);
-        if (date_from) query = query.gte('order_date', date_from);
-        if (date_to) query = query.lte('order_date', date_to);
+        if (status) queryBuilder = queryBuilder.eq('status', status);
+        if (customer_id) queryBuilder = queryBuilder.eq('customer_contact_id', customer_id);
+        if (sales_person_id) queryBuilder = queryBuilder.eq('sales_person_individual_id', sales_person_id);
+        if (date_from) queryBuilder = queryBuilder.gte('order_date', date_from);
+        if (date_to) queryBuilder = queryBuilder.lte('order_date', date_to);
 
         // Apply ordering and execute query
-        query = query.order('order_date', { ascending: false });
+        queryBuilder = queryBuilder.order('order_date', { ascending: false });
 
-        const { data, error } = await query;
+        const { data, error } = await queryBuilder;
         if (error) throw error;
 
         return res.status(200).json(data || []);
