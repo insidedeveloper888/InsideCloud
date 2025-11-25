@@ -36,6 +36,8 @@ import {
   Phone,
   Calendar,
   Clock,
+  Puzzle,
+  ShoppingCart,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
@@ -45,8 +47,10 @@ import './index.css';
 import StrategicMapV2Preview from '../../tools/strategic-map/index.jsx';
 import DocumentParser from '../../tools/document-parser/index.jsx';
 import ContactManagementApp from '../../tools/contact-management/index.jsx';
+import SalesManagementApp from '../../tools/sales-management/index.jsx';
 import InventoryProduct from '../../tools/inventory/index.jsx';
-import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon } from '../../components/ui/icons';
+import IntegrationsDashboard from '../../products/integrations/index.jsx';
+import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon, PuzzleIcon, ShoppingCartIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';
 import { useOrganizationProducts } from '../../hooks/useOrganizationProducts';
@@ -405,6 +409,14 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
     'SheetIcon': SheetIcon,
     'PromotionIcon': PromotionIcon,
     'InventoryIcon': InventoryIcon,
+    'PuzzleIcon': PuzzleIcon,
+    'ShoppingCartIcon': ShoppingCartIcon,
+    // Fallback mappings for Lucide-React icon names
+    'ShoppingCart': ShoppingCartIcon,
+    'Puzzle': PuzzleIcon,
+    'Map': TargetIcon,
+    'Users': ContactBookIcon,
+    'FileText': DocumentIcon,
   };
 
   if (loading) {
@@ -1085,39 +1097,36 @@ const Home = () => {
   // TESTING: Set to true to stay on loading screen and see Lottie animation
   const DISABLE_AUTO_NAVIGATION = false;
 
-  const [userInfo, setUserInfo] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Initialize view from URL path
+  const initialView = location.pathname === '/' ? 'dashboard' : location.pathname.substring(1);
+
+  const [userInfo, setUserInfo] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [authError, setAuthError] = useState(null);
   const [showOrganizationSelector, setShowOrganizationSelector] = useState(true);
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState(initialView);
   const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState(null);
   const [selectedOrganizationName, setSelectedOrganizationName] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const hasInitialized = useRef(false); // Prevent double initialization in React Strict Mode
   const authInProgress = useRef(false); // Ref-based guard for authentication (more reliable than state)
 
-  // Navigation helper: Use React Router navigate
+  // Navigation helper: Use React Router's navigate
   const navigateToView = useCallback((view) => {
     const path = view === 'dashboard' ? '/' : `/${view}`;
     navigate(path);
-    setActiveView(view);
+    // Don't call setActiveView here - let the useEffect handle it
   }, [navigate]);
 
-  // Sync activeView with URL on route change
+  // Sync activeView with URL changes (for back/forward buttons)
   useEffect(() => {
-    // Don't process if we have OAuth params
-    const urlParams = new URLSearchParams(location.search);
-    const hasOAuthParams = urlParams.has('code') || urlParams.has('error');
-
-    if (!hasOAuthParams) {
-      const path = location.pathname.slice(1); // Remove leading "/"
-      const view = path || 'dashboard';
-      setActiveView(view);
-    }
-  }, [location]);
+    const view = location.pathname === '/' ? 'dashboard' : location.pathname.substring(1);
+    setActiveView(view);
+  }, [location.pathname]);
 
   // Fetch products for navigation (admin only)
   const { products: navProducts } = useOrganizationProducts(
@@ -1168,7 +1177,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory') {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory' && activeView !== 'integrations' && activeView !== 'sales_management') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
@@ -1495,9 +1504,21 @@ const Home = () => {
             organizationSlug={selectedOrganizationSlug}
           />
         );
+      case 'sales_management':
+        return (
+          <SalesManagementApp
+            organizationSlug={selectedOrganizationSlug}
+          />
+        );
       case 'inventory':
         return (
           <InventoryProduct
+            organizationSlug={selectedOrganizationSlug}
+          />
+        );
+      case 'integrations':
+        return (
+          <IntegrationsDashboard
             organizationSlug={selectedOrganizationSlug}
           />
         );

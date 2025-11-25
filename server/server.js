@@ -14,6 +14,7 @@ const { supabase } = require('./supabase_client')
 const { syncLarkUser } = require('../lib/larkUserSync')
 const { requireProductAccess } = require('./middleware/product_access')
 const { getOrganizationProducts, getAllProducts, getDashboardProducts } = require('./product_helper')
+const integrationsController = require('./integrations_controller')
 
 const LJ_JSTICKET_KEY = 'lk_jsticket'
 const LJ_TOKEN_KEY = 'lk_token'
@@ -886,17 +887,17 @@ app.use(session(koaSessionConfig, app));
 
 // Global CORS middleware
 app.use(async (ctx, next) => {
-  ctx.set('Access-Control-Allow-Origin', ctx.headers.origin || '*');
-  ctx.set('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE');
-  ctx.set('Access-Control-Allow-Credentials', 'true');
-  ctx.set('Access-Control-Allow-Headers', 'x-requested-with, accept, origin, content-type, authorization, Authorization');
+    ctx.set('Access-Control-Allow-Origin', ctx.headers.origin || '*');
+    ctx.set('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE');
+    ctx.set('Access-Control-Allow-Credentials', 'true');
+    ctx.set('Access-Control-Allow-Headers', 'x-requested-with, accept, origin, content-type, authorization, Authorization');
 
-  if (ctx.method === 'OPTIONS') {
-    ctx.status = 200;
-    return;
-  }
+    if (ctx.method === 'OPTIONS') {
+        ctx.status = 200;
+        return;
+    }
 
-  await next();
+    await next();
 });
 
 // Add body parser middleware to parse JSON request bodies
@@ -1690,9 +1691,9 @@ const contactController = require('./contact_management_controller')
 
 // CORS preflight for contacts
 router.options('/api/contacts', async (ctx) => {
-  const serverUtil = require('./server_util');
-  serverUtil.configAccessControl(ctx);
-  ctx.status = 200;
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
 })
 
 // Contacts (specific routes before parameterized routes)
@@ -1744,6 +1745,212 @@ router.post('/api/contacts/import/execute', requireProductAccess('contact_manage
 // Contact Settings
 router.get('/api/contact-settings', requireProductAccess('contact_management'), contactController.getContactSettings)
 router.put('/api/contact-settings', requireProductAccess('contact_management'), contactController.updateContactSettings)
+
+// =============================================================================
+// Sales Management Routes
+// =============================================================================
+
+const salesOrderController = require('./sales_order_controller')
+const quotationController = require('./quotation_controller')
+const deliveryOrderController = require('./delivery_order_controller')
+const invoiceController = require('./invoice_controller')
+
+// Sales Order Settings
+router.options('/api/sales_order_settings', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_order_settings/preview_format', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/sales_order_settings', requireProductAccess('sales_management'), salesOrderController.getSalesOrderSettings)
+router.put('/api/sales_order_settings', requireProductAccess('sales_management'), salesOrderController.updateSalesOrderSettings)
+router.post('/api/sales_order_settings/preview_format', requireProductAccess('sales_management'), salesOrderController.previewOrderFormat)
+
+// Sales Orders
+router.options('/api/sales_orders', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_orders/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_orders/:id/delivery_summary', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/sales_orders/:id/delivery_summary', requireProductAccess('sales_management'), salesOrderController.getDeliverySummary)
+router.get('/api/sales_orders/:id', requireProductAccess('sales_management'), salesOrderController.getSalesOrder)
+router.get('/api/sales_orders', requireProductAccess('sales_management'), salesOrderController.getSalesOrders)
+router.post('/api/sales_orders', requireProductAccess('sales_management'), salesOrderController.createSalesOrder)
+router.put('/api/sales_orders/:id', requireProductAccess('sales_management'), salesOrderController.updateSalesOrder)
+router.delete('/api/sales_orders/:id', requireProductAccess('sales_management'), salesOrderController.deleteSalesOrder)
+
+// Sales Management - Organization Members (for dropdowns)
+router.options('/api/sales_management/members', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/sales_management/members', requireProductAccess('sales_management'), salesOrderController.getOrganizationMembers)
+
+// Sales Teams
+router.options('/api/sales_teams', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_teams/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_teams/:id/members', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_teams/:id/members/:individual_id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/sales_teams/:id', requireProductAccess('sales_management'), salesOrderController.getSalesTeam)
+router.get('/api/sales_teams', requireProductAccess('sales_management'), salesOrderController.getSalesTeams)
+router.post('/api/sales_teams', requireProductAccess('sales_management'), salesOrderController.createSalesTeam)
+router.put('/api/sales_teams/:id', requireProductAccess('sales_management'), salesOrderController.updateSalesTeam)
+router.delete('/api/sales_teams/:id', requireProductAccess('sales_management'), salesOrderController.deleteSalesTeam)
+router.post('/api/sales_teams/:id/members', requireProductAccess('sales_management'), salesOrderController.addTeamMember)
+router.delete('/api/sales_teams/:id/members/:individual_id', requireProductAccess('sales_management'), salesOrderController.removeTeamMember)
+
+// Sales Order Status Configuration
+router.options('/api/sales_order_statuses', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/sales_order_statuses', requireProductAccess('sales_management'), salesOrderController.getSalesOrderStatuses)
+router.put('/api/sales_order_statuses', requireProductAccess('sales_management'), salesOrderController.updateSalesOrderStatuses)
+
+// Quotation Settings
+router.options('/api/quotation_settings', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/quotation_settings/preview_format', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/quotation_settings', requireProductAccess('sales_management'), quotationController.getQuotationSettings)
+router.put('/api/quotation_settings', requireProductAccess('sales_management'), quotationController.updateQuotationSettings)
+router.post('/api/quotation_settings/preview_format', requireProductAccess('sales_management'), quotationController.previewQuotationFormat)
+
+// Quotations
+router.options('/api/sales_quotations', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/sales_quotations/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/sales_quotations/:id', requireProductAccess('sales_management'), quotationController.getQuotation)
+router.get('/api/sales_quotations', requireProductAccess('sales_management'), quotationController.getQuotations)
+router.post('/api/sales_quotations', requireProductAccess('sales_management'), quotationController.createQuotation)
+router.put('/api/sales_quotations/:id', requireProductAccess('sales_management'), quotationController.updateQuotation)
+router.delete('/api/sales_quotations/:id', requireProductAccess('sales_management'), quotationController.deleteQuotation)
+
+// Quotation Status Configuration
+router.options('/api/quotation_statuses', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/quotation_statuses', requireProductAccess('sales_management'), quotationController.getQuotationStatuses)
+router.put('/api/quotation_statuses', requireProductAccess('sales_management'), quotationController.updateQuotationStatuses)
+
+// Delivery Order Settings
+router.options('/api/delivery_order_settings', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/delivery_order_settings/preview_format', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/delivery_order_settings', requireProductAccess('sales_management'), deliveryOrderController.getDeliveryOrderSettings)
+router.put('/api/delivery_order_settings', requireProductAccess('sales_management'), deliveryOrderController.updateDeliveryOrderSettings)
+router.post('/api/delivery_order_settings/preview_format', requireProductAccess('sales_management'), deliveryOrderController.previewDeliveryOrderFormat)
+
+// Delivery Orders
+router.options('/api/delivery_orders', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/delivery_orders/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/delivery_orders/:id/mark-delivered', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/delivery_orders/:id', requireProductAccess('sales_management'), deliveryOrderController.getDeliveryOrder)
+router.get('/api/delivery_orders', requireProductAccess('sales_management'), deliveryOrderController.getDeliveryOrders)
+router.post('/api/delivery_orders', requireProductAccess('sales_management'), deliveryOrderController.createDeliveryOrder)
+router.put('/api/delivery_orders/:id', requireProductAccess('sales_management'), deliveryOrderController.updateDeliveryOrder)
+router.delete('/api/delivery_orders/:id', requireProductAccess('sales_management'), deliveryOrderController.deleteDeliveryOrder)
+router.post('/api/delivery_orders/:id/mark-delivered', requireProductAccess('sales_management'), deliveryOrderController.markDelivered)
+
+// Delivery Order Status Configuration
+router.options('/api/delivery_order_statuses', async (ctx) => {
+    serverUtil.addCors(ctx)
+    ctx.status = 200
+})
+router.get('/api/delivery_order_statuses', requireProductAccess('sales_management'), deliveryOrderController.getDeliveryOrderStatuses)
+router.put('/api/delivery_order_statuses', requireProductAccess('sales_management'), deliveryOrderController.updateDeliveryOrderStatuses)
+
+// Invoice Settings
+router.options('/api/invoice_settings', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/invoice_settings/preview_format', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/invoice_settings', requireProductAccess('sales_management'), invoiceController.getInvoiceSettings)
+router.put('/api/invoice_settings', requireProductAccess('sales_management'), invoiceController.updateInvoiceSettings)
+router.post('/api/invoice_settings/preview_format', requireProductAccess('sales_management'), invoiceController.previewInvoiceFormat)
+
+// Invoices
+router.options('/api/invoices', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/invoices/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/invoices/:id/payments', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/invoices/:id/payments/:paymentId', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/invoices/:id', requireProductAccess('sales_management'), invoiceController.getInvoice)
+router.get('/api/invoices', requireProductAccess('sales_management'), invoiceController.getInvoices)
+router.post('/api/invoices', requireProductAccess('sales_management'), invoiceController.createInvoice)
+router.put('/api/invoices/:id', requireProductAccess('sales_management'), invoiceController.updateInvoice)
+router.delete('/api/invoices/:id', requireProductAccess('sales_management'), invoiceController.deleteInvoice)
+router.get('/api/invoices/:id/payments', requireProductAccess('sales_management'), invoiceController.getInvoicePayments)
+router.post('/api/invoices/:id/payments', requireProductAccess('sales_management'), invoiceController.addInvoicePayment)
+router.delete('/api/invoices/:id/payments/:paymentId', requireProductAccess('sales_management'), invoiceController.deleteInvoicePayment)
+
+// Invoice Status Configuration
+router.options('/api/invoice_statuses', async (ctx) => {
+    serverUtil.addCors(ctx)
+    ctx.status = 200
+})
+router.get('/api/invoice_statuses', requireProductAccess('sales_management'), invoiceController.getInvoiceStatuses)
+router.put('/api/invoice_statuses', requireProductAccess('sales_management'), invoiceController.updateInvoiceStatuses)
 
 // =============================================================================
 // Calendar API
@@ -2162,6 +2369,273 @@ router.post('/api/inventory/upload-do', async (ctx) => {
         setHeader: (name, value) => { ctx.set(name, value) },
     })
 })
+
+// ============================================================================
+// Document Templates Routes (Sales Management)
+// ============================================================================
+const templateController = require('./template_controller');
+
+// OPTIONS handler for CORS preflight
+router.options('/api/templates', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+
+// GET /api/templates - List templates (optionally filtered by document_type)
+// GET /api/templates?template_id=xxx - Get single template
+router.get('/api/templates', requireProductAccess('sales_management'), async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+
+    const { organization_slug, document_type, template_id } = ctx.query;
+
+    if (!organization_slug) {
+        ctx.status = 400;
+        ctx.body = serverUtil.failResponse('Missing organization_slug parameter');
+        return;
+    }
+
+    const organization = await getOrganizationInfo(organization_slug);
+    if (!organization) {
+        ctx.status = 404;
+        ctx.body = serverUtil.failResponse('Organization not found');
+        return;
+    }
+
+    if (template_id) {
+        // Get single template
+        const result = await templateController.getTemplate(template_id, organization.id);
+        if (!result.success) {
+            ctx.status = 500;
+            ctx.body = serverUtil.failResponse(result.error);
+            return;
+        }
+        ctx.body = serverUtil.okResponse(result.data);
+    } else {
+        // Get all templates
+        const result = await templateController.getTemplates(organization.id, document_type);
+        if (!result.success) {
+            ctx.status = 500;
+            ctx.body = serverUtil.failResponse(result.error);
+            return;
+        }
+        ctx.body = serverUtil.okResponse(result.data);
+    }
+})
+
+// POST /api/templates - Create template
+// POST /api/templates?action=initialize - Initialize default templates
+// POST /api/templates?action=duplicate&template_id=xxx - Duplicate template
+// POST /api/templates?action=set-default&template_id=xxx - Set as default
+router.post('/api/templates', requireProductAccess('sales_management'), async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+
+    const { organization_slug, action, template_id } = ctx.query;
+
+    if (!organization_slug) {
+        ctx.status = 400;
+        ctx.body = serverUtil.failResponse('Missing organization_slug parameter');
+        return;
+    }
+
+    const organization = await getOrganizationInfo(organization_slug);
+    if (!organization) {
+        ctx.status = 404;
+        ctx.body = serverUtil.failResponse('Organization not found');
+        return;
+    }
+
+    // Get an individual_id for template attribution
+    let individualId = null;
+    try {
+        // Try to get an individual from organization_members
+        const { data: memberData } = await supabase
+            .from('organization_members')
+            .select('individual_id')
+            .eq('organization_id', organization.id)
+            .limit(1)
+            .single();
+
+        if (memberData) {
+            individualId = memberData.individual_id;
+        } else {
+            // Fallback: Get ANY individual
+            const { data: individualData } = await supabase
+                .from('individuals')
+                .select('id')
+                .limit(1)
+                .single();
+
+            if (individualData) {
+                individualId = individualData.id;
+            }
+        }
+    } catch (err) {
+        console.error('[templates] Error getting individual_id:', err);
+    }
+
+    if (!individualId) {
+        ctx.status = 500;
+        ctx.body = serverUtil.failResponse('Could not find a valid individual_id for this organization');
+        return;
+    }
+
+    if (action === 'initialize') {
+        const result = await templateController.initializeDefaultTemplates(organization.id, individualId);
+        if (!result.success) {
+            ctx.status = 500;
+            ctx.body = serverUtil.failResponse(result.error);
+            return;
+        }
+        ctx.body = serverUtil.okResponse({ message: result.message });
+    } else if (action === 'duplicate' && template_id) {
+        const result = await templateController.duplicateTemplate(template_id, organization.id, individualId);
+        if (!result.success) {
+            ctx.status = 500;
+            ctx.body = serverUtil.failResponse(result.error);
+            return;
+        }
+        ctx.body = serverUtil.okResponse(result.data);
+    } else if (action === 'set-default' && template_id) {
+        const result = await templateController.setDefaultTemplate(template_id, organization.id);
+        if (!result.success) {
+            ctx.status = 500;
+            ctx.body = serverUtil.failResponse(result.error);
+            return;
+        }
+        ctx.body = serverUtil.okResponse(result.data);
+    } else {
+        // Create new template
+        const result = await templateController.createTemplate(ctx.request.body, organization.id, individualId);
+        if (!result.success) {
+            ctx.status = 500;
+            ctx.body = serverUtil.failResponse(result.error);
+            return;
+        }
+        ctx.status = 201;
+        ctx.body = serverUtil.okResponse(result.data);
+    }
+})
+
+// PUT /api/templates?template_id=xxx - Update template
+router.put('/api/templates', requireProductAccess('sales_management'), async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+
+    const { organization_slug, template_id } = ctx.query;
+
+    if (!organization_slug) {
+        ctx.status = 400;
+        ctx.body = serverUtil.failResponse('Missing organization_slug parameter');
+        return;
+    }
+
+    if (!template_id) {
+        ctx.status = 400;
+        ctx.body = serverUtil.failResponse('Missing template_id parameter');
+        return;
+    }
+
+    const organization = await getOrganizationInfo(organization_slug);
+    if (!organization) {
+        ctx.status = 404;
+        ctx.body = serverUtil.failResponse('Organization not found');
+        return;
+    }
+
+    // TODO: Get authenticated user's individual_id from session
+    const individualId = organization.created_by_individual_id;
+
+    const result = await templateController.updateTemplate(template_id, ctx.request.body, organization.id, individualId);
+    if (!result.success) {
+        ctx.status = 500;
+        ctx.body = serverUtil.failResponse(result.error);
+        return;
+    }
+    ctx.body = serverUtil.okResponse(result.data);
+})
+
+// DELETE /api/templates?template_id=xxx - Delete template
+router.delete('/api/templates', requireProductAccess('sales_management'), async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+
+    const { organization_slug, template_id } = ctx.query;
+
+    if (!organization_slug) {
+        ctx.status = 400;
+        ctx.body = serverUtil.failResponse('Missing organization_slug parameter');
+        return;
+    }
+
+    if (!template_id) {
+        ctx.status = 400;
+        ctx.body = serverUtil.failResponse('Missing template_id parameter');
+        return;
+    }
+
+    const organization = await getOrganizationInfo(organization_slug);
+    if (!organization) {
+        ctx.status = 404;
+        ctx.body = serverUtil.failResponse('Organization not found');
+        return;
+    }
+
+    const result = await templateController.deleteTemplate(template_id, organization.id);
+    if (!result.success) {
+        ctx.status = 500;
+        ctx.body = serverUtil.failResponse(result.error);
+        return;
+    }
+    ctx.body = serverUtil.okResponse({ message: result.message });
+})
+
+// ============================================================================
+// PDF Generation Routes
+// ============================================================================
+
+// OPTIONS /api/documents/pdf/generate - CORS preflight
+router.options('/api/documents/pdf/generate', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+
+// GET /api/documents/pdf/generate?type=quotation&id=xxx&template_id=xxx&organization_slug=xxx
+const pdfGenerationHandler = require('./api_handlers/pdf_generation');
+router.get('/api/documents/pdf/generate', requireProductAccess('sales_management'), async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+
+    // Convert Koa context to req/res-like objects for the handler
+    const req = {
+        query: ctx.query,
+        headers: ctx.headers
+    };
+
+    const res = {
+        status: (code) => {
+            ctx.status = code;
+            return res;
+        },
+        json: (data) => {
+            ctx.body = data;
+            return res;
+        },
+        setHeader: (name, value) => {
+            ctx.set(name, value);
+            return res;
+        },
+        send: (data) => {
+            ctx.body = data;
+            return res;
+        }
+    };
+
+    await pdfGenerationHandler(req, res);
+})
+
+// ============================================================================
+// Integrations Module Routes
+// ============================================================================
+router.get('/api/integrations', integrationsController.listIntegrations);
+router.post('/api/integrations/connect', integrationsController.connectIntegration);
+router.post('/api/integrations/disconnect', integrationsController.disconnectIntegration);
 
 var port = process.env.PORT || serverConfig.config.apiPort;
 app.use(router.routes()).use(router.allowedMethods());

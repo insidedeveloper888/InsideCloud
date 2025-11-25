@@ -33,6 +33,16 @@ yarn-error.log*
 temp_*.txt
 *.tmp
 
+# Backup files
+*.backup
+*.bak
+*.bak2
+*.bak3
+
+# Test/Generated PDF files
+docs/generate*.pdf
+*.pdf.test
+
 # Scripts temporary data
 scripts/map-gen/node_modules
 scripts/map-gen/map_data.txt

@@ -62,7 +62,10 @@ async function getLarkCredentials(orgSlug) {
  * @returns {Promise<boolean>}
  */
 async function validateOrganization(orgSlug) {
+    console.log(`🔍 [validateOrganization] Checking org: ${orgSlug}`);
+
     if (!orgSlug) {
+        console.log('❌ [validateOrganization] No orgSlug provided');
         return false;
     }
 
@@ -72,6 +75,7 @@ async function validateOrganization(orgSlug) {
     }
 
     try {
+        console.log('🔍 [validateOrganization] Querying Supabase...');
         const { data, error } = await supabase
             .from('organizations')
             .select('id, slug, is_active')
@@ -79,10 +83,14 @@ async function validateOrganization(orgSlug) {
             .eq('is_active', true)
             .single();
 
+        console.log('🔍 [validateOrganization] Query result:', { data, error });
+
         if (error || !data) {
+            console.log(`❌ [validateOrganization] Failed: error=${error?.message}, hasData=${!!data}`);
             return false;
         }
 
+        console.log(`✅ [validateOrganization] Success: ${orgSlug}`);
         return true;
     } catch (error) {
         console.error('❌ Error validating organization:', error);

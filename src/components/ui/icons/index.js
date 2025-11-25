@@ -4,3 +4,5 @@ export { default as SheetIcon } from './SheetIcon.jsx';
 export { default as DocumentIcon } from './DocumentIcon.jsx';
 export { default as ContactBookIcon } from './ContactBookIcon.jsx';
 export { default as InventoryIcon } from './InventoryIcon.jsx';
+export { default as PuzzleIcon } from './PuzzleIcon.jsx';
+export { default as ShoppingCartIcon } from './ShoppingCartIcon.jsx';

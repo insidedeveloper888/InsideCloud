@@ -10,10 +10,15 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Home />} />
         <Route path="/strategic_map" element={<Home />} />
+        <Route path="/strategic_map_v2" element={<Home />} />
         <Route path="/document_parser" element={<Home />} />
         <Route path="/contact_management" element={<Home />} />
+        <Route path="/sales_management" element={<Home />} />
         <Route path="/inventory" element={<Home />} />
+        <Route path="/integrations" element={<Home />} />
         <Route path="/account" element={<Home />} />
+        <Route path="/users" element={<Home />} />
+        <Route path="/audit_log" element={<Home />} />
         <Route path="/audit_logs" element={<Home />} />
         <Route path="/organization" element={<Home />} />
         <Route path="*" element={<NotFound />} />

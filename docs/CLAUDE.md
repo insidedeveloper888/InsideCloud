@@ -222,8 +222,61 @@ A comprehensive inventory management system with multi-location stock tracking, 
 - **Main Component**: `src/tools/inventory/index.jsx`
 - **Backend Controller**: `server/inventory_controller.js`
 - **API Client**: `src/tools/inventory/api/inventory.js`
-- **Complete Schema**: `docs/inventory/inventory_schema.sql`
+- **Complete Schema**: `docs/sql-scripts/inventory/inventory_schema.sql`
 - **Documentation**: `docs/inventory/` (integration plans, setup guides, feature docs)
+
+### Sales Management (销售管理) - Production Ready ✅
+
+**Status**: Production-ready as of 2025-11-25 (v1.0.0)
+
+A complete sales document workflow system from quotation to invoice, with an advanced visual PDF template builder.
+
+**Key Features:**
+- ✅ **4 Document Types**: Quotations, Sales Orders, Delivery Orders, Invoices
+- ✅ **Document Conversion Workflow**: Quotation → Sales Order → Delivery Order → Invoice (one-click auto-fill)
+- ✅ **Visual PDF Template Builder**: Drag-and-drop editor with live preview, 10 component types
+- ✅ **PDF Generation Engine**: pdfkit-based generator with data mapping, QR codes, dynamic tables
+- ✅ **Configurable Status Workflows**: Custom statuses per document type with color-coding
+- ✅ **Payment Tracking**: Multiple payment methods, payment history, automatic status calculation
+- ✅ **Auto-Generated Document Codes**: Custom formats with tokens (e.g., SO-{YYMM}-{5digits})
+- ✅ **Team-Based Access Control**: Organization-wide, assigned-only, or team-based visibility
+- ✅ **7 Reusable Select Components**: Searchable dropdowns for customers, products, statuses, etc.
+- ✅ **Inline Validation System**: Per-field error messages replacing alert() dialogs
+- ✅ **Mobile Responsive**: Card views, collapsible filters, touch-friendly actions
+
+**Document Workflow:**
+```
+Quotation (QT-2511-00001)
+  ↓ Convert
+Sales Order (SO-2511-00001) ← Auto-fill customer, items, amounts
+  ↓ Convert
+Delivery Order (DO-2511-00001) ← Select items to deliver, assign technician
+  ↓ Create
+Invoice (INV-2511-00001) ← Track payments, calculate amount due
+```
+
+**PDF Template System:**
+- **Visual Builder**: Full-screen editor with 3-pane layout (library, canvas, properties)
+- **10 Component Types**: Text, Multiline, Number, Date, Image, Table, QR Code, Signature, Checkbox, Label
+- **Data Mapping**: Connect template components to document fields via dataKey
+- **Live Preview**: Toggle-able preview panel shows real-time changes
+- **8 Customizable Sections**: Header, Title, Details, Items Table, Totals, Notes, Footer, Watermark
+- **Multiple Templates**: One default template per document type, unlimited custom templates
+- **Number Formatting**: Currency (RM 1,234.56), Percentage (15%), Decimal control
+- **Table Configuration**: Column editor with field selection, width, alignment, format
+
+**Implementation Status:**
+- Backend: 66 API endpoints, 6 controllers (398-700 lines each), 6 Vercel handlers
+- Frontend: 13 React hooks, 23 components (~6,000 lines total)
+- Database: 14 tables, 50+ indexes, 9 migrations
+- Build: Successful, minimal bundle increase (+10.5 KB)
+
+**Implementation Files:**
+- **Main Component**: `src/tools/sales-management/index.jsx`
+- **Backend Controllers**: `server/quotation_controller.js`, `server/sales_order_controller.js`, `server/delivery_order_controller.js`, `server/invoice_controller.js`, `server/template_controller.js`, `server/pdf_generator.js`
+- **API Handlers**: `server/api_handlers/quotations.js`, `sales_orders.js`, `delivery_orders.js`, `invoices.js`, `templates.js`, `pdf_generation.js`
+- **Complete Schema**: `docs/sql-scripts/sales-management/sales-management-complete-schema.sql`
+- **Migrations**: `docs/sql-scripts/sales-management/` (9 migration files)
 
 ### Strategic Map - Production Ready ✅
 
@@ -351,10 +404,62 @@ When implementing a new API endpoint, you **MUST** implement it in **BOTH** plac
 
 ## Key Implementation Patterns
 
-### 1. Organization-Specific App IDs
+### 1. React Router Navigation with Product Access Control
+
+**CRITICAL: Adding New Product Routes**
+
+When adding a new product (tool) to the platform, you MUST update **TWO** locations or navigation will fail:
+
+1. **App.js Routes** (`src/App.js`):
+   ```javascript
+   <Route path="/new_product" element={<Home />} />
+   ```
+
+2. **Product Access Control** (`src/pages/home/index.js`):
+   ```javascript
+   // Add product to allowed views for non-admin users
+   useEffect(() => {
+     if (!isAdmin && activeView !== 'dashboard' &&
+         activeView !== 'strategic_map' &&
+         activeView !== 'new_product') {  // ADD HERE
+       setActiveView('dashboard');
+     }
+   }, [isAdmin, activeView]);
+   ```
+
+**Why Both Are Required:**
+- **App.js**: React Router needs the route definition to match the URL
+- **Access Control**: Home component checks if non-admin users can access the view
+- **Failure Pattern**: If you forget either, navigation appears to work (URL changes) but view doesn't render
+
+**Example Fix (Sales Management & Integrations - 2025-11-22):**
+```javascript
+// In src/App.js - Added routes
+<Route path="/sales_management" element={<Home />} />
+<Route path="/integrations" element={<Home />} />
+
+// In src/pages/home/index.js - Added to allowed views
+activeView !== 'sales_management' && activeView !== 'integrations'
+```
+
+**Navigation Flow:**
+1. User clicks product → `navigateToView(product.key)` called
+2. React Router navigate() changes URL to `/product_key`
+3. App.js route matches → renders `<Home />` component
+4. Home component reads URL pathname → sets `activeView` state
+5. Access control useEffect checks if user can access view
+6. If allowed → `renderActiveView()` displays the product component
+7. If blocked → redirects to dashboard
+
+**Common Mistake:**
+- ❌ Adding route to App.js but forgetting access control check
+- Symptom: URL changes, then immediately redirects back to dashboard
+- Root cause: Access control blocks the view as "unauthorized"
+
+### 2. Organization-Specific App IDs
 Each organization can have different Lark app credentials. The frontend stores the organization-specific `app_id` in localStorage and uses it for JSAPI calls.
 
-### 2. Optimistic Updates with Cascade Support
+### 3. Optimistic Updates with Cascade Support
 Strategic Map uses optimistic updates for instant UX feedback:
 ```javascript
 // Optimistic: Update UI immediately
@@ -382,7 +487,7 @@ catch (error) {
 }
 ```
 
-### 3. User Sync on Login
+### 4. User Sync on Login
 Every authentication triggers `syncLarkUser()`:
 - Check if `auth.users` exists by `lark_user_id`
 - If not: Create user, individual, and organization_member records
@@ -489,6 +594,130 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. Key decisions:
 - **ADR-006**: Strategic map cascading - client-side pattern (migrated to database in v2.2.0)
 
 ## Recent Major Milestones
+
+### ✅ Sales Management v1.0.0 - Production Ready (2025-11-25)
+
+**Complete sales document workflow** with visual PDF template builder:
+
+**Core Features:**
+- Full CRUD for 4 document types (Quotations, Sales Orders, Delivery Orders, Invoices)
+- Document conversion workflow with auto-fill (Q→SO→DO→INV)
+- Visual PDF template builder with 8 customizable sections and 10 component types
+- PDF generation engine (pdfkit) with data mapping, QR codes, dynamic tables, number formatting
+- Configurable status workflows per document type with color-coding
+- Payment tracking with multiple methods, payment history, automatic status calculation
+- Auto-generated document codes with custom formats (SO-{YYMM}-{5digits})
+- Team-based access control (organization-wide, assigned-only, or team-based visibility)
+- 7 reusable select components for consistent UI/UX (searchable dropdowns)
+- Inline validation system replacing all alert() dialogs
+
+**Technical Implementation:**
+- Backend: 66 API endpoints, 6 controllers (2,900+ lines total), 6 Vercel handlers
+- Frontend: 13 React hooks, 23 components (~6,000 lines), 15 template components
+- Database: 14 tables with 50+ indexes, JSONB template storage, 9 migrations
+- PDF System: pdfkit engine (700+ lines) with coordinate scaling, A4 rendering
+- Build: Successful with minimal bundle increase (+10.5 KB)
+
+**Files**: `src/tools/sales-management/`, `server/*_controller.js`, `docs/sql-scripts/sales-management/`
+
+---
+
+### ✅ Sales Management UI/UX Standardization - COMPLETED (2025-11-24)
+
+**Phase 1: Status Display & Component Library** ✅ **COMPLETED**
+
+**Status Display Standardization:**
+- ✅ Fixed QuotationsListView to use correct `useQuotationStatuses` hook (was using `useSalesOrderStatuses`)
+- ✅ Updated DeliveryOrderListView to use dynamic `useDeliveryOrderStatuses` hook
+- ✅ Updated InvoiceListView to use dynamic `useInvoiceStatuses` hook
+- ✅ All status badges now display colors and labels from Settings configuration
+- ✅ Consistent rendering: inline styles with 20% opacity backgrounds + full opacity text
+
+**New Standardized Components Created:**
+1. ✅ **QuotationSelect** (`src/tools/sales-management/components/QuotationSelect.jsx`)
+   - Searchable dropdown with quotation code + customer name
+   - Auto-filters converted quotations by default
+   - Shows amount and status badge
+
+2. ✅ **SalesOrderSelect** (`src/tools/sales-management/components/SalesOrderSelect.jsx`)
+   - Searchable dropdown with order code + customer
+   - Optional filter for completed orders
+   - Shows amount and status badge
+
+3. ✅ **DeliveryOrderSelect** (`src/tools/sales-management/components/DeliveryOrderSelect.jsx`)
+   - Searchable dropdown with DO code + customer
+   - Optional filter for delivered orders
+   - Shows delivery date and status badge
+
+4. ✅ **CustomerSelect** (Previously created)
+5. ✅ **ProductSelect** (Previously created)
+6. ✅ **StatusSelect** (Previously created)
+7. ✅ **MemberSelect** (Previously created)
+
+**SalesOrderFormDialog Standardization:** ✅ **COMPLETED**
+- ✅ Replaced native `<select>` for Quotation with `QuotationSelect`
+- ✅ Replaced native `<select>` for Customer with `CustomerSelect`
+- ✅ Replaced native `<select>` for Status with `StatusSelect`
+- ✅ Replaced native `<select>` for Product in line items with `ProductSelect`
+- ✅ Implemented inline validation with error state management
+- ✅ Added per-field inline error messages with AlertCircle icons
+- ✅ Added line item validation UI (product_id, quantity fields)
+- ✅ Added error clearing logic to updateLineItem function
+- ✅ Removed all alert() dialogs
+
+**DeliveryOrderFormDialog Standardization:** ✅ **COMPLETED**
+- ✅ Replaced native `<select>` for Customer with `CustomerSelect`
+- ✅ Replaced native `<select>` for Status with `StatusSelect`
+- ✅ Replaced native `<select>` for Product in line items with `ProductSelect`
+- ✅ Fixed overflow-hidden issue preventing dropdown display
+- ✅ Moved "Sales Order" to blue-bordered section matching SalesOrderFormDialog pattern
+- ✅ Added inline validation with error state management
+- ✅ Added per-field error messages with AlertCircle icons
+- ✅ Added line items error banner
+- ✅ Removed all alert() dialogs
+- ✅ All dropdowns now use standardized components
+- ✅ **Renamed "Sales Person" to "Technician"** (UI and database schema)
+- ✅ **Filter out fully delivered sales orders** from dropdown
+- ✅ **Updated validation message**: "Please select at least one item to be delivered"
+
+**InvoiceFormDialog Standardization:** ✅ **COMPLETED**
+- ✅ Replaced native `<select>` for Customer with `CustomerSelect`
+- ✅ Replaced native `<select>` for Status with `StatusSelect`
+- ✅ Replaced native `<select>` for Product in line items with `ProductSelect`
+- ✅ Fixed overflow-hidden issue preventing dropdown display
+- ✅ Moved "References" section to blue-bordered section at top (create mode only)
+- ✅ Added inline validation with error state management
+- ✅ Added per-field error messages (Customer, Due Date)
+- ✅ Added line items error banner
+- ✅ Removed all alert() dialogs
+- ✅ All dropdowns now use standardized components
+
+**Convert From Document Components:** ✅ **STANDARDIZED UI**
+- ✅ SalesOrderFormDialog: "📋 Convert from Quotation" - blue box with icon, success message
+- ✅ DeliveryOrderFormDialog: "📦 Convert from Sales Order" - blue box with icon, success message
+- ✅ InvoiceFormDialog: "🧾 Convert from Sales Order / Delivery Order" - blue box with dual selects, success message
+- ✅ All document conversion sections now use consistent blue-bordered UI pattern
+- ✅ Only shown in create mode (!order/!invoice condition)
+
+**Summary of Changes:**
+- 🎯 **All native `<select>` elements replaced** across all 4 document type forms
+- 🎯 **Consistent UI/UX** with searchable dropdowns, clear buttons, keyboard navigation
+- 🎯 **Inline validation** implemented in ALL forms (Sales Orders, Delivery Orders, Invoices)
+- 🎯 **Overflow issues fixed** in all table-based line item forms
+- 🎯 **Document conversion UI standardized** - blue-bordered sections with icons and success messages
+- 🎯 **Error handling improved** - replaced alert() dialogs with graceful inline error messages
+- 🎯 **7 reusable select components** in component library
+- 🎯 **Zero breaking changes** - all existing functionality preserved
+
+**Build Status:** ✅ Successful (878.76 kB, +442 B for validation features)
+
+**Remaining Tasks for Future Sprints:**
+- ⏳ Add inline validation to QuotationFormDialog (ENHANCEMENT)
+- ⏳ Database constraints for document relationships (1:1 quotation→sales order)
+- ⏳ Contact management integration features
+- ⏳ PDF template system with drag-and-drop builder
+
+---
 
 ### ✅ Contact Management v1.0.0 - Production Ready (2025-11-19)
 - Full CRM system with customer, supplier, COI, and internal contact types

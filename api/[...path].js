@@ -40,6 +40,11 @@ const inventory = require('../server/api_handlers/inventory');
 const userDepartment = require('../server/api_handlers/user_department');
 const tenantInfo = require('../server/api_handlers/tenant_info');
 const calendarEvents = require('../server/api_handlers/calendar_events');
+const salesOrders = require('../server/api_handlers/sales_orders');
+const quotations = require('../server/api_handlers/quotations');
+const integrations = require('../server/api_handlers/integrations');
+const templates = require('../server/api_handlers/templates');
+const pdfGeneration = require('../server/api_handlers/pdf_generation');
 
 /**
  * Route mapping: path -> handler
@@ -71,6 +76,16 @@ const routes = {
   '/api/user_department': userDepartment,
   '/api/tenant_info': tenantInfo,
   '/api/calendar/events': calendarEvents,
+  '/api/sales_order_settings': salesOrders,
+  '/api/sales_order_statuses': salesOrders,
+  '/api/sales_orders': salesOrders,
+  '/api/sales_teams': salesOrders,
+  '/api/quotation_settings': quotations,
+  '/api/quotation_statuses': quotations,
+  '/api/sales_quotations': quotations,
+  '/api/integrations': integrations,
+  '/api/templates': templates,
+  '/api/documents/pdf/generate': pdfGeneration,
 };
 
 /**
