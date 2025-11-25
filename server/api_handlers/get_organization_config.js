@@ -1,18 +1,79 @@
-let handleCors, okResponse, failResponse, supabase, getLarkCredentials;
+const { createClient } = require('@supabase/supabase-js');
 
-try {
-  const utils = require('../../api/_utils');
-  handleCors = utils.handleCors;
-  okResponse = utils.okResponse;
-  failResponse = utils.failResponse;
+// Initialize Supabase client directly to avoid module loading issues
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-  const supabaseHelper = require('../../api/_supabase_helper');
-  supabase = supabaseHelper.supabase;
-  getLarkCredentials = supabaseHelper.getLarkCredentials;
-} catch (initError) {
-  console.error('❌ [INIT] Failed to load dependencies:', initError);
-  console.error('Init error stack:', initError.stack);
-}
+const supabase = supabaseUrl && supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : null;
+
+// Inline utility functions to avoid module loading issues
+const handleCors = (req, res) => {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return true;
+  }
+  return false;
+};
+
+const okResponse = (data) => ({ success: true, data });
+const failResponse = (error) => ({ success: false, error });
+
+// Inline getLarkCredentials to avoid module loading issues
+const getLarkCredentials = async (orgSlug) => {
+  if (!orgSlug || !supabase) {
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+    return null;
+  }
+
+  try {
+    console.log(`🔍 Fetching Lark credentials for organization slug: ${orgSlug}`);
+    const { data, error } = await supabase.rpc('get_lark_credentials', {
+      org_slug: orgSlug
+    });
+
+    if (error) {
+      console.error('❌ Supabase RPC error:', error);
+      throw new Error(`Supabase RPC error: ${error.message || 'Unknown error'}`);
+    }
+
+    if (!data || data.length === 0) {
+      console.warn(`⚠️  No credentials found for organization slug: ${orgSlug}`);
+      return null;
+    }
+
+    const credentials = data[0];
+    if (!credentials.lark_app_id || !credentials.lark_app_secret) {
+      console.warn(`⚠️  Incomplete credentials for organization slug: ${orgSlug}`);
+      return null;
+    }
+
+    console.log(`✅ Lark credentials retrieved for organization: ${orgSlug}`);
+    return {
+      lark_app_id: credentials.lark_app_id,
+      lark_app_secret: credentials.lark_app_secret,
+      noncestr: credentials.noncestr || '',
+      organization_id: credentials.organization_id,
+      is_active: credentials.is_active
+    };
+  } catch (error) {
+    console.error('❌ Error fetching Lark credentials:', error);
+    throw error;
+  }
+};
 
 /**
  * Validate that an organization exists and is active
@@ -69,20 +130,15 @@ async function getOrganizationInfo(orgSlug) {
 }
 
 module.exports = async function handler(req, res) {
-  // Check if dependencies loaded successfully
-  if (!handleCors || !okResponse || !failResponse) {
-    console.error('❌ [HANDLER] Dependencies not loaded - utils missing');
-    res.status(500).json({
-      success: false,
-      error: 'Server initialization error - utils not loaded'
-    });
-    return;
-  }
-
   // Handle CORS
   if (handleCors(req, res)) return;
 
   console.log("\n-------------------[获取组织配置 BEGIN]-----------------------------");
+  console.log('Environment check:', {
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseInitialized: !!supabase
+  });
 
   if (!supabase) {
     console.error('Supabase not configured');
