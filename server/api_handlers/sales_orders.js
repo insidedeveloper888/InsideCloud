@@ -110,6 +110,9 @@ module.exports = async function handler(req, res) {
   const { method, query } = req;
   let { organization_slug, id } = query;
 
+  // Extract path from URL (remove query string)
+  const path = req.url.split('?')[0];
+
   // Extract ID from URL if not in query (for catch-all routing)
   if (!id) {
     // Match UUID in path: /sales_orders/UUID

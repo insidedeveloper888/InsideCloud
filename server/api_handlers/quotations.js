@@ -110,6 +110,9 @@ module.exports = async function handler(req, res) {
   const { method, query } = req;
   const { organization_slug, id } = query;
 
+  // Extract path from URL (remove query string)
+  const path = req.url.split('?')[0];
+
   try {
     // Settings endpoints
     if (req.url.includes('/quotation_settings/preview_format')) {
