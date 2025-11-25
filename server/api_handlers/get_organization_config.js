@@ -27,8 +27,8 @@ const handleCors = (req, res) => {
   return false;
 };
 
-const okResponse = (data) => ({ success: true, data });
-const failResponse = (error) => ({ success: false, error });
+const okResponse = (data) => ({ code: 0, msg: "success", data });
+const failResponse = (msg) => ({ code: -1, msg, data: null });
 
 // Inline getLarkCredentials to avoid module loading issues
 const getLarkCredentials = async (orgSlug) => {
