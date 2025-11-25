@@ -1,0 +1,347 @@
+import React, { useState } from 'react';
+import { FileText, X, CheckCircle, Truck, Upload } from 'lucide-react';
+import { InventoryAPI } from '../../api/inventory';
+
+/**
+ * Delivery Order Detail Modal
+ * Shows full DO details with ability to:
+ * - View order items
+ * - Update status (draft → confirmed → dispatched → delivered)
+ * - Upload delivery order document
+ * - Cancel delivery order
+ * - View cancellation info if cancelled
+ */
+export default function DODetailModal({
+  isOpen,
+  selectedDO,
+  onClose,
+  organizationSlug,
+  onUpdateStatus,
+  onRefresh,
+  setShowCancelDOModal
+}) {
+  const [localError, setLocalError] = useState('');
+
+  if (!isOpen || !selectedDO) return null;
+
+  const handleClose = () => {
+    setLocalError('');
+    onClose();
+  };
+
+  const handleUpdateStatus = async (newStatus) => {
+    try {
+      setLocalError('');
+      await onUpdateStatus(newStatus);
+    } catch (err) {
+      console.error('Failed to update DO status:', err);
+      setLocalError(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  const handleViewDO = () => {
+    const url = selectedDO.delivery_order_url;
+
+    // Validate URL to prevent XSS
+    const isValidUrl = (urlToValidate) => {
+      try {
+        const parsed = new URL(urlToValidate, window.location.origin);
+        return ['http:', 'https:', 'data:'].includes(parsed.protocol);
+      } catch {
+        return false;
+      }
+    };
+
+    if (url?.startsWith('data:')) {
+      try {
+        const [metadata, base64Data] = url.split(',');
+        if (!base64Data) {
+          alert('Invalid document format');
+          return;
+        }
+
+        const byteString = atob(base64Data);
+        const mimeString = metadata.split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+        const blob = new Blob([ab], { type: mimeString });
+        const blobUrl = URL.createObjectURL(blob);
+
+        // Open in new window
+        const newWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+
+        // Clean up blob URL after a short delay to prevent memory leak
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+        if (!newWindow) {
+          alert('Please allow popups to view the document');
+        }
+      } catch (err) {
+        console.error('Failed to decode document:', err);
+        alert('Unable to display document. The file may be corrupted.');
+      }
+    } else if (url) {
+      // Validate external URL before opening
+      if (isValidUrl(url)) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        alert('Invalid document URL');
+      }
+    }
+  };
+
+  const handleUploadDO = async (file) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setLocalError('Failed to read file. Please try again.');
+    };
+    reader.onload = async (event) => {
+      try {
+        setLocalError('');
+        const dataUrl = event.target.result;
+        // Update DO with the document URL using updateDOStatus
+        const result = await InventoryAPI.updateDOStatus(organizationSlug, selectedDO.id, selectedDO.status, dataUrl);
+        if (result.code === 0) {
+          await onRefresh();
+        } else {
+          setLocalError(`Failed to save DO document: ${result.msg}`);
+        }
+      } catch (err) {
+        console.error('Failed to upload DO document:', err);
+        setLocalError(`Upload failed: ${err.message}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200/50 my-auto animate-in zoom-in-95 fade-in duration-300">
+        {/* Header */}
+        <div className="sticky top-0 bg-white px-8 pt-8 pb-4 border-b border-gray-100 z-10 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">Delivery Order Details</h2>
+            <p className="text-sm text-gray-500">{selectedDO.do_number}</p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="px-8 pb-8 pt-4 space-y-6">
+          {/* Error Display */}
+          {localError && (
+            <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-4 animate-in slide-in-from-top-2 fade-in duration-200">
+              <div className="flex items-start space-x-2">
+                <X className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-900">Error</p>
+                  <p className="text-sm text-red-700 mt-1">{localError}</p>
+                </div>
+                <button
+                  onClick={() => setLocalError('')}
+                  className="text-red-400 hover:text-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* DO Info Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Customer</label>
+              <p className="text-gray-900">{selectedDO.customer_name || '-'}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Warehouse</label>
+              <p className="text-gray-900">{selectedDO.location?.name || '-'}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Delivery Address</label>
+              <p className="text-gray-900">{selectedDO.delivery_address || '-'}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Created By</label>
+              <p className="text-gray-900">{selectedDO.created_by?.display_name || '-'}</p>
+            </div>
+          </div>
+
+          {/* Order Items */}
+          <div>
+            <label className="block text-sm font-bold text-gray-900 mb-3">Order Items</label>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Product</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Quantity</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Unit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {selectedDO.items?.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{item.product?.name || '-'}</div>
+                        <div className="text-xs text-gray-500">{item.product?.sku || item.product?.code || '-'}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center font-semibold text-gray-900">{item.quantity}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{item.unit || 'pcs'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-emerald-50 border-t border-emerald-200">
+                  <tr>
+                    <td className="px-4 py-3 font-bold text-gray-900">Total Items:</td>
+                    <td className="px-4 py-3 text-center text-lg font-bold text-emerald-600">
+                      {selectedDO.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Update Status */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-bold text-gray-900 mb-3">Update Status</label>
+            {selectedDO.status === 'delivered' ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center space-x-2 text-emerald-700">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-medium">Stock Deducted from Inventory</span>
+                </div>
+                <p className="text-sm text-emerald-600 mt-1">Status is locked. For returns or corrections, use Stock In movements.</p>
+              </div>
+            ) : null}
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                disabled={true}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                  selectedDO.status === 'draft' ? 'bg-gray-100 border-gray-300' : 'bg-gray-50 border-gray-200 opacity-50'
+                }`}
+              >
+                <FileText className="w-5 h-5 text-gray-500 mb-1" />
+                <span className="text-xs font-medium text-gray-600">Draft</span>
+              </button>
+              <button
+                onClick={() => selectedDO.status === 'draft' && selectedDO.delivery_order_url ? handleUpdateStatus('confirmed') : null}
+                disabled={selectedDO.status !== 'draft' || !selectedDO.delivery_order_url}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                  selectedDO.status === 'confirmed' ? 'bg-blue-100 border-blue-300' :
+                  selectedDO.status === 'draft' && selectedDO.delivery_order_url ? 'bg-blue-50 border-blue-200 hover:bg-blue-100 cursor-pointer' :
+                  'bg-gray-50 border-gray-200 opacity-50'
+                }`}
+              >
+                <CheckCircle className="w-5 h-5 text-blue-500 mb-1" />
+                <span className="text-xs font-medium text-blue-600">Confirmed</span>
+              </button>
+              <button
+                onClick={() => selectedDO.status === 'confirmed' ? handleUpdateStatus('dispatched') : null}
+                disabled={selectedDO.status !== 'confirmed'}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                  selectedDO.status === 'dispatched' ? 'bg-yellow-100 border-yellow-300' :
+                  selectedDO.status === 'confirmed' ? 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100 cursor-pointer' :
+                  'bg-gray-50 border-gray-200 opacity-50'
+                }`}
+              >
+                <Truck className="w-5 h-5 text-yellow-600 mb-1" />
+                <span className="text-xs font-medium text-yellow-700">Dispatched</span>
+              </button>
+              <button
+                onClick={() => selectedDO.status === 'dispatched' ? handleUpdateStatus('delivered') : null}
+                disabled={selectedDO.status !== 'dispatched'}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                  selectedDO.status === 'delivered' ? 'bg-emerald-100 border-emerald-300' :
+                  selectedDO.status === 'dispatched' ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 cursor-pointer' :
+                  'bg-gray-50 border-gray-200 opacity-50'
+                }`}
+              >
+                <CheckCircle className="w-5 h-5 text-emerald-500 mb-1" />
+                <span className="text-xs font-medium text-emerald-600">Delivered</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cancel Button - Show only if not delivered or already cancelled */}
+          {selectedDO.status !== 'delivered' && selectedDO.status !== 'cancelled' && (
+            <div className="border-t pt-4">
+              <button
+                onClick={() => setShowCancelDOModal(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                <span className="font-medium">Cancel Delivery Order</span>
+              </button>
+            </div>
+          )}
+
+          {/* Show cancellation info if cancelled */}
+          {selectedDO.status === 'cancelled' && (
+            <div className="border-t pt-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2 text-red-700 mb-2">
+                  <X className="w-5 h-5" />
+                  <span className="font-bold">Delivery Order Cancelled</span>
+                </div>
+                <p className="text-sm text-red-600"><span className="font-medium">Reason:</span> {selectedDO.cancellation_reason || '-'}</p>
+                {selectedDO.cancelled_at && <p className="text-xs text-red-500 mt-1">Cancelled on {new Date(selectedDO.cancelled_at).toLocaleString()}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Delivery Order (DO) Document Upload */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-bold text-gray-900 mb-3">Delivery Order (DO)</label>
+            {selectedDO.delivery_order_url ? (
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2 text-emerald-700">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-medium">DO Document uploaded</span>
+                </div>
+                <button
+                  onClick={handleViewDO}
+                  className="px-3 py-1 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700"
+                >
+                  View DO
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="file"
+                  id="do-out-upload"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleUploadDO(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="do-out-upload"
+                  className="flex items-center justify-center space-x-2 px-6 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer"
+                >
+                  <Upload className="w-5 h-5 text-gray-400" />
+                  <span className="text-gray-600 font-medium">Upload DO Document</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-2">Upload DO to enable status confirmation</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

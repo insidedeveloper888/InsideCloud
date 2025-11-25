@@ -246,6 +246,12 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(okResponse(result.data));
       }
 
+      // Handle product unit update (e.g., pricing)
+      if (action === 'update-product-unit' && resourceId) {
+        const result = await controller.updateProductUnit(organization_slug, resourceId, data);
+        return res.status(200).json(okResponse(result.data));
+      }
+
       // Handle inventory quantity update (default action when no specific action is provided)
       if (!action) {
         if (!item_id && !resourceId) {

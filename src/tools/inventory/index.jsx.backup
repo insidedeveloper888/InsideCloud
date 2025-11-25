@@ -98,7 +98,6 @@ export default function InventoryProduct({ onBack }) {
     doStatuses: [],     // For delivery orders tab
     states: [],         // For suppliers tab
     minQuantity: null,  // For overview tab - quantity range
-    itemType: 'selling', // For products tab - 'selling' or 'spare'
     maxQuantity: null,  // For overview tab - quantity range
   });
 
@@ -270,7 +269,6 @@ export default function InventoryProduct({ onBack }) {
   const [expandedProductId, setExpandedProductId] = useState(null);
   const [allProductUnits, setAllProductUnits] = useState([]);
   const [newProductUnit, setNewProductUnit] = useState({}); // { productId: { unit_name, conversion } }
-  const [showAddUnitForm, setShowAddUnitForm] = useState({}); // { productId: boolean }
 
   // Load locations on mount (needed for Add Product modal and PO)
   useEffect(() => {
@@ -339,9 +337,6 @@ export default function InventoryProduct({ onBack }) {
           }
           if (settingsRes.data.custom_units) {
             setCustomUnits(settingsRes.data.custom_units);
-          }
-          if (settingsRes.data.custom_stock_in_types) {
-            setCustomStockInTypes(settingsRes.data.custom_stock_in_types);
           }
         }
         // Load unit conversions
@@ -460,7 +455,7 @@ export default function InventoryProduct({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationSlug, tab]);
 
-  const fetchData = async (signal, isMounted = true) => {
+  const fetchData = async (signal, isMounted) => {
     try {
       if (tab === 'overview') {
         const results = await Promise.allSettled([
@@ -807,41 +802,8 @@ export default function InventoryProduct({ onBack }) {
         setModalError('SKU is required');
         return;
       }
-
-      // Check for duplicate SKU (only active products)
-      const duplicateSKU = products.find(p =>
-        !p.is_deleted && p.sku?.toLowerCase() === newProduct.sku.trim().toLowerCase()
-      );
-      if (duplicateSKU) {
-        setModalError(`SKU "${newProduct.sku.trim()}" already exists for an active product. Please use a different SKU.`);
-        return;
-      }
-
-      // Check if SKU exists in a soft-deleted product
-      const softDeletedSKU = products.find(p =>
-        p.is_deleted && p.sku?.toLowerCase() === newProduct.sku.trim().toLowerCase()
-      );
-      if (softDeletedSKU) {
-        console.warn(`SKU "${newProduct.sku.trim()}" exists in soft-deleted product. Attempting to reuse...`);
-      }
-
       if (!newProduct.name?.trim()) {
         setModalError('Product name is required');
-        return;
-      }
-
-      // Helper function to normalize product name (remove spaces, symbols, lowercase)
-      const normalizeProductName = (name) => {
-        return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      };
-
-      // Check for duplicate product name (only active products, normalized)
-      const normalizedNewName = normalizeProductName(newProduct.name.trim());
-      const duplicateName = products.find(p =>
-        !p.is_deleted && normalizeProductName(p.name) === normalizedNewName
-      );
-      if (duplicateName) {
-        setModalError(`A product with similar name "${duplicateName.name}" already exists. Product names must be unique (ignoring spaces, symbols, and case).`);
         return;
       }
 
@@ -907,32 +869,15 @@ export default function InventoryProduct({ onBack }) {
       } else {
         // Show error in modal
         const errorMsg = result.msg || 'Failed to create product';
-        console.error('Product creation error:', errorMsg);
-
-        if (errorMsg.includes('duplicate') || errorMsg.includes('already exists') || errorMsg.includes('unique constraint')) {
-          // Check if it's a soft-deleted product
-          const softDeletedProduct = products.find(p =>
-            p.is_deleted && p.sku?.toLowerCase() === newProduct.sku.trim().toLowerCase()
-          );
-
-          if (softDeletedProduct) {
-            setModalError(`SKU "${newProduct.sku.trim()}" exists in a deleted product. The database has a unique constraint on SKU. Please contact your administrator to permanently delete the old product or use a different SKU.`);
-          } else {
-            setModalError(`SKU "${newProduct.sku.trim()}" already exists. Please use a different SKU.`);
-          }
+        if (errorMsg.includes('duplicate') || errorMsg.includes('already exists')) {
+          setModalError('A product with this SKU already exists');
         } else {
           setModalError(errorMsg);
         }
       }
     } catch (err) {
       console.error('Failed to add product:', err);
-      const errorMsg = err.message || 'Failed to create product';
-
-      if (errorMsg.includes('duplicate') || errorMsg.includes('already exists') || errorMsg.includes('unique constraint')) {
-        setModalError(`SKU "${newProduct.sku.trim()}" already exists. Please use a different SKU or contact your administrator.`);
-      } else {
-        setModalError(errorMsg);
-      }
+      setModalError(err.message || 'Failed to create product');
     }
   };
 
@@ -1417,17 +1362,6 @@ export default function InventoryProduct({ onBack }) {
     }
   };
 
-  // Save custom stock in types to database
-  const saveCustomStockInTypes = async (newTypes) => {
-    try {
-      await InventoryAPI.updateSettings(organizationSlug, {
-        custom_stock_in_types: newTypes
-      });
-    } catch (err) {
-      console.error('Failed to save stock in types:', err);
-    }
-  };
-
   const handleOpenPODetail = (po) => {
     setSelectedPO(po);
     setShowPODetailModal(true);
@@ -1615,8 +1549,8 @@ export default function InventoryProduct({ onBack }) {
                 className="group relative bg-gradient-to-r from-gray-900 to-gray-800 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl flex items-center justify-center space-x-1 md:space-x-2 hover:from-gray-800 hover:to-gray-700 transition-all duration-200 shadow-md text-xs md:text-sm"
               >
                 <Plus className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Add Item</span>
-                <span className="font-medium sm:hidden">Item</span>
+                <span className="font-medium hidden sm:inline">Add Product</span>
+                <span className="font-medium sm:hidden">Product</span>
               </button>
               <button
                 onClick={() => setShowAddPOModal(true)}
@@ -1675,7 +1609,7 @@ export default function InventoryProduct({ onBack }) {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Items</span>
+                <span className="relative z-10">Products</span>
                 {tab === 'products' && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
                 )}
@@ -1794,7 +1728,6 @@ export default function InventoryProduct({ onBack }) {
                 handleItemClick={handleItemClick}
                 toggleSort={toggleSort}
                 SortIcon={SortIcon}
-                allProductUnits={allProductUnits}
               />
             )}
 
@@ -1828,7 +1761,6 @@ export default function InventoryProduct({ onBack }) {
                 showFilters={showFilters}
                 setShowFilters={setShowFilters}
                 filters={filters}
-                setFilters={setFilters}
                 productPage={productPage}
                 setProductPage={setProductPage}
                 ITEMS_PER_PAGE={ITEMS_PER_PAGE}
@@ -1847,8 +1779,6 @@ export default function InventoryProduct({ onBack }) {
                 setAllProductUnits={setAllProductUnits}
                 newProductUnit={newProductUnit}
                 setNewProductUnit={setNewProductUnit}
-                showAddUnitForm={showAddUnitForm}
-                setShowAddUnitForm={setShowAddUnitForm}
                 setError={setError}
                 organizationSlug={organizationSlug}
               />
@@ -1972,7 +1902,6 @@ export default function InventoryProduct({ onBack }) {
         allProductUnits={allProductUnits}
         customStockInTypes={customStockInTypes}
         setCustomStockInTypes={setCustomStockInTypes}
-        onSaveStockInTypes={saveCustomStockInTypes}
       />
 
       {/* Create Purchase Order Modal */}

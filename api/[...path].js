@@ -45,6 +45,7 @@ const quotations = require('../server/api_handlers/quotations');
 const integrations = require('../server/api_handlers/integrations');
 const templates = require('../server/api_handlers/templates');
 const pdfGeneration = require('../server/api_handlers/pdf_generation');
+const healthLark = require('../server/api_handlers/health_lark');
 
 /**
  * Route mapping: path -> handler
@@ -86,6 +87,7 @@ const routes = {
   '/api/integrations': integrations,
   '/api/templates': templates,
   '/api/documents/pdf/generate': pdfGeneration,
+  '/api/health/lark': healthLark,
 };
 
 /**

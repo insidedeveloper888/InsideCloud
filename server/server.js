@@ -1220,6 +1220,75 @@ router.get('/api/get_supabase_members', getSupabaseMembers)
 router.get('/api/admin/organizations', getOrganizationsAdmin)
 router.post('/api/admin/organizations', createOrganizationAdmin)
 
+// Health Check Endpoint for Uptime Monitoring
+router.get('/api/health/lark', async (ctx) => {
+    try {
+        console.log('[Health Check] Lark authentication check started');
+
+        // Get Lark credentials for "cloud" organization (main Inside Cloud org)
+        const larkCredentials = await getLarkCredentials('cloud');
+
+        if (!larkCredentials || !larkCredentials.lark_app_id || !larkCredentials.lark_app_secret) {
+            console.error('[Health Check] Lark credentials not configured for organization "cloud"');
+            ctx.status = 503;
+            ctx.body = {
+                status: 'error',
+                message: 'Lark credentials not configured',
+                error: 'Unable to retrieve credentials for organization "cloud"'
+            };
+            return;
+        }
+
+        // Get tenant access token from Lark API
+        const tokenResponse = await axios.post(
+            'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+            {
+                app_id: larkCredentials.lark_app_id,
+                app_secret: larkCredentials.lark_app_secret
+            },
+            {
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+
+        const tokenData = tokenResponse.data;
+
+        // Check if token request was successful
+        if (tokenData.code !== 0 || !tokenData.tenant_access_token) {
+            console.error('[Health Check] Failed to get Lark access token:', tokenData);
+            ctx.status = 503;
+            ctx.body = {
+                status: 'error',
+                message: 'Lark authentication failed',
+                error: tokenData.msg || 'Unable to obtain tenant access token',
+                code: tokenData.code
+            };
+            return;
+        }
+
+        // Success - Lark authentication is working
+        console.log('[Health Check] Lark authentication successful');
+        ctx.status = 200;
+        ctx.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        ctx.body = {
+            status: 'ok',
+            message: 'Lark authentication is working',
+            timestamp: new Date().toISOString(),
+            service: 'inside-cloud',
+            lark_connected: true
+        };
+
+    } catch (error) {
+        console.error('[Health Check] Exception:', error);
+        ctx.status = 503;
+        ctx.body = {
+            status: 'error',
+            message: 'Health check failed',
+            error: error.message || 'Internal server error'
+        };
+    }
+});
+
 // Strategic Map API routes
 router.get('/api/strategic_map', requireProductAccess('strategic_map'), async (ctx) => {
     const strategicMapHandler = require('./api_handlers/strategic_map_v2')

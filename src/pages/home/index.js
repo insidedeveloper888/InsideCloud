@@ -50,7 +50,8 @@ import ContactManagementApp from '../../tools/contact-management/index.jsx';
 import SalesManagementApp from '../../tools/sales-management/index.jsx';
 import InventoryProduct from '../../tools/inventory/index.jsx';
 import IntegrationsDashboard from '../../products/integrations/index.jsx';
-import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon, PuzzleIcon, ShoppingCartIcon } from '../../components/ui/icons';
+import ProjectManagement from '../../tools/project-management/index.jsx';
+import { TargetIcon, PromotionIcon, SheetIcon, DocumentIcon, ContactBookIcon, InventoryIcon, PuzzleIcon, ShoppingCartIcon, ProjectManagementIcon } from '../../components/ui/icons';
 import backgroundAnimation from '../../assets/animations/background-animation.json';
 import cloudsAnimation from '../../assets/animations/clouds-animation.json';
 import { useOrganizationProducts } from '../../hooks/useOrganizationProducts';
@@ -411,6 +412,7 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
     'InventoryIcon': InventoryIcon,
     'PuzzleIcon': PuzzleIcon,
     'ShoppingCartIcon': ShoppingCartIcon,
+    'ProjectManagementIcon': ProjectManagementIcon,
     // Fallback mappings for Lucide-React icon names
     'ShoppingCart': ShoppingCartIcon,
     'Puzzle': PuzzleIcon,
@@ -444,7 +446,7 @@ const DashboardContent = ({ onNavigate, organizationSlug, userInfo, organization
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* Top Section: User Profile and Events */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="md:col-span-1">
@@ -1177,7 +1179,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory' && activeView !== 'integrations' && activeView !== 'sales_management') {
+    if (!isAdmin && activeView !== 'dashboard' && activeView !== 'strategic_map' && activeView !== 'strategic_map_v2' && activeView !== 'document_parser' && activeView !== 'contact_management' && activeView !== 'inventory' && activeView !== 'integrations' && activeView !== 'sales_management' && activeView !== 'project_management') {
       setActiveView('dashboard');
     }
   }, [isAdmin, activeView]);
@@ -1519,6 +1521,12 @@ const Home = () => {
       case 'integrations':
         return (
           <IntegrationsDashboard
+            organizationSlug={selectedOrganizationSlug}
+          />
+        );
+      case 'project_management':
+        return (
+          <ProjectManagement
             organizationSlug={selectedOrganizationSlug}
           />
         );

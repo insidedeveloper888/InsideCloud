@@ -447,13 +447,29 @@ class InventoryController {
 
       let newQty = stockItem ? stockItem.quantity : 0;
 
-      // Calculate new quantity based on movement type
+      // Calculate new quantity and weighted average cost based on movement type
+      let newAverageCost = stockItem ? stockItem.average_cost : 0;
+
       if (movementData.movement_type === 'stock_in') {
+        // Calculate weighted average cost for stock in
+        if (stockItem && stockItem.quantity > 0) {
+          const oldValue = stockItem.quantity * stockItem.average_cost;
+          const newValue = movementData.quantity * (movementData.unit_cost || 0);
+          newAverageCost = (oldValue + newValue) / (stockItem.quantity + movementData.quantity);
+        } else {
+          // First stock in or zero stock - use new cost
+          newAverageCost = movementData.unit_cost || 0;
+        }
         newQty += movementData.quantity;
       } else if (movementData.movement_type === 'stock_out') {
+        // Stock out doesn't change average cost
         newQty -= movementData.quantity;
       } else if (movementData.movement_type === 'adjustment') {
-        newQty = movementData.quantity; // Direct set
+        // Adjustment - direct set quantity, optionally update cost
+        newQty = movementData.quantity;
+        if (movementData.unit_cost !== undefined && movementData.unit_cost !== null) {
+          newAverageCost = movementData.unit_cost;
+        }
       }
 
       // Prevent negative stock
@@ -467,6 +483,7 @@ class InventoryController {
           .from('inventory_stock_items')
           .update({
             quantity: newQty,
+            average_cost: newAverageCost,
             updated_at: new Date().toISOString()
           })
           .eq('product_id', movementData.product_id)
@@ -964,7 +981,8 @@ class InventoryController {
           data: {
             low_stock_threshold: 10,
             custom_categories: [],
-            custom_units: []
+            custom_units: [],
+            custom_stock_in_types: []
           },
           metadata: {
             organizationId: org.id,
@@ -978,7 +996,8 @@ class InventoryController {
         data: {
           low_stock_threshold: data.low_stock_threshold,
           custom_categories: data.custom_categories || [],
-          custom_units: data.custom_units || []
+          custom_units: data.custom_units || [],
+          custom_stock_in_types: data.custom_stock_in_types || []
         },
         metadata: {
           organizationId: org.id,
@@ -1002,13 +1021,14 @@ class InventoryController {
       const org = await getOrganizationInfo(organizationSlug);
       if (!org) throw new Error('Organization not found');
 
-      const { low_stock_threshold, custom_categories, custom_units } = settings;
+      const { low_stock_threshold, custom_categories, custom_units, custom_stock_in_types } = settings;
 
       // Build update object with only provided fields
       const updateData = { updated_at: new Date().toISOString() };
       if (low_stock_threshold !== undefined) updateData.low_stock_threshold = low_stock_threshold;
       if (custom_categories !== undefined) updateData.custom_categories = custom_categories;
       if (custom_units !== undefined) updateData.custom_units = custom_units;
+      if (custom_stock_in_types !== undefined) updateData.custom_stock_in_types = custom_stock_in_types;
 
       // Try to update existing settings first
       const { data: existingData } = await this.supabase
@@ -1700,13 +1720,17 @@ class InventoryController {
       const org = await getOrganizationInfo(organizationSlug);
       if (!org) throw new Error('Organization not found');
 
+      // Build update object dynamically to only include provided fields
+      const updateFields = {};
+      if (unitData.unit_name !== undefined) updateFields.unit_name = unitData.unit_name;
+      if (unitData.conversion_to_base !== undefined) updateFields.conversion_to_base = unitData.conversion_to_base;
+      if (unitData.is_base_unit !== undefined) updateFields.is_base_unit = unitData.is_base_unit;
+      if (unitData.buying_price !== undefined) updateFields.buying_price = unitData.buying_price;
+      if (unitData.selling_price !== undefined) updateFields.selling_price = unitData.selling_price;
+
       const { data, error } = await this.supabase
         .from('inventory_product_units')
-        .update({
-          unit_name: unitData.unit_name,
-          conversion_to_base: unitData.conversion_to_base,
-          is_base_unit: unitData.is_base_unit
-        })
+        .update(updateFields)
         .eq('id', unitId)
         .eq('organization_id', org.id)
         .select()

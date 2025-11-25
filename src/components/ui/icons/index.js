@@ -6,3 +6,4 @@ export { default as ContactBookIcon } from './ContactBookIcon.jsx';
 export { default as InventoryIcon } from './InventoryIcon.jsx';
 export { default as PuzzleIcon } from './PuzzleIcon.jsx';
 export { default as ShoppingCartIcon } from './ShoppingCartIcon.jsx';
+export { default as ProjectManagementIcon } from './ProjectManagementIcon.jsx';

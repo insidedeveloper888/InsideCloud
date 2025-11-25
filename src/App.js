@@ -16,6 +16,7 @@ function App() {
         <Route path="/sales_management" element={<Home />} />
         <Route path="/inventory" element={<Home />} />
         <Route path="/integrations" element={<Home />} />
+        <Route path="/project_management" element={<Home />} />
         <Route path="/account" element={<Home />} />
         <Route path="/users" element={<Home />} />
         <Route path="/audit_log" element={<Home />} />

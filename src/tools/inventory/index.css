@@ -1,0 +1,71 @@
+/* Inventory Management Styles */
+
+/* Main Container */
+.inventory-container {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar for Tables */
+.inventory-container ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.inventory-container ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.inventory-container ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.inventory-container ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth transitions for modals */
+.inventory-modal-backdrop {
+  transition: opacity 0.2s ease-in-out;
+}
+
+.inventory-modal-content {
+  transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+/* Animation for loading spinner */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .inventory-container {
+    padding: 0;
+  }
+
+  /* Stack table cells vertically on mobile */
+  .inventory-container .responsive-table td {
+    display: block;
+    text-align: right;
+    padding-left: 50%;
+    position: relative;
+  }
+
+  .inventory-container .responsive-table td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0;
+    width: 45%;
+    padding-left: 15px;
+    font-weight: bold;
+    text-align: left;
+  }
+}
