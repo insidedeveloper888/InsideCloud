@@ -300,18 +300,18 @@ module.exports = async function handler(req, res) {
           .eq('organization_id', organizationId)
           .eq('is_deleted', false);
 
-        // Apply visibility filter (returns Promise<query builder>)
-        queryBuilder = await applyVisibilityFilter(queryBuilder, organizationId, currentIndividualId);
+        // Apply visibility filter - use .then() to avoid double-awaiting the thenable query builder
+        const { data, error } = await applyVisibilityFilter(queryBuilder, organizationId, currentIndividualId).then(qb => {
+          // Apply additional filters
+          if (status) qb = qb.eq('status', status);
+          if (customer_id) qb = qb.eq('customer_contact_id', customer_id);
+          if (sales_person_id) qb = qb.eq('sales_person_individual_id', sales_person_id);
+          if (date_from) qb = qb.gte('order_date', date_from);
+          if (date_to) qb = qb.lte('order_date', date_to);
 
-        // Apply additional filters
-        if (status) queryBuilder = queryBuilder.eq('status', status);
-        if (customer_id) queryBuilder = queryBuilder.eq('customer_contact_id', customer_id);
-        if (sales_person_id) queryBuilder = queryBuilder.eq('sales_person_individual_id', sales_person_id);
-        if (date_from) queryBuilder = queryBuilder.gte('order_date', date_from);
-        if (date_to) queryBuilder = queryBuilder.lte('order_date', date_to);
-
-        // Apply ordering and execute query
-        const { data, error } = await queryBuilder.order('order_date', { ascending: false });
+          // Apply ordering and execute query
+          return qb.order('order_date', { ascending: false });
+        });
         if (error) throw error;
 
         return res.status(200).json(data || []);
