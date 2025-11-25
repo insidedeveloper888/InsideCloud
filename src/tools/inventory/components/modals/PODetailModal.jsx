@@ -51,7 +51,7 @@ export default function PODetailModal({
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this purchase order? This action cannot be undone.')) {
+    if (window.confirm(`⚠️ Delete Purchase Order "${selectedPO.po_number}"?\n\nThis action cannot be undone. The purchase order and all its items will be permanently removed.`)) {
       try {
         setLocalError('');
         await onDelete(selectedPO.id);

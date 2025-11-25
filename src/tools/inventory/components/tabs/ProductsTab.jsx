@@ -141,7 +141,7 @@ export default function ProductsTab({
                       </div>
                       <button
                         onClick={async () => {
-                          if (window.confirm(`Delete product "${product.name}"?`)) {
+                          if (window.confirm(`⚠️ Delete product "${product.name}"?\n\nThis action cannot be undone. The product and all its stock data will be permanently removed.`)) {
                             try {
                               await InventoryAPI.deleteProduct(organizationSlug, product.id);
                               setProducts(products.filter(p => p.id !== product.id));
@@ -320,7 +320,7 @@ export default function ProductsTab({
                                 </button>
                                 <button
                                   onClick={async () => {
-                                    if (window.confirm(`Delete item "${product.name}"? This will remove it from inventory.`)) {
+                                    if (window.confirm(`⚠️ Delete item "${product.name}"?\n\nThis action cannot be undone. The item and all its stock data will be permanently removed.`)) {
                                       try {
                                         await InventoryAPI.deleteProduct(organizationSlug, product.id);
                                         setProducts(products.filter(p => p.id !== product.id));
@@ -651,8 +651,10 @@ export default function ProductsTab({
                                                   <span className="text-gray-900 flex-shrink-0">1 {unit.unit_name} = {unit.conversion_to_base} {product.base_unit || 'pcs'}</span>
                                                   <button
                                                     onClick={async () => {
-                                                      await InventoryAPI.deleteProductUnit(organizationSlug, unit.id);
-                                                      setAllProductUnits(allProductUnits.filter(u => u.id !== unit.id));
+                                                      if (window.confirm(`⚠️ Delete unit conversion "${unit.unit_name}"?\n\nThis action cannot be undone.`)) {
+                                                        await InventoryAPI.deleteProductUnit(organizationSlug, unit.id);
+                                                        setAllProductUnits(allProductUnits.filter(u => u.id !== unit.id));
+                                                      }
                                                     }}
                                                     className="text-red-500 hover:text-red-700 ml-auto"
                                                   >

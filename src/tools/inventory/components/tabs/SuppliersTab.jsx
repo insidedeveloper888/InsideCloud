@@ -85,7 +85,7 @@ export default function SuppliersTab({
                 </div>
                 <button
                   onClick={() => {
-                    if (window.confirm(`Delete supplier "${supplier.name}"?`)) {
+                    if (window.confirm(`⚠️ Delete supplier "${supplier.name}"?\n\nThis action cannot be undone. All supplier information will be permanently removed.`)) {
                       handleDeleteSupplier(supplier.id);
                     }
                   }}
@@ -210,7 +210,7 @@ export default function SuppliersTab({
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <button
                       onClick={() => {
-                        if (window.confirm(`Delete supplier "${supplier.name}"? This will soft-delete the contact.`)) {
+                        if (window.confirm(`⚠️ Delete supplier "${supplier.name}"?\n\nThis action cannot be undone. All supplier information will be permanently removed.`)) {
                           handleDeleteSupplier(supplier.id);
                         }
                       }}
