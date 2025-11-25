@@ -1210,6 +1210,13 @@ async function createOrganizationAdmin(ctx) {
 //注册服务端路由和处理
 router.get(serverConfig.config.getUserAccessTokenPath, getUserAccessToken)
 router.get(serverConfig.config.getSignParametersPath, getSignParameters)
+
+// OPTIONS handler for CORS preflight - CRITICAL!
+router.options("/api/get_organization_config", async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
 router.get("/api/get_organization_config", getOrganizationConfig) // New endpoint
 router.get(serverConfig.config.getOrganizationMembersPath, getOrganizationMembers)
 router.get(serverConfig.config.getDepartmentsPath, getDepartments)
