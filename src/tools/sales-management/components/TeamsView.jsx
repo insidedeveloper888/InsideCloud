@@ -85,6 +85,7 @@ export default function TeamsView({ organizationSlug }) {
   useEffect(() => {
     fetchTeams();
     fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationSlug]);
 
   const handleCreateTeam = () => {

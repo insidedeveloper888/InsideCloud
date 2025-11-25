@@ -57,6 +57,7 @@ export default function DeliveryOrderItemSelector({
         };
 
         fetchDeliverySummary();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [salesOrderId, organizationSlug]);
 
     const handleQuantityChange = (productId, newQuantity) => {

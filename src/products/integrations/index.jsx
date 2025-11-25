@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { FileText, MessageCircle, ShoppingBag, Loader2 } from 'lucide-react';
 import IntegrationCard from './components/IntegrationCard';
@@ -36,12 +36,7 @@ const IntegrationsDashboard = ({ organizationSlug }) => {
         }
     ];
 
-    useEffect(() => {
-        console.log('🧩 IntegrationsDashboard mounted');
-        fetchIntegrations();
-    }, []);
-
-    const fetchIntegrations = async () => {
+    const fetchIntegrations = useCallback(async () => {
         try {
             const response = await axios.get(`/api/integrations?organization_slug=${organizationSlug}`);
             setIntegrations(response.data.data || []);
@@ -50,7 +45,12 @@ const IntegrationsDashboard = ({ organizationSlug }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [organizationSlug]);
+
+    useEffect(() => {
+        console.log('🧩 IntegrationsDashboard mounted');
+        fetchIntegrations();
+    }, [fetchIntegrations]);
 
     const handleConnectBukku = async (config) => {
         setConnecting(true);

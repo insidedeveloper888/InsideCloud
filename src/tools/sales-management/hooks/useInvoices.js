@@ -34,6 +34,7 @@ export function useInvoices(organizationSlug, filters = {}) {
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationSlug, JSON.stringify(filters)]);
 
   useEffect(() => {
