@@ -296,9 +296,8 @@ module.exports = async function handler(req, res) {
         if (date_from) queryBuilder = queryBuilder.gte('quotation_date', date_from);
         if (date_to) queryBuilder = queryBuilder.lte('quotation_date', date_to);
 
-        queryBuilder = queryBuilder.order('quotation_date', { ascending: false });
-
-        const { data, error } = await queryBuilder;
+        // Apply ordering and execute query
+        const { data, error } = await queryBuilder.order('quotation_date', { ascending: false });
         if (error) throw error;
 
         return res.status(200).json(data || []);

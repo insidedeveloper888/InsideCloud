@@ -297,17 +297,18 @@ module.exports = async function handler(req, res) {
           .eq('organization_id', organizationId)
           .eq('is_deleted', false);
 
+        // Apply visibility filter (returns Promise<query builder>)
         queryBuilder = await applyVisibilityFilter(queryBuilder, organizationId, currentIndividualId);
 
+        // Apply additional filters
         if (status) queryBuilder = queryBuilder.eq('status', status);
         if (customer_id) queryBuilder = queryBuilder.eq('customer_contact_id', customer_id);
         if (sales_person_id) queryBuilder = queryBuilder.eq('sales_person_individual_id', sales_person_id);
         if (date_from) queryBuilder = queryBuilder.gte('order_date', date_from);
         if (date_to) queryBuilder = queryBuilder.lte('order_date', date_to);
 
-        queryBuilder = queryBuilder.order('order_date', { ascending: false });
-
-        const { data, error } = await queryBuilder;
+        // Apply ordering and execute query
+        const { data, error } = await queryBuilder.order('order_date', { ascending: false });
         if (error) throw error;
 
         return res.status(200).json(data || []);
