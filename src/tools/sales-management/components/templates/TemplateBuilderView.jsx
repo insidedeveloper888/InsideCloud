@@ -12,7 +12,7 @@ import { SectionLibrary } from './SectionLibrary/LibrarySidebar';
 import { FlexibleCanvas } from './Canvas/FlexibleCanvas';
 import { PropertyPanel } from './PropertyPanel/PanelContainer';
 import { FormInput } from './ui/FormInput';
-import { ConfirmDialog } from './ui/ConfirmDialog';
+import { ConfirmDialog } from '../../../../components/ui/confirm-dialog';
 import { X, Save } from 'lucide-react';
 
 export function TemplateBuilderView({ template, onSave, onClose, documentType }) {

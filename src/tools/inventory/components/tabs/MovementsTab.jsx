@@ -2,7 +2,7 @@ import React from 'react';
 import { Activity, Search, Filter } from 'lucide-react';
 import { getMovementTypeColor, getMovementTypeLabel } from '../../utils/helpers';
 import { filterMovements, sortMovements } from '../../utils/filtering';
-import Pagination from '../Pagination';
+import { Pagination } from '../../../../components/ui/pagination';
 
 /**
  * Movements Tab - Stock Movement History

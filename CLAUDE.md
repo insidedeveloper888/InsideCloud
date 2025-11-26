@@ -547,12 +547,13 @@ Required RPC function:
 Comprehensive documentation exists in the `/docs` folder:
 
 - **🏗️ Architecture Guide**: [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture decisions, component standards, UI/UX guidelines
+- **🎨 Design System**: [docs/design-system/README.md](docs/design-system/README.md) - Shared UI components and design tokens
 - **Getting Started**: [docs/project/project-understanding.md](docs/project/project-understanding.md)
-- **Strategic Map Solution**: [docs/strategic-map/strategic-map-solution-summary.md](docs/strategic-map/strategic-map-solution-summary.md)
-- **Strategic Map CRUD Guide**: [docs/strategic-map/strategic-map-crud-guide.md](docs/strategic-map/strategic-map-crud-guide.md)
-- **Strategic Map Cascade Flow**: [docs/strategic-map/strategic-map-cascade-flow.md](docs/strategic-map/strategic-map-cascade-flow.md)
-- **Lark API Overview**: [docs/lark/lark-api-overview.md](docs/lark/lark-api-overview.md)
-- **OAuth Local Development**: [docs/guides/oauth-local-development.md](docs/guides/oauth-local-development.md)
+- **Strategic Map Solution**: [docs/features/strategic-map/strategic-map-solution-summary.md](docs/features/strategic-map/strategic-map-solution-summary.md)
+- **Strategic Map CRUD Guide**: [docs/features/strategic-map/strategic-map-crud-guide.md](docs/features/strategic-map/strategic-map-crud-guide.md)
+- **Strategic Map Cascade Flow**: [docs/features/strategic-map/strategic-map-cascade-flow.md](docs/features/strategic-map/strategic-map-cascade-flow.md)
+- **Lark API Overview**: [docs/api/lark/lark-api-overview.md](docs/api/lark/lark-api-overview.md)
+- **OAuth Local Development**: [docs/getting-started/oauth-local-development.md](docs/getting-started/oauth-local-development.md)
 
 Refer to these documents for detailed implementation guides and API documentation.
 

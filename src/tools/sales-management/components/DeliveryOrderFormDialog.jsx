@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, AlertCircle } from 'lucide-react';
-import MemberSelect from './MemberSelect';
+import MemberSelect from '../../../components/ui/member-select';
 import CustomerSelect from './CustomerSelect';
 import ProductSelect from './ProductSelect';
 import SalesOrderSelect from './SalesOrderSelect';

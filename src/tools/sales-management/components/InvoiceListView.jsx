@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, FileText, Edit, Trash2, DollarSign } from 'lucide-react';
 import { useInvoiceStatuses } from '../hooks/useInvoiceStatuses';
-import ConfirmDialog from './ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 
 export default function InvoiceListView({
   invoices,

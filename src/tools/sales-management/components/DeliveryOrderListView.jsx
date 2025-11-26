@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Truck, Edit, Trash2, CheckCircle } from 'lucide-react';
 import { useDeliveryOrderStatuses } from '../hooks/useDeliveryOrderStatuses';
-import ConfirmDialog from './ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 
 export default function DeliveryOrderListView({
   deliveryOrders,

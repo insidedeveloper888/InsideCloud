@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, ChevronDown, ChevronUp, CheckCircle, FileText } from 'lucide-react';
 import StatusConfigurationPanel from './StatusConfigurationPanel';
-import ConfirmDialog from './ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 import TemplatesView from './templates/TemplatesView';
 import { useSalesOrderStatuses } from '../hooks/useSalesOrderStatuses';
 import { useQuotationStatuses } from '../hooks/useQuotationStatuses';

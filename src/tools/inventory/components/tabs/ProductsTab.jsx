@@ -1,7 +1,7 @@
 import React from 'react';
 import { Package, Search, Settings, ChevronDown, Trash2, X, Filter, Plus, Info } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
-import Pagination from '../Pagination';
+import { Pagination } from '../../../../components/ui/pagination';
 import { InventoryAPI } from '../../api/inventory';
 
 /**

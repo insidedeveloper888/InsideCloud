@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Upload, Loader2 } from 'lucide-react';
 import { useOrganizationMembers } from '../hooks/useOrganizationMembers';
-import MemberSelect from './MemberSelect';
+import MemberSelect from '../../../components/ui/member-select';
 import TagInput from './TagInput';
 import StarRating from './StarRating';
 import { createClient } from '@supabase/supabase-js';

@@ -29,7 +29,7 @@ import InvoicePaymentDialog from './components/InvoicePaymentDialog';
 import SettingsView from './components/SettingsView';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import TeamsView from './components/TeamsView';
-import ConfirmDialog from './components/ConfirmDialog';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 
 const TABS = {
   ANALYTICS: 0,

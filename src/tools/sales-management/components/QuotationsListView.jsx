@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Trash2, Edit, Eye, Grid, List, Printer } from 'lucide-react';
 import SalesFilterPanel from './SalesFilterPanel';
 import { useQuotationStatuses } from '../hooks/useQuotationStatuses';
-import ConfirmDialog from './ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 
 export default function QuotationsListView({
   quotations,

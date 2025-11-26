@@ -15,7 +15,7 @@ import { ComponentLibrary } from './SectionLibrary/ComponentLibrary';
 import { AbsoluteCanvas } from './Canvas/AbsoluteCanvas';
 import { ComponentPropertyPanel } from './PropertyPanel/ComponentPropertyPanel';
 import { FormInput } from './ui/FormInput';
-import { ConfirmDialog } from './ui/ConfirmDialog';
+import { ConfirmDialog } from '../../../../components/ui/confirm-dialog';
 import { X, Save, Grid, Ruler } from 'lucide-react';
 
 export function TemplateBuilderV2({ template, onSave, onClose, documentType }) {

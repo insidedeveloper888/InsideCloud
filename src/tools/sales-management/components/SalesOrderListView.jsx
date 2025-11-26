@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Trash2, Edit, Eye, Grid, List } from 'lucide-react';
 import SalesFilterPanel from './SalesFilterPanel';
 import { useSalesOrderStatuses } from '../hooks/useSalesOrderStatuses';
-import ConfirmDialog from './ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 
 export default function SalesOrderListView({
   salesOrders,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Package, Plus, Minus, Search, Filter, X, TrendingUp } from 'lucide-react';
 import { getStatusColor, getStatusLabel } from '../../utils/helpers';
-import Pagination from '../Pagination';
+import { Pagination } from '../../../../components/ui/pagination';
 
 /**
  * Overview Tab - Stock Items Overview

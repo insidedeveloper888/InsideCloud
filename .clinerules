@@ -69,6 +69,47 @@ When adding new product route:
    }
    ```
 
+## UI Component Guidelines
+
+### MANDATORY: Use Shared Components
+Before creating ANY new UI component, check `src/components/ui/` for existing components:
+
+| Component | File | Status | Use For |
+|-----------|------|--------|---------|
+| Button | `button.jsx` | ✅ Ready | All buttons |
+| Card | `card.jsx` | ✅ Ready | Content containers |
+| Tabs | `tabs.jsx` | ✅ Ready | Tab navigation |
+| Avatar | `avatar.jsx` | ✅ Ready | User avatars |
+| MemberSelect | `member-select.jsx` | ✅ Ready | Team member dropdowns |
+| Pagination | `pagination.jsx` | ✅ Ready | List pagination |
+| ConfirmDialog | `confirm-dialog.jsx` | ✅ Ready | Delete/dangerous action confirmations |
+
+### MANDATORY: Use Design Tokens
+Import from `src/lib/design-tokens.js` for consistent styling:
+- `buttonStyles` - All button variants
+- `badgeStyles` - Status badges
+- `colors` - Color palette
+- `radius` - Border radius
+- `typography` - Text styles
+
+### Creating New Components
+1. First check if similar component exists in `src/components/ui/`
+2. If creating new, place in `src/components/ui/` (NOT in tool-specific folders)
+3. Use design tokens, not hardcoded Tailwind classes
+4. Add to `src/components/ui/index.js` exports
+5. Document in `docs/design-system/README.md`
+
+### DO NOT:
+- ❌ Create duplicate components in tool folders
+- ❌ Use different button styles across tools
+- ❌ Hardcode colors (use design tokens)
+- ❌ Create tool-specific Modal/Dialog/Select components
+
+### DO:
+- ✅ Import from `@/components/ui/` or `src/components/ui/`
+- ✅ Extend shared components with props if needed
+- ✅ Follow existing patterns in inventory-management (best reference)
+
 ## 6 Core Modules (See /docs/agents/ for details)
 
 ### 1. Strategic Map (战略地图)
@@ -98,8 +139,9 @@ When adding new product route:
 
 ### 5. Integrations (集成)
 - **Purpose**: Third-party software connections (accounting, social platforms)
-- **Status**: 🚧 In Development
-- **Files**: `src/tools/integrations/`, `server/integrations_controller.js`
+- **Status**: 🚧 In Development (Backend Only)
+- **Files**: `server/integrations_controller.js`
+- **Note**: Frontend `src/tools/integrations/` not yet created
 - **Features**: OAuth flows, data sync, webhook handlers
 
 ### 6. Document Parser (文档解析器)

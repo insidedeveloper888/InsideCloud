@@ -1,11 +1,41 @@
 /**
- * MemberSelect - Custom dropdown to display members with avatars
+ * MemberSelect - Custom dropdown to display organization members with avatars
+ *
+ * A searchable dropdown component for selecting team members. Displays member
+ * avatars and names, with support for "Not assigned" option.
+ *
+ * @component
+ * @example
+ * ```jsx
+ * <MemberSelect
+ *   value={selectedMemberId}
+ *   onChange={(e) => setSelectedMemberId(e.target.value)}
+ *   members={teamMembers}
+ *   name="assigned_to"
+ *   placeholder="Select team member"
+ * />
+ * ```
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-export default function MemberSelect({
+/**
+ * @typedef {Object} Member
+ * @property {string} id - Unique identifier for the member
+ * @property {string} display_name - Name to display for the member
+ * @property {string} [avatar_url] - Optional URL to member's avatar image
+ */
+
+/**
+ * @param {Object} props
+ * @param {string} props.value - Currently selected member ID
+ * @param {function} props.onChange - Callback when selection changes. Receives synthetic event: { target: { name, value } }
+ * @param {Member[]} props.members - Array of member objects to display
+ * @param {string} [props.placeholder="Not assigned"] - Placeholder text when no member is selected
+ * @param {string} [props.name] - Form field name (passed to onChange event)
+ */
+export function MemberSelect({
   value,
   onChange,
   members = [],
@@ -111,3 +141,6 @@ export default function MemberSelect({
     </div>
   );
 }
+
+// Default export for backwards compatibility
+export default MemberSelect;

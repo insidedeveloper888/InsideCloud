@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Users, UserPlus, X, Crown, User } from 'lucide-react';
-import { ConfirmDialog } from './templates/ui/ConfirmDialog';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 
 const resolveApiOrigin = () =>
   process.env.REACT_APP_API_ORIGIN || window.location.origin;
