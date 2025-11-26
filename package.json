@@ -63,7 +63,13 @@
     "vercel-build": "react-scripts build",
     "deploy": "vercel --prod",
     "deploy:preview": "vercel",
-    "config": "node ./cli/cli.js config"
+    "config": "node ./cli/cli.js config",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:auth": "playwright test auth.setup.ts --headed --project=chromium-no-auth",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed --project=chromium",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
   },
   "proxy": "http://localhost:8989",
   "eslintConfig": {
@@ -85,11 +91,14 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^20.19.25",
     "chalk": "4.1.2",
     "commander": "^10.0.0",
     "figlet": "^1.5.2",
     "fs-extra": "^11.1.0",
     "inquirer": "8.0.0",
-    "ora": "5.1.0"
+    "ora": "5.1.0",
+    "typescript": "^5.9.3"
   }
 }

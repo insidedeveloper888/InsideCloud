@@ -48,3 +48,10 @@ scripts/map-gen/node_modules
 scripts/map-gen/map_data.txt
 
 .vercel
+
+# Playwright
+.auth/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
