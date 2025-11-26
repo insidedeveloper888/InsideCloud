@@ -11,12 +11,29 @@
         "SUPABASE_ACCESS_TOKEN": "sbp_9ecc76406f79afe44b0f5ca694d2dd8deeff2f34"
       }
     },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": "10000"
+      }
+    },
     "filesystem": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "."
+        "/Users/jackytok/Desktop",
+        "/Users/jackytok/Downloads"
       ]
     }
   }

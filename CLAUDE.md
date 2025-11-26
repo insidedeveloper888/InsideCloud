@@ -19,12 +19,30 @@ The `config` command generates:
 - `server/server_config.js` - Backend Lark configuration
 
 ### Running the Application
+
+**CRITICAL: Standard Server Start Procedure**
+
+Always use this command to ensure clean server startup:
+
+```bash
+pkill -f "server/server.js"; pkill -f "react-scripts"; npm run start
+```
+
+This command:
+- Kills any existing server processes to free ports 3000 and 8989
+- Prevents port conflicts and zombie processes
+- Ensures reliable testing workflows with Playwright MCP tools
+
+**Other npm Scripts:**
 ```bash
 npm run start              # Start both backend (port 8989) and frontend (port 3000)
 npm run start:web          # React dev server only
 npm run start:server       # Koa backend server only
 npm run start:with-ngrok   # Start with ngrok tunnel for Lark testing
 ```
+
+**For detailed server management practices, see:**
+[DEVELOPMENT_SERVER_PRACTICES.md](DEVELOPMENT_SERVER_PRACTICES.md)
 
 ### Build and Deployment
 ```bash

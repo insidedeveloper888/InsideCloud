@@ -428,6 +428,98 @@ When implementing database backend (see Database Design Plan), replace client-si
 
 **Decision**: All new products MUST be registered in both App.js routes AND Home page access control
 
+---
+
+### ADR-013: Development Server Standard Start Procedure
+**Status**: Approved (2025-11-25)
+**Context**: Testing workflows interrupted by port conflicts and zombie processes
+
+**Decision**: Establish standard server start command with process cleanup
+
+**Problem Statement:**
+During browser-based testing with Playwright MCP tools, developers encountered:
+- Port 3000 conflicts (React dev server already running)
+- Port 8989 conflicts (Koa backend already running)
+- API requests stuck at "Pending" status
+- Test workflow interruptions requiring manual process cleanup
+
+**Root Cause:**
+Improper server shutdown leaves zombie processes occupying critical ports. Standard `Ctrl+C` termination and `npm run start` don't guarantee clean process cleanup.
+
+**Decision:**
+All agents and developers MUST use this standard server start command:
+
+```bash
+pkill -f "server/server.js"; pkill -f "react-scripts"; npm run start
+```
+
+**Rationale:**
+
+1. **Guaranteed Port Availability**:
+   - `pkill -f "server/server.js"` kills all Koa server processes (port 8989)
+   - `pkill -f "react-scripts"` kills all React dev server processes (port 3000)
+   - Ensures clean slate before starting new processes
+
+2. **Testing Workflow Reliability**:
+   - Playwright MCP tools require consistent localhost:3000 access
+   - Browser-based tests depend on both frontend and backend being responsive
+   - Eliminates "server not responding" failures during test execution
+
+3. **Cross-Agent Consistency**:
+   - `test-driven-developer` agent always starts with clean servers
+   - `playwright-testing-agent` can verify server availability before testing
+   - Reduces time wasted debugging port conflicts
+
+4. **Multi-Tenant Architecture Requirement**:
+   - Port 3000 reserved for frontend (React dev server)
+   - Port 8989 reserved for backend API (Koa server)
+   - No other services should occupy these ports during development
+
+**Implementation Requirements:**
+
+**For All Agents:**
+```bash
+# Start of development workflow
+pkill -f "server/server.js"; pkill -f "react-scripts"; npm run start
+
+# Verification
+lsof -i :3000  # Should show node process with react-scripts
+lsof -i :8989  # Should show node process with server/server.js
+```
+
+**For test-driven-developer Agent:**
+- Include this command at beginning of implementation workflow
+- Verify servers running before handoff to testing agent
+- Document in test scenarios: "Prerequisites: Development servers running on ports 3000, 8989"
+
+**For playwright-testing-agent Agent:**
+- Check server availability before test execution
+- Recommend this command to user if servers not running
+- Include server status in test reports
+
+**Package.json Integration:**
+Consider adding convenience script (optional):
+```json
+{
+  "scripts": {
+    "dev": "pkill -f 'server/server.js'; pkill -f 'react-scripts'; npm run start"
+  }
+}
+```
+
+**Consequences:**
+- ✅ **Eliminates port conflicts**: Clean process termination before start
+- ✅ **Improves testing reliability**: Consistent server availability for Playwright tests
+- ✅ **Reduces debugging time**: No manual process hunting with `lsof` and `kill`
+- ✅ **Establishes best practice**: All agents follow same server start procedure
+- ⚠️ **Requires discipline**: Developers must use this command, not just `npm run start`
+- ⚠️ **Platform-specific**: `pkill` works on macOS/Linux, may need adjustment for Windows
+
+**Related Documentation:**
+- [DEVELOPMENT_SERVER_PRACTICES.md](DEVELOPMENT_SERVER_PRACTICES.md) - Comprehensive development server guide
+- [.claude/agents/test-driven-developer.md](.claude/agents/test-driven-developer.md) - TDD workflow with server management
+- [.claude/agents/playwright-testing-agent.md](.claude/agents/playwright-testing-agent.md) - Testing workflow requirements
+
 **Problem**: When adding new products like `integrations` or `sales_management`, navigation appeared broken:
 - URL changed to `/integrations`
 - Screen remained on home page/dashboard
@@ -760,6 +852,177 @@ const CellInput = ({ onSave }) => {
 ## 8. Change Log
 
 ### Version History
+
+## [2.5.1] - 2025-11-25 📚 DEVELOPMENT & TESTING WORKFLOW DOCUMENTATION
+
+### 📚 Documentation Updates: Development Server Practices & Testing Workflows
+
+**Status**: Documentation complete and cross-referenced
+
+Following a testing workflow interruption due to port conflicts and MCP tool permission issues, comprehensive documentation has been established to ensure reliable development and testing practices.
+
+### Added Documentation
+
+**1. DEVELOPMENT_SERVER_PRACTICES.md** (New)
+- **Purpose**: Comprehensive guide for development server management
+- **Key Content**:
+  - Critical server start command with process cleanup
+  - Port management (3000 for React, 8989 for Koa)
+  - Development vs production architecture comparison
+  - Common issues and solutions (port conflicts, CORS, API failures)
+  - Testing workflow integration with Playwright MCP tools
+  - Agent coordination guidelines
+
+**2. TESTING_WORKFLOW_GUIDE.md** (New)
+- **Purpose**: Agent coordination protocol for test-driven development
+- **Key Content**:
+  - Two-agent testing system architecture (test-driven-developer + playwright-testing-agent)
+  - Workflow phases (Implementation, Testing, Iteration)
+  - Playwright MCP tools integration guide
+  - Test scenario templates (CRUD, validation, multi-step workflows)
+  - Common testing patterns for each production tool
+  - Troubleshooting guide with agent response templates
+
+**3. ADR-013: Development Server Standard Start Procedure** (Added to ARCHITECTURE.md)
+- **Decision**: Establish standard server start command with process cleanup
+- **Command**: `pkill -f "server/server.js"; pkill -f "react-scripts"; npm run start`
+- **Rationale**:
+  - Guarantees port availability (3000, 8989)
+  - Improves testing workflow reliability
+  - Reduces debugging time for port conflicts
+  - Establishes cross-agent consistency
+- **Agent Requirements**:
+  - test-driven-developer: Include command at workflow start
+  - playwright-testing-agent: Verify servers before test execution
+
+### Updated Documentation
+
+**CLAUDE.md** (Updated)
+- Added "CRITICAL: Standard Server Start Procedure" section
+- Highlighted the standard cleanup command before npm run start
+- Cross-referenced DEVELOPMENT_SERVER_PRACTICES.md
+- Moved from "Running the Application" to prominent position
+
+**ARCHITECTURE.md** (Updated)
+- Added ADR-013 with full rationale and implementation requirements
+- Cross-referenced new documentation files
+- Established as firm architectural decision
+
+### Architecture Integration
+
+**Development Workflow Enhancement:**
+```
+User/Agent Starts Development
+  ↓
+Execute: pkill -f "server/server.js"; pkill -f "react-scripts"; npm run start
+  ↓
+Verify: lsof -i :3000 && lsof -i :8989
+  ↓
+Implement Feature (test-driven-developer agent)
+  ↓
+Create Test Scenarios
+  ↓
+Execute Browser Tests (playwright-testing-agent via Playwright MCP)
+  ↓
+Iterate on Failures
+  ↓
+Production Ready
+```
+
+**Agent Coordination Protocol:**
+- test-driven-developer provides structured test scenarios
+- playwright-testing-agent executes with Playwright MCP tools
+- Test reports include evidence (screenshots, console logs, network traces)
+- Iteration loop continues until all tests pass
+
+### Cross-References Established
+
+**From ARCHITECTURE.md:**
+- → DEVELOPMENT_SERVER_PRACTICES.md (ADR-013)
+- → .claude/agents/test-driven-developer.md (ADR-013)
+- → .claude/agents/playwright-testing-agent.md (ADR-013)
+
+**From CLAUDE.md:**
+- → DEVELOPMENT_SERVER_PRACTICES.md (Running the Application section)
+
+**From DEVELOPMENT_SERVER_PRACTICES.md:**
+- → ARCHITECTURE.md (ADR-013)
+- → CLAUDE.md (operational commands)
+- → TESTING_WORKFLOW_GUIDE.md (testing integration)
+- → .claude/agents/test-driven-developer.md (agent practices)
+- → .claude/agents/playwright-testing-agent.md (agent practices)
+
+**From TESTING_WORKFLOW_GUIDE.md:**
+- → DEVELOPMENT_SERVER_PRACTICES.md (server management)
+- → ARCHITECTURE.md (architectural decisions)
+- → .claude/agents/test-driven-developer.md (TDD workflow)
+- → .claude/agents/playwright-testing-agent.md (testing execution)
+
+### Best Practices Established
+
+**Development Server Management:**
+1. Always use cleanup command before starting servers
+2. Verify ports 3000 and 8989 are free and available
+3. Test API endpoints directly with curl for debugging
+4. Check console logs for both React and Koa servers
+
+**Testing Workflows:**
+1. Verify servers running before browser-based tests
+2. Grant MCP server permissions when prompted
+3. Use structured test scenario format for clarity
+4. Capture evidence at each test step
+5. Perform root cause analysis for failures
+6. Iterate until all tests pass
+
+**Agent Coordination:**
+1. test-driven-developer creates structured test scenarios
+2. playwright-testing-agent executes with detailed reporting
+3. Clear handoff protocol between phases
+4. Evidence-based feedback loop for iteration
+
+### Files Created
+
+1. `/Users/jackytok/Desktop/InsideCloud/docs/DEVELOPMENT_SERVER_PRACTICES.md`
+2. `/Users/jackytok/Desktop/InsideCloud/docs/TESTING_WORKFLOW_GUIDE.md`
+
+### Files Updated
+
+1. `/Users/jackytok/Desktop/InsideCloud/docs/ARCHITECTURE.md` (ADR-013 added)
+2. `/Users/jackytok/Desktop/InsideCloud/docs/CLAUDE.md` (server start section updated)
+
+### Impact Assessment
+
+**For Agents:**
+- ✅ Clear server start procedure documented
+- ✅ Testing workflow coordination protocol established
+- ✅ Troubleshooting guides with agent response templates
+- ✅ Best practices for Playwright MCP tool usage
+
+**For Developers:**
+- ✅ Eliminates port conflict issues
+- ✅ Improves testing reliability
+- ✅ Reduces time wasted on environment setup
+- ✅ Clear examples for common testing patterns
+
+**For Project Quality:**
+- ✅ Establishes testing as first-class workflow
+- ✅ Documents agent collaboration patterns
+- ✅ Creates reusable test scenario templates
+- ✅ Improves knowledge discoverability
+
+### Maintenance Plan
+
+**Review Frequency:** Monthly or after major workflow changes
+**Next Review:** 2025-12-25
+**Ownership:** Architecture Overseer + QA Team
+
+**Update Triggers:**
+- New Playwright MCP tools added
+- Agent coordination patterns evolve
+- Testing workflows change
+- Port configurations modified
+
+---
 
 ## [2.5.0] - 2025-11-25 ✅ SALES MANAGEMENT PRODUCTION READY
 

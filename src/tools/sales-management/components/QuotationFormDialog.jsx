@@ -18,6 +18,7 @@ export default function QuotationFormDialog({
   salesPersons = [],
   products = [],
   organizationSlug,
+  initialCustomerId = null,
 }) {
   const { statuses: quotationStatuses } = useQuotationStatuses(organizationSlug);
   const [formData, setFormData] = useState({
@@ -78,7 +79,7 @@ export default function QuotationFormDialog({
       defaultExpiry.setDate(defaultExpiry.getDate() + 30);
 
       setFormData({
-        customer_contact_id: '',
+        customer_contact_id: initialCustomerId || '', // Pre-fill from Quick Sales Action
         sales_person_individual_id: '',
         quotation_date: new Date().toISOString().split('T')[0],
         expiry_date: defaultExpiry.toISOString().split('T')[0],
@@ -96,7 +97,7 @@ export default function QuotationFormDialog({
       items: ''
     });
     setLineItemErrors([]);
-  }, [order, isOpen]);
+  }, [order, isOpen, initialCustomerId]);
 
   const addLineItem = () => {
     setFormData(prev => ({

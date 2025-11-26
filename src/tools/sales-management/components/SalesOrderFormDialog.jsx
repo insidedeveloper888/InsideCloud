@@ -20,6 +20,7 @@ export default function SalesOrderFormDialog({
   products = [],
   quotations = [],
   organizationSlug,
+  initialCustomerId = null,
 }) {
   const { statuses } = useSalesOrderStatuses(organizationSlug);
   const [formData, setFormData] = useState({
@@ -77,7 +78,7 @@ export default function SalesOrderFormDialog({
       // Create mode - reset form
       setFormData({
         source_quotation_id: '',
-        customer_contact_id: '',
+        customer_contact_id: initialCustomerId || '', // Pre-fill from Quick Sales Action
         sales_person_individual_id: '',
         order_date: new Date().toISOString().split('T')[0],
         status: 'draft',
@@ -86,7 +87,7 @@ export default function SalesOrderFormDialog({
         items: [],
       });
     }
-  }, [order, isOpen]);
+  }, [order, isOpen, initialCustomerId]);
 
   // Handle quotation selection
   const handleQuotationSelect = async (quotationId) => {

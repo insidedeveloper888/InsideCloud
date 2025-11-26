@@ -20,6 +20,7 @@ export default function InvoiceFormDialog({
   salesOrders = [],
   deliveryOrders = [],
   organizationSlug,
+  initialCustomerId = null,
 }) {
   const { statuses: invoiceStatuses } = useInvoiceStatuses(organizationSlug);
   const [formData, setFormData] = useState({
@@ -98,7 +99,7 @@ export default function InvoiceFormDialog({
       defaultDueDate.setDate(defaultDueDate.getDate() + 30); // Default 30 days payment term
 
       setFormData({
-        customer_contact_id: '',
+        customer_contact_id: initialCustomerId || '', // Pre-fill from Quick Sales Action
         sales_person_individual_id: '',
         sales_order_id: '',
         delivery_order_id: '',
@@ -112,7 +113,7 @@ export default function InvoiceFormDialog({
         items: [],
       });
     }
-  }, [invoice, isOpen]);
+  }, [invoice, isOpen, initialCustomerId]);
 
   // Auto-fill from sales order or delivery order
   const handleSalesOrderChange = async (salesOrderId) => {

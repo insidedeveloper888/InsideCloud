@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BarChart3, Settings, List, FileText, Users, Truck, Receipt } from 'lucide-react';
 import { useSalesOrders } from './hooks/useSalesOrders';
 import { useQuotations } from './hooks/useQuotations';
@@ -44,6 +45,9 @@ const resolveApiOrigin = () =>
   process.env.REACT_APP_API_ORIGIN || window.location.origin;
 
 export default function SalesManagementApp({ organizationSlug }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState(TABS.ANALYTICS);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isQuotationFormOpen, setIsQuotationFormOpen] = useState(false);
@@ -58,6 +62,9 @@ export default function SalesManagementApp({ organizationSlug }) {
   const [customers, setCustomers] = useState([]);
   const [salesPersons, setSalesPersons] = useState([]);
   const [products, setProducts] = useState([]);
+
+  // Initial customer ID from URL params (for Quick Sales Actions from Contact Management)
+  const [initialCustomerId, setInitialCustomerId] = useState(null);
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -193,6 +200,72 @@ export default function SalesManagementApp({ organizationSlug }) {
 
     fetchProducts();
   }, [organizationSlug]);
+
+  // Handle URL params for Quick Sales Actions (from Contact Management)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const dialog = searchParams.get('dialog');
+    const customerId = searchParams.get('customer_id');
+
+    if (dialog && customerId) {
+      // Set the initial customer ID
+      setInitialCustomerId(customerId);
+
+      // Open the appropriate dialog and switch to the correct tab
+      switch (dialog) {
+        case 'quotation':
+          setActiveTab(TABS.QUOTATIONS);
+          setEditingQuotation(null);
+          setIsQuotationFormOpen(true);
+          break;
+        case 'sales_order':
+          setActiveTab(TABS.ORDERS);
+          setEditingOrder(null);
+          setIsFormOpen(true);
+          break;
+        case 'delivery_order':
+          setActiveTab(TABS.DELIVERY_ORDERS);
+          setEditingDeliveryOrder(null);
+          setIsDeliveryOrderFormOpen(true);
+          break;
+        case 'invoice':
+          setActiveTab(TABS.INVOICES);
+          setEditingInvoice(null);
+          setIsInvoiceFormOpen(true);
+          break;
+        default:
+          break;
+      }
+
+      // Clear the URL params after processing to avoid re-opening on refresh
+      navigate('/sales_management', { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  // Clear initialCustomerId when dialogs are closed
+  const handleCloseQuotationForm = () => {
+    setIsQuotationFormOpen(false);
+    setEditingQuotation(null);
+    setInitialCustomerId(null);
+  };
+
+  const handleCloseSalesOrderForm = () => {
+    setIsFormOpen(false);
+    setEditingOrder(null);
+    setInitialCustomerId(null);
+  };
+
+  const handleCloseDeliveryOrderForm = () => {
+    setIsDeliveryOrderFormOpen(false);
+    setEditingDeliveryOrder(null);
+    setInitialCustomerId(null);
+  };
+
+  const handleCloseInvoiceForm = () => {
+    setIsInvoiceFormOpen(false);
+    setEditingInvoice(null);
+    setInitialCustomerId(null);
+  };
 
   const handleCreateOrder = () => {
     setEditingOrder(null);
@@ -537,25 +610,20 @@ export default function SalesManagementApp({ organizationSlug }) {
       {/* Quotation Form Dialog */}
       <QuotationFormDialog
         isOpen={isQuotationFormOpen}
-        onClose={() => {
-          setIsQuotationFormOpen(false);
-          setEditingQuotation(null);
-        }}
+        onClose={handleCloseQuotationForm}
         onSave={handleSaveQuotation}
         order={editingQuotation}
         customers={customers}
         salesPersons={salesPersons}
         products={products}
         organizationSlug={organizationSlug}
+        initialCustomerId={initialCustomerId}
       />
 
       {/* Sales Order Form Dialog */}
       <SalesOrderFormDialog
         isOpen={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false);
-          setEditingOrder(null);
-        }}
+        onClose={handleCloseSalesOrderForm}
         onSave={handleSaveOrder}
         order={editingOrder}
         customers={customers}
@@ -563,15 +631,13 @@ export default function SalesManagementApp({ organizationSlug }) {
         products={products}
         quotations={quotations}
         organizationSlug={organizationSlug}
+        initialCustomerId={initialCustomerId}
       />
 
       {/* Delivery Order Form Dialog */}
       <DeliveryOrderFormDialog
         isOpen={isDeliveryOrderFormOpen}
-        onClose={() => {
-          setIsDeliveryOrderFormOpen(false);
-          setEditingDeliveryOrder(null);
-        }}
+        onClose={handleCloseDeliveryOrderForm}
         onSave={handleSaveDeliveryOrder}
         order={editingDeliveryOrder}
         customers={customers}
@@ -579,15 +645,13 @@ export default function SalesManagementApp({ organizationSlug }) {
         products={products}
         salesOrders={salesOrders}
         organizationSlug={organizationSlug}
+        initialCustomerId={initialCustomerId}
       />
 
       {/* Invoice Form Dialog */}
       <InvoiceFormDialog
         isOpen={isInvoiceFormOpen}
-        onClose={() => {
-          setIsInvoiceFormOpen(false);
-          setEditingInvoice(null);
-        }}
+        onClose={handleCloseInvoiceForm}
         onSave={handleSaveInvoice}
         invoice={editingInvoice}
         customers={customers}
@@ -596,6 +660,7 @@ export default function SalesManagementApp({ organizationSlug }) {
         salesOrders={salesOrders}
         deliveryOrders={deliveryOrders}
         organizationSlug={organizationSlug}
+        initialCustomerId={initialCustomerId}
       />
 
       {/* Invoice Payment Dialog */}

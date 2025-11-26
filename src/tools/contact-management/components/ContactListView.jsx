@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Grid, List, Filter, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Edit, Trash2, Grid, List, Filter, Upload, FileText, ShoppingCart, Truck, Receipt } from 'lucide-react';
 import ContactFormDialog from './ContactFormDialog';
 import ContactAvatar from './ContactAvatar';
 import FilterPanel from './FilterPanel';
@@ -26,6 +27,7 @@ export default function ContactListView({
   organizationSlug,
   maxRatingScale = 10,
 }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
@@ -296,6 +298,23 @@ export default function ContactListView({
   const handleAddClick = () => {
     setEditingContact(null);
     setIsFormOpen(true);
+  };
+
+  // Quick Sales Actions - Navigate to sales_management with pre-filled customer
+  const handleQuickQuote = (contactId) => {
+    navigate(`/sales_management?dialog=quotation&customer_id=${contactId}`);
+  };
+
+  const handleQuickSalesOrder = (contactId) => {
+    navigate(`/sales_management?dialog=sales_order&customer_id=${contactId}`);
+  };
+
+  const handleQuickDeliveryOrder = (contactId) => {
+    navigate(`/sales_management?dialog=delivery_order&customer_id=${contactId}`);
+  };
+
+  const handleQuickInvoice = (contactId) => {
+    navigate(`/sales_management?dialog=invoice&customer_id=${contactId}`);
   };
 
   const handleEditClick = (contact) => {
@@ -689,6 +708,52 @@ export default function ContactListView({
                       </td>
                       <td className="px-3 md:px-4 py-3">
                         <div className="flex justify-end gap-1 md:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Quick Sales Actions - Only show for customers */}
+                          {contact.contact_type === 'customer' && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickQuote(contact.id);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Quick Quote"
+                              >
+                                <FileText size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickSalesOrder(contact.id);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Quick Sales Order"
+                              >
+                                <ShoppingCart size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickDeliveryOrder(contact.id);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                                title="Quick Delivery Order"
+                              >
+                                <Truck size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickInvoice(contact.id);
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                title="Quick Invoice"
+                              >
+                                <Receipt size={16} />
+                              </button>
+                              <div className="w-px h-5 bg-gray-200 mx-0.5" />
+                            </>
+                          )}
                           <button
                             onClick={() => handleEditClick(contact)}
                             className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -817,6 +882,44 @@ export default function ContactListView({
                     {contact.tags.map((tag) => (
                       <TagBadge key={tag.id} tag={tag} size="xs" />
                     ))}
+                  </div>
+                )}
+
+                {/* Quick Sales Actions (only for customers) */}
+                {contact.contact_type === 'customer' && (
+                  <div className="grid grid-cols-4 gap-2 mt-auto pt-2 border-b border-gray-100 pb-3 mb-3">
+                    <button
+                      onClick={() => handleQuickQuote(contact.id)}
+                      className="flex flex-col items-center justify-center gap-1 px-2 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 rounded-lg transition-all touch-manipulation text-xs font-medium"
+                      title="Quick Quote"
+                    >
+                      <FileText size={18} />
+                      <span>Quote</span>
+                    </button>
+                    <button
+                      onClick={() => handleQuickSalesOrder(contact.id)}
+                      className="flex flex-col items-center justify-center gap-1 px-2 py-2 text-green-600 bg-green-50 hover:bg-green-100 active:bg-green-200 rounded-lg transition-all touch-manipulation text-xs font-medium"
+                      title="Quick Sales Order"
+                    >
+                      <ShoppingCart size={18} />
+                      <span>SO</span>
+                    </button>
+                    <button
+                      onClick={() => handleQuickDeliveryOrder(contact.id)}
+                      className="flex flex-col items-center justify-center gap-1 px-2 py-2 text-orange-600 bg-orange-50 hover:bg-orange-100 active:bg-orange-200 rounded-lg transition-all touch-manipulation text-xs font-medium"
+                      title="Quick Delivery Order"
+                    >
+                      <Truck size={18} />
+                      <span>DO</span>
+                    </button>
+                    <button
+                      onClick={() => handleQuickInvoice(contact.id)}
+                      className="flex flex-col items-center justify-center gap-1 px-2 py-2 text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 rounded-lg transition-all touch-manipulation text-xs font-medium"
+                      title="Quick Invoice"
+                    >
+                      <Receipt size={18} />
+                      <span>Invoice</span>
+                    </button>
                   </div>
                 )}
 

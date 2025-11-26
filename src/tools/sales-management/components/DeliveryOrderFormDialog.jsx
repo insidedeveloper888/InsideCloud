@@ -19,6 +19,7 @@ export default function DeliveryOrderFormDialog({
   products = [],
   salesOrders = [],
   organizationSlug,
+  initialCustomerId = null,
 }) {
   const { statuses: deliveryOrderStatuses } = useDeliveryOrderStatuses(organizationSlug);
   const [formData, setFormData] = useState({
@@ -88,7 +89,7 @@ export default function DeliveryOrderFormDialog({
     } else {
       // Create mode - reset form
       setFormData({
-        customer_contact_id: '',
+        customer_contact_id: initialCustomerId || '', // Pre-fill from Quick Sales Action
         technician_individual_id: '',
         sales_order_id: '',
         delivery_date: new Date().toISOString().split('T')[0],
@@ -105,7 +106,7 @@ export default function DeliveryOrderFormDialog({
       });
       setSameAsBilling(false);
     }
-  }, [order, isOpen]);
+  }, [order, isOpen, initialCustomerId]);
 
   // Auto-fill from sales order
   const handleSalesOrderChange = async (salesOrderId) => {
