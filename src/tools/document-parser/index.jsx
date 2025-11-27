@@ -5,12 +5,13 @@ import { AlertCircle } from 'lucide-react';
 import SoftwareSelector from './components/SoftwareSelector';
 import DocumentTypeSelector from './components/DocumentTypeSelector';
 import FileUploader from './components/FileUploader';
+import DualFileUploader from './components/DualFileUploader';
 import DataPreviewTable from './components/DataPreviewTable';
 import DownloadButton from './components/DownloadButton';
 
 // Parsers
-import { parseInvoiceWithItem } from './parsers/sql-accounting/invoiceWithItem';
-import { parseSupplierInvoice } from './parsers/sql-accounting/supplierInvoice';
+import { parseInvoiceWithItem, parseInvoiceWithItemDual } from './parsers/sql-accounting/invoiceWithItem';
+import { parseSupplierInvoice, parseSupplierInvoiceDual } from './parsers/sql-accounting/supplierInvoice';
 import { parseGLDocumentOR } from './parsers/sql-accounting/glDocumentOR';
 import { parseGLDocumentPV } from './parsers/sql-accounting/glDocumentPV';
 
@@ -98,6 +99,70 @@ function DocumentParser({ organizationSlug }) {
     }
   };
 
+  // Handle dual file upload and parsing (for Customer Invoice with Item)
+  const handleDualFileUpload = async (customerFile, salesFile) => {
+    console.log('🚀 handleDualFileUpload called');
+    console.log('🚀 Customer file:', customerFile?.name, customerFile?.size);
+    console.log('🚀 Sales file:', salesFile?.name, salesFile?.size);
+
+    setError(null);
+    setParsedData(null);
+    setIsProcessing(true);
+
+    try {
+      console.log('🚀 Reading customer file...');
+      const customerData = await readExcelFile(customerFile);
+      console.log('🚀 Customer data rows:', customerData?.length);
+
+      console.log('🚀 Reading sales file...');
+      const salesData = await readExcelFile(salesFile);
+      console.log('🚀 Sales data rows:', salesData?.length);
+
+      console.log('🚀 Starting parsing...');
+      const result = parseInvoiceWithItemDual(customerData, salesData);
+      console.log('🚀 Parsing complete. Rows:', result?.rows?.length);
+
+      setParsedData(result);
+    } catch (err) {
+      console.error('❌ Parsing error:', err);
+      setError(err.message || 'Failed to parse files');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle dual file upload and parsing (for Supplier Invoice)
+  const handleSupplierDualFileUpload = async (supplierFile, purchaseFile) => {
+    console.log('🚀 handleSupplierDualFileUpload called');
+    console.log('🚀 Supplier file:', supplierFile?.name, supplierFile?.size);
+    console.log('🚀 Purchase file:', purchaseFile?.name, purchaseFile?.size);
+
+    setError(null);
+    setParsedData(null);
+    setIsProcessing(true);
+
+    try {
+      console.log('🚀 Reading supplier file...');
+      const supplierData = await readExcelFile(supplierFile);
+      console.log('🚀 Supplier data rows:', supplierData?.length);
+
+      console.log('🚀 Reading purchase file...');
+      const purchaseData = await readExcelFile(purchaseFile);
+      console.log('🚀 Purchase data rows:', purchaseData?.length);
+
+      console.log('🚀 Starting parsing...');
+      const result = parseSupplierInvoiceDual(supplierData, purchaseData);
+      console.log('🚀 Parsing complete. Rows:', result?.rows?.length);
+
+      setParsedData(result);
+    } catch (err) {
+      console.error('❌ Parsing error:', err);
+      setError(err.message || 'Failed to parse files');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Handle file removal
   const handleClearFile = () => {
     setUploadedFile(null);
@@ -146,8 +211,36 @@ function DocumentParser({ organizationSlug }) {
         />
       )}
 
-      {/* File Uploader */}
-      {selectedDocType && (
+      {/* File Uploader - Conditional based on doc type */}
+      {selectedDocType === DOCUMENT_TYPES.SQL_ACCOUNTING.INVOICE_WITH_ITEM && (
+        <DualFileUploader
+          onFilesSelect={handleDualFileUpload}
+          isProcessing={isProcessing}
+          onClear={() => {
+            setParsedData(null);
+            setError(null);
+          }}
+          primaryLabel="1. Customer Document Listing - Invoice with Item"
+          secondaryLabel="2. Sales Document Listing"
+        />
+      )}
+
+      {selectedDocType === DOCUMENT_TYPES.SQL_ACCOUNTING.SUPPLIER_INVOICE && (
+        <DualFileUploader
+          onFilesSelect={handleSupplierDualFileUpload}
+          isProcessing={isProcessing}
+          onClear={() => {
+            setParsedData(null);
+            setError(null);
+          }}
+          primaryLabel="1. Supplier Document Listing"
+          secondaryLabel="2. Purchase Document Listing"
+        />
+      )}
+
+      {selectedDocType &&
+       selectedDocType !== DOCUMENT_TYPES.SQL_ACCOUNTING.INVOICE_WITH_ITEM &&
+       selectedDocType !== DOCUMENT_TYPES.SQL_ACCOUNTING.SUPPLIER_INVOICE && (
         <FileUploader
           onFileSelect={handleFileUpload}
           isProcessing={isProcessing}

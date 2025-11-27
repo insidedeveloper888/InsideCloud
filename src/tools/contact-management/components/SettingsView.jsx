@@ -232,17 +232,6 @@ export default function SettingsView({
     }
   };
 
-  // Get icon for contact type
-  const getTypeIcon = (code) => {
-    const icons = {
-      customer: '👤',
-      supplier: '🏭',
-      coi: '🤝',
-      internal: '🏢',
-    };
-    return icons[code] || '📋';
-  };
-
   const tabs = [
     { id: 0, label: 'Stage management' },
     { id: 1, label: 'Channel management' },
