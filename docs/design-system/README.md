@@ -16,6 +16,7 @@ All new development MUST use these components for consistency.
 | Design Tokens | ✅ Ready | `import { buttonStyles } from 'src/lib/design-tokens'` |
 | Pagination | ✅ Ready | `import { Pagination } from 'src/components/ui'` |
 | ConfirmDialog | ✅ Ready | `import { ConfirmDialog } from 'src/components/ui'` |
+| SearchableSelect | ✅ Ready | `import { SearchableSelect } from 'src/components/ui'` |
 
 ---
 
@@ -23,10 +24,11 @@ All new development MUST use these components for consistency.
 
 ### Importing Components
 ```jsx
-import { Button, Card, MemberSelect, ConfirmDialog } from '@/components/ui';
+import { Button, Card, MemberSelect, ConfirmDialog, SearchableSelect } from '@/components/ui';
 // or
 import { Button } from 'src/components/ui/button';
 import { MemberSelect } from 'src/components/ui/member-select';
+import { SearchableSelect } from 'src/components/ui/searchable-select';
 ```
 
 ### Importing Design Tokens
@@ -154,7 +156,127 @@ import { ConfirmDialog } from 'src/components/ui/confirm-dialog';
 
 ---
 
-### 4. Button (shadcn/ui)
+### 4. SearchableSelect
+Flexible dropdown select with search, keyboard navigation, and custom rendering.
+
+**Location:** `src/components/ui/searchable-select.jsx`
+
+**Features:**
+- ✅ Search/filter options with customizable search keys
+- ✅ Keyboard navigation (Arrow keys, Enter, Escape, Tab)
+- ✅ Click outside to close
+- ✅ Custom option and selected value rendering
+- ✅ Create new items inline (`creatable` prop)
+- ✅ Loading and disabled states
+- ✅ Error state with message display
+- ✅ ARIA accessibility (role="listbox", aria-selected, aria-expanded)
+- ✅ Design token integration
+
+**Props:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `any` | required | Selected value |
+| `onChange` | `function` | required | Called with new value `(value) => void` |
+| `options` | `array` | `[]` | Array of option objects |
+| `getOptionValue` | `function` | `(o) => o.id` | Extract value from option |
+| `getOptionLabel` | `function` | `(o) => o.name` | Extract display label |
+| `placeholder` | `string` | `"Select..."` | Placeholder text |
+| `searchable` | `boolean` | `true` | Show search input |
+| `searchPlaceholder` | `string` | `"Search..."` | Search input placeholder |
+| `searchKeys` | `array` | `null` | Fields to search, e.g., `['name', 'email']` |
+| `filterFn` | `function` | `null` | Custom filter `(option, term) => boolean` |
+| `clearable` | `boolean` | `false` | Show clear button (X) |
+| `creatable` | `boolean` | `false` | Allow creating new items |
+| `onCreate` | `function` | `null` | Called with input value |
+| `createLabel` | `function` | `(input) => \`+ Add "${input}"\`` | Label for create option |
+| `filterOptions` | `function` | `null` | Pre-filter options before display |
+| `loading` | `boolean` | `false` | Show loading spinner |
+| `disabled` | `boolean` | `false` | Disable interaction |
+| `error` | `string` | `null` | Error message to display |
+| `renderOption` | `function` | `null` | Custom option renderer |
+| `renderSelected` | `function` | `null` | Custom selected display |
+| `renderEmpty` | `function` | `null` | Custom empty state |
+| `minDropdownWidth` | `number` | `300` | Minimum dropdown width (px) |
+| `maxDropdownHeight` | `number` | `320` | Max dropdown height (px) |
+
+**Basic Usage:**
+```jsx
+import { SearchableSelect } from 'src/components/ui/searchable-select';
+
+<SearchableSelect
+  value={selectedId}
+  onChange={setSelectedId}
+  options={items}
+  getOptionValue={(item) => item.id}
+  getOptionLabel={(item) => item.name}
+  placeholder="Select item..."
+  searchable
+  clearable
+/>
+```
+
+**With Custom Rendering:**
+```jsx
+<SearchableSelect
+  value={customerId}
+  onChange={setCustomerId}
+  options={customers}
+  getOptionValue={(c) => c.id}
+  getOptionLabel={(c) => c.company_name || `${c.first_name} ${c.last_name}`}
+  searchKeys={['company_name', 'first_name', 'last_name', 'email']}
+  searchPlaceholder="Search by name or email..."
+  clearable
+  renderOption={(customer, { isSelected }) => (
+    <div className="flex flex-col">
+      <span className="font-medium">
+        {customer.company_name || `${customer.first_name} ${customer.last_name}`}
+      </span>
+      {customer.email && (
+        <span className="text-xs text-gray-500">{customer.email}</span>
+      )}
+    </div>
+  )}
+/>
+```
+
+**With Create New:**
+```jsx
+<SearchableSelect
+  value={selectedCategory}
+  onChange={setSelectedCategory}
+  options={categories}
+  getOptionValue={(c) => c.value}
+  getOptionLabel={(c) => c.label}
+  creatable
+  onCreate={(inputValue) => {
+    const newCategory = { value: inputValue.toLowerCase(), label: inputValue };
+    setCategories([...categories, newCategory]);
+    setSelectedCategory(newCategory.value);
+  }}
+  createLabel={(input) => `+ Create "${input}"`}
+/>
+```
+
+**With Pre-filtering:**
+```jsx
+<SearchableSelect
+  value={quotationId}
+  onChange={setQuotationId}
+  options={quotations}
+  getOptionValue={(q) => q.id}
+  getOptionLabel={(q) => q.quotation_code}
+  filterOptions={(opts) => opts.filter(q => !q.converted_to_sales_order_id)}
+  searchKeys={['quotation_code', 'customer_name']}
+/>
+```
+
+**Used In:**
+- Can replace: CustomerSelect, ProductSelect, StatusSelect, QuotationSelect, SalesOrderSelect, DeliveryOrderSelect
+- Inventory: SearchableSelect (with `creatable`)
+
+---
+
+### 5. Button (shadcn/ui)
 Standard button component with variants.
 
 **Location:** `src/components/ui/button.jsx`
@@ -317,7 +439,7 @@ import { colors } from '@/lib/design-tokens';
 | ConfirmDialog | ✅ Done | `src/components/ui/confirm-dialog.jsx` | Consolidated from sales-management |
 | Modal | 📋 Planned | `src/tools/inventory/components/Modal.jsx` | Move best version |
 | FilterPanel | 📋 Planned | 4 implementations | Complex, needs abstraction |
-| SearchableSelect | 📋 Planned | 7 implementations | Create generic base |
+| SearchableSelect | ✅ Done | `src/components/ui/searchable-select.jsx` | Base component ready, migration pending |
 | FormField | 📋 Planned | 2 implementations | Consolidate |
 | StatusBadge | 📋 Planned | Inline everywhere | Create shared |
 
@@ -339,5 +461,5 @@ For best practices in component usage, refer to:
 
 ---
 
-*Last Updated: 2025-11-26*
+*Last Updated: 2025-11-27*
 *Maintainer: Architecture Overseer Agent*

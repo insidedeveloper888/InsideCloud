@@ -19,7 +19,13 @@ export { MemberSelect } from './member-select';
 export { Pagination } from './pagination';
 export { ConfirmDialog } from './confirm-dialog';
 
+// Searchable dropdown
+export { SearchableSelect } from './searchable-select';
+
+// Filter panel components
+export { FilterPanel, FilterSection } from './filter-panel';
+export { CheckboxFilter, SearchableCheckboxFilter, DateRangeFilter, NumberRangeFilter } from './filters';
+
 // Planned components (uncomment when created)
 // export { FormField } from './form-field';
-// export { SearchableSelect } from './searchable-select';
 // export { StatusBadge } from './status-badge';

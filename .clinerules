@@ -83,6 +83,7 @@ Before creating ANY new UI component, check `src/components/ui/` for existing co
 | MemberSelect | `member-select.jsx` | ✅ Ready | Team member dropdowns |
 | Pagination | `pagination.jsx` | ✅ Ready | List pagination |
 | ConfirmDialog | `confirm-dialog.jsx` | ✅ Ready | Delete/dangerous action confirmations |
+| SearchableSelect | `searchable-select.jsx` | ✅ Ready | Dropdown select with search, keyboard nav |
 
 ### MANDATORY: Use Design Tokens
 Import from `src/lib/design-tokens.js` for consistent styling:

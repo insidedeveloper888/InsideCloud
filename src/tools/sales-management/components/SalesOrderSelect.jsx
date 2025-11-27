@@ -1,163 +1,103 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X } from 'lucide-react';
+import React from 'react';
+import { SearchableSelect } from '../../../components/ui/searchable-select';
 
-export default function SalesOrderSelect({
-    value,
-    onChange,
-    salesOrders = [],
-    placeholder = "Select Sales Order...",
-    className = "",
-    filterCompleted = false, // Option to filter out completed orders
-    filterFullyDelivered = false, // Option to filter out fully delivered orders
+/**
+ * SalesOrderSelect - Dropdown for selecting sales orders
+ * Shows order code, customer name, amount, and status badge
+ */
+export function SalesOrderSelect({
+  value,
+  onChange,
+  salesOrders = [],
+  placeholder = 'Select Sales Order...',
+  className = '',
+  filterCompleted = false,
+  filterFullyDelivered = false,
 }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const dropdownRef = useRef(null);
-    const searchInputRef = useRef(null);
+  // Adapt onChange to match existing event-style API
+  const handleChange = (newValue) => {
+    onChange({ target: { value: newValue } });
+  };
 
-    // Find selected sales order
-    const selectedOrder = salesOrders.find(so => so.id === value);
-
-    // Filter sales orders based on search and completion status
-    const filteredOrders = salesOrders.filter(order => {
-        // Filter out completed/cancelled orders if enabled
-        if (filterCompleted && (order.status === 'completed' || order.status === 'cancelled')) {
-            return false;
-        }
-
-        // Filter out fully delivered orders if enabled
-        if (filterFullyDelivered && order.is_fully_delivered) {
-            return false;
-        }
-
-        // Apply search filter
-        const searchLower = searchTerm.toLowerCase();
-        const code = (order.order_code || '').toLowerCase();
-        const customerName = (order.customer_name || order.customer?.company_name || '').toLowerCase();
-        return code.includes(searchLower) || customerName.includes(searchLower);
+  // Pre-filter options
+  const filterOptions = (options) => {
+    return options.filter(order => {
+      // Filter out cancelled
+      if (order.status === 'cancelled') return false;
+      // Filter out completed (if enabled)
+      if (filterCompleted && order.status === 'completed') return false;
+      // Filter out fully delivered (if enabled)
+      if (filterFullyDelivered && order.is_fully_delivered) return false;
+      return true;
     });
+  };
 
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
+  // Status badge styles
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-700';
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-700';
+      case 'cancelled':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
 
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            // Focus search input when opening
-            setTimeout(() => {
-                searchInputRef.current?.focus();
-            }, 100);
-        }
+  // Format currency
+  const formatAmount = (amount) => {
+    return `RM ${Number(amount || 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`;
+  };
 
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
+  // Get customer name
+  const getCustomerName = (order) => {
+    return order.customer_name || order.customer?.company_name || 'Unknown Customer';
+  };
 
-    const handleSelect = (orderId) => {
-        onChange({ target: { value: orderId } });
-        setIsOpen(false);
-        setSearchTerm('');
-    };
+  // Custom option rendering
+  const renderOption = (order, { isSelected }) => (
+    <div className="flex items-center justify-between w-full gap-2">
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className={`font-medium truncate ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>
+          {order.order_code}
+        </span>
+        <span className="text-xs text-gray-500 truncate">{getCustomerName(order)}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-sm text-gray-600">{formatAmount(order.total_amount)}</span>
+        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusStyle(order.status)}`}>
+          {order.status}
+        </span>
+      </div>
+    </div>
+  );
 
-    const clearSelection = (e) => {
-        e.stopPropagation();
-        onChange({ target: { value: '' } });
-    };
+  // Custom selected display
+  const renderSelected = (order) => {
+    return `${order.order_code} - ${getCustomerName(order)}`;
+  };
 
-    return (
-        <div className={`relative ${className}`} ref={dropdownRef}>
-            {/* Trigger Button */}
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-3 py-2 text-left border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white flex items-center justify-between shadow-sm min-h-[38px]"
-            >
-                <div className="flex-1 truncate mr-2">
-                    {selectedOrder ? (
-                        <span className="text-gray-900 block truncate" title={`${selectedOrder.order_code} - ${selectedOrder.customer_name || ''}`}>
-                            <span className="font-medium">{selectedOrder.order_code}</span>
-                            {selectedOrder.customer_name && <span className="text-gray-500 ml-2 text-sm">({selectedOrder.customer_name})</span>}
-                        </span>
-                    ) : (
-                        <span className="text-gray-400">{placeholder}</span>
-                    )}
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    {selectedOrder && (
-                        <div
-                            onClick={clearSelection}
-                            className="p-0.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                            <X size={14} />
-                        </div>
-                    )}
-                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </div>
-            </button>
-
-            {/* Dropdown Menu */}
-            {isOpen && (
-                <div className="absolute z-50 mt-1 w-full min-w-[400px] bg-white border border-gray-300 rounded-lg shadow-xl max-h-80 overflow-hidden flex flex-col left-0">
-                    {/* Search Header */}
-                    <div className="p-2 border-b border-gray-100 bg-gray-50 sticky top-0 z-10">
-                        <div className="relative">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by code or customer..."
-                                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Sales Order List */}
-                    <div className="overflow-y-auto flex-1 p-1">
-                        {filteredOrders.length > 0 ? (
-                            filteredOrders.map((order) => (
-                                <button
-                                    key={order.id}
-                                    type="button"
-                                    onClick={() => handleSelect(order.id)}
-                                    className={`w-full px-3 py-2 text-left hover:bg-blue-50 rounded-md flex flex-col gap-0.5 transition-colors ${value === order.id ? 'bg-blue-50 ring-1 ring-blue-200' : ''
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium text-gray-900">
-                                            {order.order_code}
-                                        </span>
-                                        <span className="text-sm font-semibold text-blue-600">
-                                            RM {(order.total_amount || 0).toFixed(2)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs text-gray-500">
-                                        <span>{order.customer_name || order.customer?.company_name || 'No customer'}</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                            order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                            'bg-gray-100 text-gray-800'
-                                        }`}>
-                                            {order.status}
-                                        </span>
-                                    </div>
-                                </button>
-                            ))
-                        ) : (
-                            <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                                {searchTerm ? `No sales orders found matching "${searchTerm}"` : 'No available sales orders'}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+  return (
+    <SearchableSelect
+      value={value}
+      onChange={handleChange}
+      options={salesOrders}
+      getOptionValue={(o) => o.id}
+      getOptionLabel={(o) => o.order_code}
+      placeholder={placeholder}
+      className={className}
+      searchable={true}
+      searchKeys={['order_code', 'customer_name']}
+      searchPlaceholder="Search by code or customer..."
+      clearable={true}
+      filterOptions={filterOptions}
+      renderOption={renderOption}
+      renderSelected={renderSelected}
+      minDropdownWidth={450}
+    />
+  );
 }
+
+export default SalesOrderSelect;
