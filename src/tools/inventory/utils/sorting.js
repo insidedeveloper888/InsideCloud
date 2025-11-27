@@ -27,9 +27,9 @@ export const createSortIcon = (sortState) => ({ field }) => {
     return <span className="text-gray-300">↕</span>;
   }
   if (sortState.direction === 'asc') {
-    return <span className="text-emerald-600">↑</span>;
+    return <span className="text-blue-600">↑</span>;
   }
-  return <span className="text-emerald-600">↓</span>;
+  return <span className="text-blue-600">↓</span>;
 };
 
 /**

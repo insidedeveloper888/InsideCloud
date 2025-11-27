@@ -57,62 +57,47 @@ export default function OverviewTab({
       {/* Stock Value Card - Full Width - Clickable */}
       <button
         onClick={() => setShowValueBreakdown(true)}
-        className="w-full group relative bg-gradient-to-br from-purple-600 to-indigo-600 border border-purple-200/60 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-1 cursor-pointer text-left"
+        className="w-full bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all duration-200 cursor-pointer text-left"
       >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[4rem] opacity-50"></div>
-        <div className="relative">
-          <div className="text-xs font-bold text-purple-100 mb-2 uppercase tracking-wider flex items-center justify-between">
-            <span>Total Stock Value</span>
-            <TrendingUp className="w-5 h-5 text-purple-200 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="text-5xl font-bold text-white mb-2">RM {stockValue}</div>
-          <div className="text-sm text-purple-100 font-medium">Based on buying prices (cost basis) • Click to view breakdown</div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Stock Value</span>
+          <TrendingUp className="w-5 h-5 text-blue-600" />
         </div>
+        <div className="text-4xl font-bold text-gray-900 mb-2">RM {stockValue}</div>
+        <div className="text-sm text-gray-500">Based on buying prices (cost basis) • Click to view breakdown</div>
       </button>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="group relative bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-bl-3xl opacity-50"></div>
-          <div className="relative">
-            <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Total Products</div>
-            <div className="text-4xl font-bold text-gray-900 mb-1">{products.filter(p => !p.is_deleted).length}</div>
-            <div className="text-xs text-emerald-600 font-medium">In catalog</div>
-          </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Total Products</div>
+          <div className="text-3xl font-bold text-gray-900 mb-1">{products.filter(p => !p.is_deleted).length}</div>
+          <div className="text-xs text-gray-500">In catalog</div>
         </div>
-        <div className="group relative bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-cyan-100 to-cyan-50 rounded-bl-3xl opacity-50"></div>
-          <div className="relative">
-            <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Stock Items</div>
-            <div className="text-4xl font-bold text-gray-900 mb-1">{items.filter(i => i.quantity > 0).length}</div>
-            <div className="text-xs text-cyan-600 font-medium">In inventory</div>
-          </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Stock Items</div>
+          <div className="text-3xl font-bold text-gray-900 mb-1">{items.filter(i => i.quantity > 0).length}</div>
+          <div className="text-xs text-gray-500">In inventory</div>
         </div>
-        <div className="group relative bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-100 to-amber-50 rounded-bl-3xl opacity-50"></div>
-          <div className="relative">
-            <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Low Stock Alert</div>
-            <div className="text-4xl font-bold text-amber-600 mb-1">
-              {filteredItems.filter(i => i.stock_status === 'low_stock' && i.id).length}
-            </div>
-            <div className="text-xs text-amber-600 font-medium">Need restock</div>
+        <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Low Stock Alert</div>
+          <div className="text-3xl font-bold text-amber-600 mb-1">
+            {filteredItems.filter(i => i.stock_status === 'low_stock' && i.id).length}
           </div>
+          <div className="text-xs text-amber-600">Need restock</div>
         </div>
-        <div className="group relative bg-white border border-gray-200/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-red-100 to-red-50 rounded-bl-3xl opacity-50"></div>
-          <div className="relative">
-            <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Out of Stock</div>
-            <div className="text-4xl font-bold text-red-600 mb-1">
-              {filteredItems.filter(i => i.stock_status === 'out_of_stock' && i.id).length}
-            </div>
-            <div className="text-xs text-red-600 font-medium">Zero quantity</div>
+        <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-sm transition-shadow">
+          <div className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Out of Stock</div>
+          <div className="text-3xl font-bold text-red-600 mb-1">
+            {filteredItems.filter(i => i.stock_status === 'out_of_stock' && i.id).length}
           </div>
+          <div className="text-xs text-red-600">Zero quantity</div>
         </div>
       </div>
 
       {/* Inventory Table */}
-      <div className="bg-white border border-gray-200/60 rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200/70 bg-gradient-to-r from-gray-50 to-white">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-4 md:px-6 py-4 md:py-5 border-b border-gray-200 bg-gray-50">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <h2 className="text-lg md:text-xl font-bold text-gray-900">Stock Items</h2>
             <div className="flex space-x-2">
@@ -122,7 +107,7 @@ export default function OverviewTab({
                   setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '', product_id: '' });
                   setShowStockInModal(true);
                 }}
-                className="px-3 md:px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold rounded-xl hover:from-emerald-600 hover:to-cyan-600 transition-all flex items-center space-x-1 md:space-x-2 shadow-sm"
+                className="px-3 md:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-1 md:space-x-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>Stock In</span>
@@ -133,7 +118,7 @@ export default function OverviewTab({
                   setStockOutData({ quantity: 1, notes: '', product_id: '', location_id: '' });
                   setShowStockOutModal(true);
                 }}
-                className="px-3 md:px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white text-sm font-semibold rounded-xl hover:from-red-600 hover:to-orange-600 transition-all flex items-center space-x-1 md:space-x-2 shadow-sm"
+                className="px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors flex items-center space-x-1 md:space-x-2"
               >
                 <Minus className="w-4 h-4" />
                 <span>Stock Out</span>
@@ -151,7 +136,7 @@ export default function OverviewTab({
                   placeholder="Search by product name or SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-gray-900 text-sm"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 text-sm"
                 />
               </div>
               {/* Filter Toggle Button */}
@@ -182,7 +167,7 @@ export default function OverviewTab({
                   type="checkbox"
                   checked={showUnstocked}
                   onChange={(e) => setShowUnstocked(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-600">Show unstocked products</span>
               </label>
@@ -242,7 +227,7 @@ export default function OverviewTab({
                   </div>
                   <div>
                     <span className="text-gray-500">Available:</span>
-                    <span className={`ml-1 font-semibold ${item.isVirtual ? 'text-purple-600' : 'text-emerald-600'}`}>{item.available_quantity} {item.product?.base_unit || item.product?.unit}</span>
+                    <span className={`ml-1 font-semibold ${item.isVirtual ? 'text-purple-600' : 'text-blue-600'}`}>{item.available_quantity} {item.product?.base_unit || item.product?.unit}</span>
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2 pt-2 border-t border-gray-100">
@@ -252,7 +237,7 @@ export default function OverviewTab({
                       setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '' });
                       setShowStockInModal(true);
                     }}
-                    className="px-3 py-1.5 text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors flex items-center"
+                    className="px-3 py-1.5 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center"
                   >
                     <Plus className="w-4 h-4 mr-1" /> In
                   </button>
@@ -350,7 +335,7 @@ export default function OverviewTab({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <span className={item.isVirtual ? 'text-purple-600' : 'text-emerald-600'}>{item.available_quantity}</span>
+                        <span className={item.isVirtual ? 'text-purple-600' : 'text-blue-600'}>{item.available_quantity}</span>
                         <span className="text-gray-400 font-normal">{item.product?.base_unit || item.product?.unit}</span>
                         {item.product?.unit !== item.product?.base_unit && item.product?.unit_conversion_factor > 1 && (
                           <span className="text-gray-400 font-normal text-xs">({(item.available_quantity / item.product.unit_conversion_factor).toFixed(1)} {item.product.unit})</span>
@@ -376,7 +361,7 @@ export default function OverviewTab({
                             setStockInData({ quantity: 1, unit_cost: 0, reference_type: '', location_id: '', notes: '' });
                             setShowStockInModal(true);
                           }}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Stock In"
                         >
                           <Plus className="w-4 h-4" />

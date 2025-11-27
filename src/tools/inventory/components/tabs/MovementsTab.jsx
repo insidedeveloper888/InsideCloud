@@ -50,7 +50,7 @@ export default function MovementsTab({
                 placeholder="Search by product, warehouse, or notes..."
                 value={movementSearchTerm}
                 onChange={(e) => setMovementSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+                className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all text-sm"
               />
             </div>
             {/* Filter Toggle Button */}
@@ -124,7 +124,7 @@ export default function MovementsTab({
               ) : (
                 <>
                   {paginatedMovements.map((movement) => (
-                    <tr key={movement.id} className="hover:bg-gradient-to-r hover:from-emerald-50/30 hover:to-cyan-50/30 transition-colors duration-150">
+                    <tr key={movement.id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {new Date(movement.occurred_at).toLocaleDateString('zh-CN')}
                       </td>
@@ -185,7 +185,7 @@ export default function MovementsTab({
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2 text-sm">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${movement.movement_type === 'stock_in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${movement.movement_type === 'stock_in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {getMovementTypeLabel(movement.movement_type)}
                     </span>
                     <span className="text-gray-500">{movement.location?.name || '-'}</span>

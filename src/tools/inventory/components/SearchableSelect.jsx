@@ -4,7 +4,7 @@ import { SearchableSelect as BaseSearchableSelect } from '../../../components/ui
 /**
  * SearchableSelect - Inventory-specific wrapper
  * Maintains backward compatibility with existing props API
- * Uses emerald/green theme to match Inventory modals
+ * Uses blue theme to match Inventory modals
  */
 export function SearchableSelect({
   value,
@@ -30,10 +30,10 @@ export function SearchableSelect({
       creatable={allowAddNew}
       onCreate={onAddNew}
       createLabel={() => addNewLabel}
-      // Inventory-specific styling (emerald theme)
+      // Inventory-specific styling (blue theme)
       triggerClassName="border-2 border-gray-200 rounded-xl hover:border-gray-300"
-      inputClassName="focus:ring-emerald-500 focus:border-emerald-500"
-      optionClassName="text-gray-700 hover:bg-emerald-50"
+      inputClassName="focus:ring-blue-500 focus:border-blue-500"
+      optionClassName="text-gray-700 hover:bg-blue-50"
     />
   );
 }

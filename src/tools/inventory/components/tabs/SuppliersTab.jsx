@@ -25,7 +25,7 @@ export default function SuppliersTab({
         <h2 className="text-lg md:text-xl font-bold text-gray-900">Suppliers</h2>
         <button
           onClick={() => setShowAddSupplierModal(true)}
-          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center space-x-2"
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center space-x-2"
         >
           <Plus className="w-4 h-4" />
           <span>Add Supplier</span>
@@ -40,7 +40,7 @@ export default function SuppliersTab({
             placeholder="Search by supplier name, contact person, email, or phone..."
             value={supplierSearchTerm}
             onChange={(e) => setSupplierSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+            className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all text-sm"
           />
         </div>
       </div>
@@ -176,7 +176,7 @@ export default function SuppliersTab({
                         {!supplierSearchTerm && (
                           <button
                             onClick={() => setShowAddSupplierModal(true)}
-                            className="mt-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all"
+                            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
                           >
                             Add First Supplier
                           </button>

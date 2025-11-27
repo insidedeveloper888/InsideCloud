@@ -55,14 +55,14 @@ export default function AddProductModal({
       onClose={handleClose}
       title="Add New Item"
       icon={Plus}
-      iconBgColor="from-emerald-500 to-cyan-600"
+      iconBgColor="from-blue-500 to-blue-600"
       footer={
         <ModalFooter
           error={modalError}
           onCancel={handleClose}
           onSubmit={onSubmit}
           submitText="Add Item"
-          submitButtonClass="bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700"
+          submitButtonClass="bg-blue-600 hover:bg-blue-700"
         />
       }
     >
@@ -72,7 +72,7 @@ export default function AddProductModal({
           value={newProduct.sku}
           onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value.toUpperCase() })}
           placeholder="e.g., CCTV-001"
-          focusColor="focus:ring-emerald-500 focus:border-emerald-500"
+          focusColor="focus:ring-blue-500 focus:border-blue-500"
         />
 
         <FormField
@@ -80,7 +80,7 @@ export default function AddProductModal({
           value={newProduct.name}
           onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
           placeholder="e.g., 1080P Camera"
-          focusColor="focus:ring-emerald-500 focus:border-emerald-500"
+          focusColor="focus:ring-blue-500 focus:border-blue-500"
         />
 
         <div>
@@ -115,13 +115,13 @@ export default function AddProductModal({
           value={newProduct.description}
           onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
           placeholder="Item description..."
-          focusColor="focus:ring-emerald-500 focus:border-emerald-500"
+          focusColor="focus:ring-blue-500 focus:border-blue-500"
         />
 
         {/* Initial Stock Section */}
         <div className="pt-5 border-t-2 border-gray-100">
           <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center space-x-2">
-            <Warehouse className="w-4 h-4 text-emerald-600" />
+            <Warehouse className="w-4 h-4 text-blue-600" />
             <span>Initial Stock (Optional)</span>
           </h3>
           <div className="space-y-4">
@@ -130,7 +130,7 @@ export default function AddProductModal({
               type="select"
               value={newProduct.initial_location_id}
               onChange={(e) => setNewProduct({ ...newProduct, initial_location_id: e.target.value })}
-              focusColor="focus:ring-emerald-500 focus:border-emerald-500"
+              focusColor="focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Skip initial stock</option>
               {locations.map((location) => (
@@ -148,7 +148,7 @@ export default function AddProductModal({
                   value={newProduct.initial_quantity}
                   onChange={(e) => setNewProduct({ ...newProduct, initial_quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                   placeholder="0"
-                  focusColor="focus:ring-emerald-500 focus:border-emerald-500"
+                  focusColor="focus:ring-blue-500 focus:border-blue-500"
                   inputProps={{ min: "1" }}
                 />
 
@@ -158,7 +158,7 @@ export default function AddProductModal({
                   value={newProduct.initial_unit_cost}
                   onChange={(e) => setNewProduct({ ...newProduct, initial_unit_cost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                   placeholder="0.00"
-                  focusColor="focus:ring-emerald-500 focus:border-emerald-500"
+                  focusColor="focus:ring-blue-500 focus:border-blue-500"
                   inputProps={{ step: "0.01" }}
                 />
               </>

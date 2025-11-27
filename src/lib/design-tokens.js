@@ -13,6 +13,15 @@
 // ===================
 export const colors = {
   primary: {
+    gradient: 'bg-gradient-to-r from-blue-600 to-blue-700',
+    gradientHover: 'hover:from-blue-700 hover:to-blue-800',
+    solid: 'bg-blue-600',
+    solidHover: 'hover:bg-blue-700',
+    text: 'text-blue-600',
+    border: 'border-blue-600',
+    ring: 'ring-blue-500',
+  },
+  dark: {
     gradient: 'bg-gradient-to-r from-gray-900 to-gray-800',
     gradientHover: 'hover:from-gray-800 hover:to-gray-700',
     solid: 'bg-gray-900',
@@ -62,7 +71,8 @@ export const colors = {
 // BUTTON STYLES
 // ===================
 export const buttonStyles = {
-  primary: `${colors.primary.gradient} ${colors.primary.gradientHover} text-white font-medium rounded-lg px-4 py-2 transition-all duration-200`,
+  primary: `bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 transition-all duration-200`,
+  dark: `${colors.dark.gradient} ${colors.dark.gradientHover} text-white font-medium rounded-lg px-4 py-2 transition-all duration-200`,
   secondary: `bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 transition-all duration-200`,
   danger: `${colors.danger.solid} ${colors.danger.solidHover} text-white font-medium rounded-lg px-4 py-2 transition-all duration-200`,
   success: `${colors.success.solid} ${colors.success.solidHover} text-white font-medium rounded-lg px-4 py-2 transition-all duration-200`,

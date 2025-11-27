@@ -83,7 +83,7 @@ export default function AddDOModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-200/50 transform transition-all my-4 md:my-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
         <div className="sticky top-0 bg-white px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-gray-100 z-10">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
               <Truck className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900">Create Delivery Order</h2>
@@ -120,7 +120,7 @@ export default function AddDOModal({
                 type="text"
                 value={newDO.do_number}
                 onChange={(e) => setNewDO({ ...newDO, do_number: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                 placeholder="Auto-generated if empty"
               />
             </div>
@@ -139,7 +139,7 @@ export default function AddDOModal({
                 type="date"
                 value={newDO.expected_delivery_date}
                 onChange={(e) => setNewDO({ ...newDO, expected_delivery_date: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
               />
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function AddDOModal({
             <textarea
               value={newDO.delivery_address}
               onChange={(e) => setNewDO({ ...newDO, delivery_address: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all resize-none"
               rows="2"
               placeholder="Delivery address (auto-filled from customer)"
             />
@@ -162,7 +162,7 @@ export default function AddDOModal({
             <textarea
               value={newDO.notes}
               onChange={(e) => setNewDO({ ...newDO, notes: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all resize-none"
               rows="2"
               placeholder="Additional notes for this delivery order..."
             />
@@ -200,7 +200,7 @@ export default function AddDOModal({
                     type="number"
                     value={doItemToAdd.quantity === 0 ? '' : doItemToAdd.quantity}
                     onChange={(e) => setDoItemToAdd({ ...doItemToAdd, quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm text-gray-900"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm text-gray-900"
                     placeholder="0"
                     min="1"
                   />
@@ -221,7 +221,7 @@ export default function AddDOModal({
                       <select
                         value={doItemToAdd.unit || baseUnit}
                         onChange={(e) => setDoItemToAdd({ ...doItemToAdd, unit: e.target.value })}
-                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm text-gray-900"
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm text-gray-900"
                         disabled={!doItemToAdd.product_id}
                       >
                         {availableUnits.map((unit) => (
@@ -235,7 +235,7 @@ export default function AddDOModal({
                   <button
                     onClick={handleAddItem}
                     disabled={!doItemToAdd.product_id || !doItemToAdd.quantity || stockInfo?.isInsufficient}
-                    className="w-full px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="hidden md:inline">Add Item</span>
@@ -288,10 +288,10 @@ export default function AddDOModal({
                   </p>
                 )}
                 {/* Total Items Summary */}
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border-2 border-emerald-200 sticky bottom-0">
+                <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200 sticky bottom-0">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-bold text-gray-900">Total Items:</span>
-                    <span className="text-2xl font-bold text-emerald-600">{newDO.items.length}</span>
+                    <span className="text-2xl font-bold text-gray-900">{newDO.items.length}</span>
                   </div>
                 </div>
               </>
@@ -320,7 +320,7 @@ export default function AddDOModal({
             <button
               onClick={onSubmit}
               disabled={!newDO.customer_id || !newDO.location_id || !newDO.delivery_address?.trim() || newDO.items.length === 0}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+              className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               Create Delivery Order
             </button>

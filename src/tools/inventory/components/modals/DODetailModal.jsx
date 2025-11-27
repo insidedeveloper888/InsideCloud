@@ -199,10 +199,10 @@ export default function DODetailModal({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-emerald-50 border-t border-emerald-200">
+                <tfoot className="bg-gray-50 border-t border-gray-200">
                   <tr>
                     <td className="px-4 py-3 font-bold text-gray-900">Total Items:</td>
-                    <td className="px-4 py-3 text-center text-lg font-bold text-emerald-600">
+                    <td className="px-4 py-3 text-center text-lg font-bold text-gray-900">
                       {selectedDO.items?.reduce((sum, item) => sum + (item.quantity || 0), 0)}
                     </td>
                     <td></td>
@@ -216,12 +216,12 @@ export default function DODetailModal({
           <div className="border-t pt-4">
             <label className="block text-sm font-bold text-gray-900 mb-3">Update Status</label>
             {selectedDO.status === 'delivered' ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
-                <div className="flex items-center space-x-2 text-emerald-700">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center space-x-2 text-green-700">
                   <CheckCircle className="w-5 h-5" />
                   <span className="font-medium">Stock Deducted from Inventory</span>
                 </div>
-                <p className="text-sm text-emerald-600 mt-1">Status is locked. For returns or corrections, use Stock In movements.</p>
+                <p className="text-sm text-green-600 mt-1">Status is locked. For returns or corrections, use Stock In movements.</p>
               </div>
             ) : null}
             <div className="grid grid-cols-4 gap-2">
@@ -262,13 +262,13 @@ export default function DODetailModal({
                 onClick={() => selectedDO.status === 'dispatched' ? handleUpdateStatus('delivered') : null}
                 disabled={selectedDO.status !== 'dispatched'}
                 className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                  selectedDO.status === 'delivered' ? 'bg-emerald-100 border-emerald-300' :
-                  selectedDO.status === 'dispatched' ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 cursor-pointer' :
+                  selectedDO.status === 'delivered' ? 'bg-green-100 border-green-300' :
+                  selectedDO.status === 'dispatched' ? 'bg-green-50 border-green-200 hover:bg-green-100 cursor-pointer' :
                   'bg-gray-50 border-gray-200 opacity-50'
                 }`}
               >
-                <CheckCircle className="w-5 h-5 text-emerald-500 mb-1" />
-                <span className="text-xs font-medium text-emerald-600">Delivered</span>
+                <CheckCircle className="w-5 h-5 text-green-500 mb-1" />
+                <span className="text-xs font-medium text-green-600">Delivered</span>
               </button>
             </div>
           </div>
@@ -304,14 +304,14 @@ export default function DODetailModal({
           <div className="border-t pt-4">
             <label className="block text-sm font-bold text-gray-900 mb-3">Delivery Order (DO)</label>
             {selectedDO.delivery_order_url ? (
-              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2 text-emerald-700">
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2 text-green-700">
                   <CheckCircle className="w-5 h-5" />
                   <span className="font-medium">DO Document uploaded</span>
                 </div>
                 <button
                   onClick={handleViewDO}
-                  className="px-3 py-1 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700"
+                  className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
                 >
                   View DO
                 </button>
@@ -331,7 +331,7 @@ export default function DODetailModal({
                 />
                 <label
                   htmlFor="do-out-upload"
-                  className="flex items-center justify-center space-x-2 px-6 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center justify-center space-x-2 px-6 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer"
                 >
                   <Upload className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-600 font-medium">Upload DO Document</span>

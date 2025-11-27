@@ -62,7 +62,7 @@ export default function ProductsTab({
                 placeholder="Search by SKU, item name, or category..."
                 value={productSearchTerm}
                 onChange={(e) => setProductSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all text-sm"
               />
             </div>
             {/* Filter Toggle Button */}
@@ -267,7 +267,7 @@ export default function ProductsTab({
                       const isExpanded = expandedProductId === product.id;
                       return (
                         <React.Fragment key={product.id}>
-                          <tr className="hover:bg-gradient-to-r hover:from-emerald-50/30 hover:to-cyan-50/30 transition-colors duration-150">
+                          <tr className="hover:bg-gray-50 transition-colors duration-150">
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                               {product.sku}
                             </td>
@@ -276,7 +276,7 @@ export default function ProductsTab({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                               {product.is_selling ? (
-                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700">
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">
                                   Selling
                                 </span>
                               ) : (
@@ -295,7 +295,7 @@ export default function ProductsTab({
                                 const isSelling = productThresholds[`${product.id}_is_selling`] ?? product.is_selling;
                                 return isSelling && baseUnit?.selling_price ? (
                                   <div className="flex flex-col">
-                                    <span className="font-semibold text-emerald-600">
+                                    <span className="font-semibold text-blue-600">
                                       RM {parseFloat(baseUnit.selling_price).toFixed(2)}
                                     </span>
                                     <span className="text-xs text-gray-500">per {product.base_unit || product.unit || 'pcs'}</span>
@@ -568,7 +568,7 @@ export default function ProductsTab({
                                           ...productThresholds,
                                           [`${product.id}_is_selling`]: e.target.checked
                                         })}
-                                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                       />
                                       <span className="text-sm font-semibold text-gray-700">This is a selling item (vs. non-selling item/accessory)</span>
                                       <div className="relative">
@@ -600,7 +600,7 @@ export default function ProductsTab({
                                           const baseUnit = productUnits.find(u => u.product_id === product.id && u.is_base_unit);
 
                                           return (
-                                            <div className="flex items-center space-x-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                                            <div className="flex items-center space-x-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
                                               <span className="text-sm font-semibold text-gray-700">Selling Price:</span>
                                               <input
                                                 type="number"
@@ -662,7 +662,7 @@ export default function ProductsTab({
                                                   </button>
                                                 </div>
                                                 {isSelling && baseSellingPrice > 0 && (
-                                                  <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-2 rounded-lg">
+                                                  <div className="flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-lg">
                                                     <span className="text-xs text-gray-600 flex-shrink-0">Selling Price:</span>
                                                     <input
                                                       type="number"
@@ -678,7 +678,7 @@ export default function ProductsTab({
                                                     />
                                                     <span className="text-xs text-gray-600">RM / {unit.unit_name}</span>
                                                     {!currentSellingPrice && (
-                                                      <span className="text-xs text-emerald-600 italic">
+                                                      <span className="text-xs text-blue-600 italic">
                                                         (auto: RM {calculatedPrice.toFixed(2)})
                                                       </span>
                                                     )}
@@ -699,7 +699,7 @@ export default function ProductsTab({
                                           {!isFormVisible && (
                                             <button
                                               onClick={() => setShowAddUnitForm({ ...showAddUnitForm, [product.id]: true })}
-                                              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg border-2 border-dashed border-emerald-300 hover:border-emerald-400 transition-all w-full justify-center"
+                                              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg border-2 border-dashed border-blue-300 hover:border-blue-400 transition-all w-full justify-center"
                                             >
                                               <Plus className="w-4 h-4" />
                                               <span>Add New Unit Conversion</span>
@@ -708,7 +708,7 @@ export default function ProductsTab({
 
                                           {/* Add New Unit Form (expanded state) */}
                                           {isFormVisible && (
-                                            <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-lg space-y-3">
+                                            <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg space-y-3">
                                               <div className="flex items-center justify-between mb-2">
                                                 <span className="text-sm font-semibold text-gray-700">New Unit Conversion</span>
                                                 <button
@@ -761,7 +761,7 @@ export default function ProductsTab({
                                                       ...newProductUnit,
                                                       [product.id]: { ...newProductUnit[product.id], conversion: e.target.value }
                                                     })}
-                                                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                     placeholder="12"
                                                   />
                                                 </div>
@@ -845,7 +845,7 @@ export default function ProductsTab({
                                                       setError(err.message);
                                                     }
                                                   }}
-                                                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
                                                 >
                                                   Add Unit
                                                 </button>

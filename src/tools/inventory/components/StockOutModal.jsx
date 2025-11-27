@@ -89,7 +89,7 @@ export default function StockOutModal({
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">Available</p>
-              <p className="font-bold text-emerald-600">{selectedStockItem.available_quantity}</p>
+              <p className="font-bold text-blue-600">{selectedStockItem.available_quantity}</p>
             </div>
           </div>
         </div>

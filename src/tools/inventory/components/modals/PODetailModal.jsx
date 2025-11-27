@@ -247,9 +247,9 @@ export default function PODetailModal({
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">RM {(item.quantity * item.unit_cost).toFixed(2)}</td>
                     </tr>
                   ))}
-                  <tr className="bg-gradient-to-r from-emerald-50 to-teal-50">
+                  <tr className="bg-gray-50">
                     <td colSpan="3" className="px-4 py-4 text-right font-bold text-gray-900">Total Amount:</td>
-                    <td className="px-4 py-4 text-right text-xl font-bold text-emerald-600">RM {(selectedPO.total_amount || 0).toFixed(2)}</td>
+                    <td className="px-4 py-4 text-right text-xl font-bold text-gray-900">RM {(selectedPO.total_amount || 0).toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -262,12 +262,12 @@ export default function PODetailModal({
 
             {/* Warning when PO is received */}
             {selectedPO.status === 'received' && (
-              <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded">
+              <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-500 rounded">
                 <div className="flex items-start space-x-2">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-emerald-900">Stock Added to Inventory</p>
-                    <p className="text-xs text-emerald-700 mt-1">
+                    <p className="text-sm font-semibold text-green-900">Stock Added to Inventory</p>
+                    <p className="text-xs text-green-700 mt-1">
                       Status is locked. For returns or corrections, use Stock Out movements.
                     </p>
                   </div>
@@ -318,10 +318,10 @@ export default function PODetailModal({
                 title={!selectedPO.delivery_order_url && selectedPO.status !== 'received' ? 'Upload Delivery Order first' : ''}
                 className={`px-4 py-3 rounded-lg font-medium transition-all ${
                   selectedPO.status === 'received'
-                    ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed'
+                    ? 'bg-green-100 text-green-400 cursor-not-allowed'
                     : !selectedPO.delivery_order_url
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
                 }`}
               >
                 <CheckCircle className="w-4 h-4 mx-auto mb-1" />
@@ -337,14 +337,14 @@ export default function PODetailModal({
           <div className="border-t-2 border-gray-200 pt-6">
             <label className="block text-sm font-bold text-gray-900 mb-3">Delivery Order (DO)</label>
             {selectedPO.delivery_order_url ? (
-              <div className="flex items-center justify-between bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4">
+              <div className="flex items-center justify-between bg-green-50 border-2 border-green-200 rounded-lg p-4">
                 <div className="flex items-center space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                  <span className="text-emerald-800 font-medium">Delivery order uploaded</span>
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="text-green-800 font-medium">Delivery order uploaded</span>
                 </div>
                 <button
                   onClick={handleViewDO}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center space-x-2"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center space-x-2"
                 >
                   <Eye className="w-4 h-4" />
                   <span>View</span>

@@ -1597,47 +1597,44 @@ export default function InventoryProduct({ onBack }) {
   };
 
   return (
-    <div className="inventory-product min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 m-0 p-0">
+    <div className="inventory-product min-h-screen bg-gray-50 m-0 p-0">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-sm sticky top-0 z-20">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="px-4 md:px-8 py-4 md:py-6 m-0">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center space-x-3 md:space-x-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-xl md:rounded-2xl blur opacity-20"></div>
-                <div className="relative bg-gradient-to-br from-emerald-500 to-cyan-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg">
-                  <Package className="w-5 h-5 md:w-7 md:h-7 text-white" />
-                </div>
+              <div className="bg-blue-100 p-2 md:p-3 rounded-lg">
+                <Package className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-xl md:text-3xl font-bold text-gray-900 tracking-tight">Inventory Management</h1>
-                <p className="text-gray-500 text-xs md:text-sm font-medium mt-0.5 tracking-wide">Stock & P/D Orders</p>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Inventory Management</h1>
+                <p className="text-gray-500 text-xs md:text-sm mt-0.5">Stock & P/D Orders</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:flex gap-2 sm:space-x-2 sm:gap-0">
               <button
                 onClick={() => setShowAddLocationModal(true)}
-                className="group relative bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl flex items-center justify-center space-x-1 md:space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md text-xs md:text-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center justify-center space-x-1 md:space-x-2 transition-colors text-xs md:text-sm font-medium"
               >
                 <Warehouse className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Add Warehouse</span>
-                <span className="font-medium sm:hidden">Warehouse</span>
+                <span className="hidden sm:inline">Add Warehouse</span>
+                <span className="sm:hidden">Warehouse</span>
               </button>
               <button
                 onClick={() => setShowAddProductModal(true)}
-                className="group relative bg-gradient-to-r from-gray-900 to-gray-800 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl flex items-center justify-center space-x-1 md:space-x-2 hover:from-gray-800 hover:to-gray-700 transition-all duration-200 shadow-md text-xs md:text-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center justify-center space-x-1 md:space-x-2 transition-colors text-xs md:text-sm font-medium"
               >
                 <Plus className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Add Item</span>
-                <span className="font-medium sm:hidden">Item</span>
+                <span className="hidden sm:inline">Add Item</span>
+                <span className="sm:hidden">Item</span>
               </button>
               <button
                 onClick={() => setShowAddPOModal(true)}
-                className="group bg-white border-2 border-emerald-600 text-emerald-600 px-3 md:px-5 py-2 md:py-2.5 rounded-xl flex items-center justify-center space-x-1 md:space-x-2 hover:bg-emerald-600 hover:text-white transition-all duration-200 shadow-sm text-xs md:text-sm"
+                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 md:px-4 py-2 rounded-lg flex items-center justify-center space-x-1 md:space-x-2 transition-colors text-xs md:text-sm font-medium"
               >
                 <FileText className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Create PO</span>
-                <span className="font-medium sm:hidden">PO</span>
+                <span className="hidden sm:inline">Create PO</span>
+                <span className="sm:hidden">PO</span>
               </button>
               <button
                 onClick={() => {
@@ -1652,11 +1649,11 @@ export default function InventoryProduct({ onBack }) {
                   });
                   setShowAddDOModal(true);
                 }}
-                className="group bg-white border-2 border-blue-600 text-blue-600 px-3 md:px-5 py-2 md:py-2.5 rounded-xl flex items-center justify-center space-x-1 md:space-x-2 hover:bg-blue-600 hover:text-white transition-all duration-200 shadow-sm text-xs md:text-sm"
+                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 md:px-4 py-2 rounded-lg flex items-center justify-center space-x-1 md:space-x-2 transition-colors text-xs md:text-sm font-medium"
               >
                 <Truck className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Create DO</span>
-                <span className="font-medium sm:hidden">DO</span>
+                <span className="hidden sm:inline">Create DO</span>
+                <span className="sm:hidden">DO</span>
               </button>
             </div>
           </div>
@@ -1665,85 +1662,67 @@ export default function InventoryProduct({ onBack }) {
 
       <div className="w-full">
         {/* Tabs - Sticky below header */}
-        <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200/70 sticky top-[88px] z-10 overflow-x-auto">
+        <div className="bg-white border-b border-gray-200 sticky top-[88px] z-10 overflow-x-auto">
           <nav className="flex px-4 md:px-8 space-x-1 min-w-max">
               <button
                 onClick={() => setTab('overview')}
-                className={`relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === 'overview'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Stock Overview</span>
-                {tab === 'overview' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
-                )}
+                Stock Overview
               </button>
               <button
                 onClick={() => setTab('products')}
-                className={`relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === 'products'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Items</span>
-                {tab === 'products' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
-                )}
+                Items
               </button>
               <button
                 onClick={() => setTab('movements')}
-                className={`relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === 'movements'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Stock Movements</span>
-                {tab === 'movements' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
-                )}
+                Stock Movements
               </button>
               <button
                 onClick={() => setTab('purchase-orders')}
-                className={`relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === 'purchase-orders'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Purchase Orders</span>
-                {tab === 'purchase-orders' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
-                )}
+                Purchase Orders
               </button>
               <button
                 onClick={() => setTab('delivery-orders')}
-                className={`relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === 'delivery-orders'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Delivery Orders</span>
-                {tab === 'delivery-orders' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
-                )}
+                Delivery Orders
               </button>
               <button
                 onClick={() => setTab('suppliers')}
-                className={`relative px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
                   tab === 'suppliers'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <span className="relative z-10">Suppliers</span>
-                {tab === 'suppliers' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full"></div>
-                )}
+                Suppliers
               </button>
             </nav>
         </div>
@@ -1778,7 +1757,7 @@ export default function InventoryProduct({ onBack }) {
           <div className="flex justify-center items-center py-16">
             <div className="relative">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200"></div>
-              <div className="animate-spin rounded-full h-16 w-16 border-4 border-emerald-500 border-t-transparent absolute top-0"></div>
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent absolute top-0"></div>
             </div>
           </div>
         ) : (

@@ -38,7 +38,7 @@ export default function AddSupplierModal({
       <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 w-full max-w-2xl border border-gray-200/50 transform transition-all max-h-[95vh] md:max-h-[90vh] overflow-y-auto my-auto mx-2 md:mx-auto animate-in zoom-in-95 fade-in duration-300">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
               <Users className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add Supplier</h2>
@@ -62,7 +62,7 @@ export default function AddSupplierModal({
                   type="text"
                   value={newSupplier.first_name}
                   onChange={(e) => setNewSupplier({ ...newSupplier, first_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="John"
                 />
               </div>
@@ -72,7 +72,7 @@ export default function AddSupplierModal({
                   type="text"
                   value={newSupplier.last_name}
                   onChange={(e) => setNewSupplier({ ...newSupplier, last_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="Doe"
                 />
               </div>
@@ -89,7 +89,7 @@ export default function AddSupplierModal({
                   type="tel"
                   value={newSupplier.phone_1}
                   onChange={(e) => setNewSupplier({ ...newSupplier, phone_1: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="+60 12-345 6789"
                 />
               </div>
@@ -99,7 +99,7 @@ export default function AddSupplierModal({
                   type="tel"
                   value={newSupplier.phone_2}
                   onChange={(e) => setNewSupplier({ ...newSupplier, phone_2: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="+60 3-1234 5678"
                 />
               </div>
@@ -110,7 +110,7 @@ export default function AddSupplierModal({
                 type="email"
                 value={newSupplier.email}
                 onChange={(e) => setNewSupplier({ ...newSupplier, email: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                 placeholder="john@example.com"
               />
             </div>
@@ -125,7 +125,7 @@ export default function AddSupplierModal({
                 <select
                   value={newSupplier.entity_type}
                   onChange={(e) => setNewSupplier({ ...newSupplier, entity_type: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                 >
                   <option value="individual">Individual</option>
                   <option value="company">Company</option>
@@ -137,7 +137,7 @@ export default function AddSupplierModal({
                   type="text"
                   value={newSupplier.company_name}
                   onChange={(e) => setNewSupplier({ ...newSupplier, company_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="Acme Inc."
                 />
               </div>
@@ -148,7 +148,7 @@ export default function AddSupplierModal({
                 type="text"
                 value={newSupplier.industry}
                 onChange={(e) => setNewSupplier({ ...newSupplier, industry: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                 placeholder="e.g., Technology, Finance, Manufacturing"
               />
             </div>
@@ -160,7 +160,7 @@ export default function AddSupplierModal({
                     type="text"
                     value={newSupplier.contact_person_name}
                     onChange={(e) => setNewSupplier({ ...newSupplier, contact_person_name: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                     placeholder="Contact person"
                   />
                 </div>
@@ -170,7 +170,7 @@ export default function AddSupplierModal({
                     type="tel"
                     value={newSupplier.contact_person_phone}
                     onChange={(e) => setNewSupplier({ ...newSupplier, contact_person_phone: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                     placeholder="Contact phone"
                   />
                 </div>
@@ -188,7 +188,7 @@ export default function AddSupplierModal({
                   type="text"
                   value={newSupplier.address_line_1}
                   onChange={(e) => setNewSupplier({ ...newSupplier, address_line_1: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="Street address"
                 />
               </div>
@@ -198,7 +198,7 @@ export default function AddSupplierModal({
                   type="text"
                   value={newSupplier.address_line_2}
                   onChange={(e) => setNewSupplier({ ...newSupplier, address_line_2: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   placeholder="Apartment, Suite, etc. (optional)"
                 />
               </div>
@@ -209,7 +209,7 @@ export default function AddSupplierModal({
                     type="text"
                     value={newSupplier.postal_code}
                     onChange={(e) => setNewSupplier({ ...newSupplier, postal_code: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                     placeholder="50000"
                   />
                 </div>
@@ -218,7 +218,7 @@ export default function AddSupplierModal({
                   <select
                     value={newSupplier.state}
                     onChange={(e) => setNewSupplier({ ...newSupplier, state: e.target.value, city: '' })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                   >
                     <option value="">Select state...</option>
                     <optgroup label="States">
@@ -249,7 +249,7 @@ export default function AddSupplierModal({
                     type="text"
                     value={newSupplier.city}
                     onChange={(e) => setNewSupplier({ ...newSupplier, city: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
                     placeholder="City"
                   />
                 </div>
@@ -263,7 +263,7 @@ export default function AddSupplierModal({
             <textarea
               value={newSupplier.notes}
               onChange={(e) => setNewSupplier({ ...newSupplier, notes: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all resize-none"
               rows="2"
               placeholder="Additional notes..."
             />
@@ -280,7 +280,7 @@ export default function AddSupplierModal({
           <button
             onClick={onSubmit}
             disabled={!newSupplier.first_name || !newSupplier.last_name || !newSupplier.phone_1}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             Add Supplier
           </button>

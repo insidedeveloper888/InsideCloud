@@ -42,7 +42,7 @@ export default function StockInModal({
       if (unitConv && stockInData.quantity > 0) {
         const baseQty = stockInData.quantity * unitConv.conversion_to_base;
         return (
-          <p className="text-xs text-emerald-600 mt-1">
+          <p className="text-xs text-blue-600 mt-1">
             = {baseQty} {baseUnit} (base unit)
           </p>
         );
@@ -57,7 +57,7 @@ export default function StockInModal({
       onClose={handleClose}
       title="Stock In"
       icon={Plus}
-      iconBgColor="from-emerald-500 to-cyan-600"
+      iconBgColor="from-blue-500 to-blue-600"
       maxWidth="max-w-lg"
       footer={
         <ModalFooter
@@ -70,13 +70,13 @@ export default function StockInModal({
               <span>Confirm Stock In</span>
             </div>
           }
-          submitButtonClass="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600"
+          submitButtonClass="bg-blue-600 hover:bg-blue-700"
         />
       }
     >
       {/* Product Info - Only show if pre-selected */}
       {selectedStockItem && (
-        <div className={`rounded-xl p-4 mb-6 border ${selectedStockItem.isVirtual ? 'bg-purple-50 border-purple-200' : 'bg-emerald-50 border-emerald-200'}`}>
+        <div className={`rounded-xl p-4 mb-6 border ${selectedStockItem.isVirtual ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'}`}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-500 mb-1">Product</p>
@@ -93,7 +93,7 @@ export default function StockInModal({
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">Current Stock</p>
-              <p className={`font-bold ${selectedStockItem.isVirtual ? 'text-purple-600' : 'text-emerald-600'}`}>
+              <p className={`font-bold ${selectedStockItem.isVirtual ? 'text-purple-600' : 'text-blue-600'}`}>
                 {selectedStockItem.quantity} {selectedStockItem.product?.unit}
               </p>
             </div>
@@ -109,7 +109,7 @@ export default function StockInModal({
             <select
               value={stockInData.product_id || ''}
               onChange={(e) => setStockInData({ ...stockInData, product_id: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
             >
               <option value="">Select product...</option>
               {products.filter(p => !p.is_deleted).map((product) => (
@@ -128,7 +128,7 @@ export default function StockInModal({
             <select
               value={stockInData.location_id}
               onChange={(e) => setStockInData({ ...stockInData, location_id: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
             >
               <option value="">Select warehouse...</option>
               {locations.map((location) => (
@@ -173,7 +173,7 @@ export default function StockInModal({
               type="number"
               value={stockInData.quantity === 0 ? '' : stockInData.quantity}
               onChange={(e) => setStockInData({ ...stockInData, quantity: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-              className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+              className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
               placeholder="Enter quantity"
               min="0.01"
               step="0.01"
@@ -182,7 +182,7 @@ export default function StockInModal({
               <select
                 value={stockInData.unit || baseUnit}
                 onChange={(e) => setStockInData({ ...stockInData, unit: e.target.value })}
-                className="w-32 px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900"
+                className="w-32 px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
               >
                 <option value={baseUnit}>{baseUnit}</option>
                 {productUnitsForItem.filter(u => !u.is_base_unit).map(u => (
@@ -205,7 +205,7 @@ export default function StockInModal({
             type="number"
             value={stockInData.unit_cost === 0 ? '' : stockInData.unit_cost}
             onChange={(e) => setStockInData({ ...stockInData, unit_cost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all"
             placeholder="Enter unit cost"
             min="0"
             step="0.01"
@@ -218,7 +218,7 @@ export default function StockInModal({
           <textarea
             value={stockInData.notes}
             onChange={(e) => setStockInData({ ...stockInData, notes: e.target.value })}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all resize-none"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all resize-none"
             rows="2"
             placeholder="e.g., Returned from customer, Supplier refund..."
           />

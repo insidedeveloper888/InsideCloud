@@ -36,7 +36,7 @@ export default function DeliveryOrdersTab({
               placeholder="Search by DO number, customer..."
               value={doSearchTerm}
               onChange={(e) => setDoSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all text-sm"
             />
           </div>
           {/* Filter Toggle Button */}
@@ -126,7 +126,7 @@ export default function DeliveryOrdersTab({
                   d.status === 'draft' ? 'bg-gray-100 text-gray-700' :
                   d.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
                   d.status === 'dispatched' ? 'bg-yellow-100 text-yellow-700' :
-                  d.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                  d.status === 'delivered' ? 'bg-green-100 text-green-700' :
                   'bg-red-100 text-red-700'
                 }`}>
                   {d.status?.charAt(0).toUpperCase() + d.status?.slice(1)}
@@ -134,7 +134,7 @@ export default function DeliveryOrdersTab({
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="text-gray-500">Date:</span> <span className="text-gray-900">{d.order_date ? new Date(d.order_date).toLocaleDateString() : '-'}</span></div>
-                <div><span className="text-gray-500">Items:</span> <span className="font-semibold text-emerald-600">{d.items?.length || 0}</span></div>
+                <div><span className="text-gray-500">Items:</span> <span className="font-semibold text-blue-600">{d.items?.length || 0}</span></div>
                 <div><span className="text-gray-500">Warehouse:</span> <span className="text-gray-900">{d.location?.name || '-'}</span></div>
               </div>
             </div>
@@ -259,14 +259,14 @@ export default function DeliveryOrdersTab({
                       d.status === 'draft' ? 'bg-gray-100 text-gray-700' :
                       d.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
                       d.status === 'dispatched' ? 'bg-yellow-100 text-yellow-700' :
-                      d.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                      d.status === 'delivered' ? 'bg-green-100 text-green-700' :
                       'bg-red-100 text-red-700'
                     }`}>
                       {d.status?.charAt(0).toUpperCase() + d.status?.slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-sm">{d.items?.length || 0}</span>
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">{d.items?.length || 0}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{d.created_by?.display_name || '-'}</td>
                 </tr>

@@ -23,7 +23,7 @@ export function TextInput({
   onChange,
   placeholder,
   className = '',
-  focusColor = 'focus:ring-emerald-500 focus:border-emerald-500',
+  focusColor = 'focus:ring-blue-500 focus:border-blue-500',
   ...props
 }) {
   return (
@@ -49,7 +49,7 @@ export function NumberInput({
   max,
   step = '0.01',
   className = '',
-  focusColor = 'focus:ring-emerald-500 focus:border-emerald-500',
+  focusColor = 'focus:ring-blue-500 focus:border-blue-500',
   ...props
 }) {
   return (
@@ -76,7 +76,7 @@ export function TextArea({
   placeholder,
   rows = 2,
   className = '',
-  focusColor = 'focus:ring-emerald-500 focus:border-emerald-500',
+  focusColor = 'focus:ring-blue-500 focus:border-blue-500',
   ...props
 }) {
   return (
@@ -99,7 +99,7 @@ export function Select({
   onChange,
   children,
   className = '',
-  focusColor = 'focus:ring-emerald-500 focus:border-emerald-500',
+  focusColor = 'focus:ring-blue-500 focus:border-blue-500',
   ...props
 }) {
   return (

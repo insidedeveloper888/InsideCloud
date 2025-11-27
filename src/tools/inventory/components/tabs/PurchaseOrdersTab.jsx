@@ -41,7 +41,7 @@ export default function PurchaseOrdersTab({
               placeholder="Search by PO number, supplier, or product..."
               value={poSearchTerm}
               onChange={(e) => setPoSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-900 transition-all text-sm"
+              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 transition-all text-sm"
             />
           </div>
           {/* Filter Toggle Button */}
@@ -146,7 +146,7 @@ export default function PurchaseOrdersTab({
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm mb-2">
                   <div><span className="text-gray-500">Date:</span> <span className="text-gray-900">{po.order_date ? new Date(po.order_date).toLocaleDateString() : 'N/A'}</span></div>
-                  <div><span className="text-gray-500">Items:</span> <span className="font-semibold text-emerald-600">{po.items?.length || 0}</span></div>
+                  <div><span className="text-gray-500">Items:</span> <span className="font-semibold text-blue-600">{po.items?.length || 0}</span></div>
                   <div><span className="text-gray-500">Warehouse:</span> <span className="text-gray-900">{warehouse?.name || 'Default'}</span></div>
                   <div><span className="text-gray-500">Total:</span> <span className="font-bold text-gray-900">RM {(po.total_amount || 0).toFixed(2)}</span></div>
                 </div>
@@ -282,7 +282,7 @@ export default function PurchaseOrdersTab({
                         {!poSearchTerm && (
                           <button
                             onClick={() => setShowAddPOModal(true)}
-                            className="mt-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all"
+                            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
                           >
                             Create First Purchase Order
                           </button>
@@ -339,7 +339,7 @@ export default function PurchaseOrdersTab({
                       <span className="font-bold text-gray-900">RM {(po.total_amount || 0).toFixed(2)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-sm">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
                         {po.items?.length || 0}
                       </span>
                     </td>
