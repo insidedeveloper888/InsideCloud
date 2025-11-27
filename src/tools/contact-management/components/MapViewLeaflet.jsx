@@ -12,6 +12,7 @@ import { MapPin, Map as MapIcon } from 'lucide-react';
 import { MALAYSIA_STATES } from '../utils/malaysiaStates';
 import MALAYSIA_GEOJSON from '../../../assets/map/malaysia-states-simplified.json';
 import { getCityCoordinates } from '../utils/malaysiaCities';
+import { hasContactType } from '../utils/contactTypeUtils';
 
 // Fix default marker icon issue with Webpack
 delete L.Icon.Default.prototype._getIconUrl;
@@ -32,8 +33,8 @@ export default function MapViewLeaflet({ contacts = [] }) {
     firstFeature: MALAYSIA_GEOJSON?.features?.[0]?.properties
   });
 
-  // Filter to customers only
-  const customers = contacts.filter((c) => c.contact_type === 'customer');
+  // Filter to customers only (using contact_types array)
+  const customers = contacts.filter((c) => hasContactType(c, 'customer'));
 
   // Calculate customer count per state
   const stateData = useMemo(() => {

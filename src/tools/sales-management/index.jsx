@@ -135,7 +135,7 @@ export default function SalesManagementApp({ organizationSlug }) {
 
         if (response.ok) {
           const data = await response.json();
-          const customerList = data.filter(c => c.contact_type === 'customer' && !c.is_deleted);
+          const customerList = data.filter(c => c.contact_types?.some(t => t.code === 'customer') && !c.is_deleted);
           setCustomers(customerList);
         }
       } catch (err) {

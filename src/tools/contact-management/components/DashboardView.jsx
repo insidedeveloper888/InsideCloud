@@ -4,17 +4,19 @@
 
 import React, { useState } from 'react';
 import { Filter } from 'lucide-react';
+import { hasContactType } from '../utils/contactTypeUtils';
 
 export default function DashboardView({ contacts = [], stages = [], channels = [] }) {
   const [selectedChannelId, setSelectedChannelId] = useState(null);
 
-  // Filter to customers only
-  const customers = contacts.filter((c) => c.contact_type === 'customer');
+  // Filter to customers only (using contact_types array)
+  const customers = contacts.filter((c) => hasContactType(c, 'customer'));
 
   // Metrics based on customers only
   const totalCustomers = customers.length;
+  // UPDATED: Use stage_type instead of hardcoded name matching
   const wonCustomers = customers.filter(
-    (c) => stages.find((s) => s.id === c.current_stage_id)?.name?.toLowerCase() === 'won'
+    (c) => stages.find((s) => s.id === c.current_stage_id)?.stage_type === 'won'
   ).length;
   const conversionRate =
     totalCustomers > 0 ? ((wonCustomers / totalCustomers) * 100).toFixed(1) : 0;

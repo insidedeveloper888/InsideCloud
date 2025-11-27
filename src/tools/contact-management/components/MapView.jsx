@@ -8,12 +8,13 @@ import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MALAYSIA_STATES } from '../utils/malaysiaStates';
 import malaysiaGeoJSON from '../../../assets/map/geoBoundaries-MYS-ADM1.geojson';
+import { hasContactType } from '../utils/contactTypeUtils';
 
 export default function MapView({ contacts = [] }) {
   const [hoveredState, setHoveredState] = useState(null);
 
-  // Filter to customers only
-  const customers = contacts.filter((c) => c.contact_type === 'customer');
+  // Filter to customers only (using contact_types array)
+  const customers = contacts.filter((c) => hasContactType(c, 'customer'));
 
   // Calculate customer count per state
   const stateData = useMemo(() => {

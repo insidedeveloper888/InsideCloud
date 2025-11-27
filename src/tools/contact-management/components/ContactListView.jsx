@@ -13,12 +13,14 @@ import ContactImportDialog from './ContactImportDialog';
 import DataQualityAlerts from './DataQualityAlerts';
 import StarRating from './StarRating';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { hasContactType, hasAnyContactType, getContactTypeCodes } from '../utils/contactTypeUtils';
 
 export default function ContactListView({
   contacts = [],
   stages = [],
   channels = [],
   tags = [],
+  contactTypes = [],
   onAddContact,
   onUpdateContact,
   onDeleteContact,
@@ -37,6 +39,7 @@ export default function ContactListView({
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [dataQualityFilter, setDataQualityFilter] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null }); // null, 'asc', 'desc'
+  const [dataQualityRefreshKey, setDataQualityRefreshKey] = useState(0);
 
   // Get current user for import
   const { individualId } = useCurrentUser();
@@ -106,17 +109,17 @@ export default function ContactListView({
           }
           break;
         case 'customers-no-sales':
-          if (contact.contact_type !== 'customer' || contact.assigned_to_individual_id) {
+          if (!hasContactType(contact, 'customer') || contact.sales_person_individual_id) {
             return false;
           }
           break;
         case 'customers-no-service':
-          if (contact.contact_type !== 'customer' || contact.assigned_department?.trim()) {
+          if (!hasContactType(contact, 'customer') || contact.customer_service_individual_id) {
             return false;
           }
           break;
         case 'customers-no-channel':
-          if (contact.contact_type !== 'customer' || contact.traffic_source_id) {
+          if (!hasContactType(contact, 'customer') || contact.traffic_source_id) {
             return false;
           }
           break;
@@ -136,9 +139,9 @@ export default function ContactListView({
       if (!matchesSearch) return false;
     }
 
-    // Contact type filter
+    // Contact type filter - check if contact has any of the selected types
     if (filters.contactTypes.length > 0) {
-      if (!filters.contactTypes.includes(contact.contact_type)) return false;
+      if (!hasAnyContactType(contact, filters.contactTypes)) return false;
     }
 
     // Stage filter
@@ -159,7 +162,7 @@ export default function ContactListView({
 
     // Rating filter - only applies to customers with ratings
     if (filters.ratings?.length > 0) {
-      if (contact.contact_type !== 'customer' || !contact.rating) {
+      if (!hasContactType(contact, 'customer') || !contact.rating) {
         return false;
       }
 
@@ -232,8 +235,9 @@ export default function ContactListView({
           bValue = `${b.first_name} ${b.last_name}`.toLowerCase();
           break;
         case 'type':
-          aValue = a.contact_type || '';
-          bValue = b.contact_type || '';
+          // Sort by first contact type code (or empty if no types)
+          aValue = getContactTypeCodes(a)[0] || '';
+          bValue = getContactTypeCodes(b)[0] || '';
           break;
         case 'company':
           aValue = a.company_name?.toLowerCase() || '';
@@ -280,21 +284,6 @@ export default function ContactListView({
     setItemsPerPage(Number(newItemsPerPage));
   };
 
-  const getContactTypeLabel = (type) => {
-    switch (type) {
-      case 'customer':
-        return 'Customer';
-      case 'supplier':
-        return 'Supplier';
-      case 'coi':
-        return 'COI';
-      case 'internal':
-        return 'Internal';
-      default:
-        return type;
-    }
-  };
-
   const handleAddClick = () => {
     setEditingContact(null);
     setIsFormOpen(true);
@@ -329,11 +318,18 @@ export default function ContactListView({
       if (editingContact) {
         // Update existing contact
         console.log('Calling onUpdateContact with id:', editingContact.id);
-        await onUpdateContact(editingContact.id, formData);
+        const updatedContact = await onUpdateContact(editingContact.id, formData);
+        // Trigger data quality alerts refresh after successful update
+        setDataQualityRefreshKey(prev => prev + 1);
+        return updatedContact;
       } else {
         // Add new contact
         console.log('Calling onAddContact');
-        await onAddContact(formData);
+        const newContact = await onAddContact(formData);
+        console.log('✅ New contact created with ID:', newContact?.id);
+        // Trigger data quality alerts refresh after successful add
+        setDataQualityRefreshKey(prev => prev + 1);
+        return newContact;
       }
     } catch (error) {
       console.error('handleSaveContact error:', error);
@@ -352,6 +348,7 @@ export default function ContactListView({
         contacts={contacts}
         stages={stages}
         channels={channels}
+        contactTypes={contactTypes}
         availableTags={tags}
         onCreateTag={onCreateTag}
         organizationSlug={organizationSlug}
@@ -384,6 +381,7 @@ export default function ContactListView({
         {/* Data Quality Alerts */}
         <DataQualityAlerts
           organizationSlug={organizationSlug}
+          refreshKey={dataQualityRefreshKey}
           onAlertClick={(filterType) => {
             setDataQualityFilter(filterType);
             setCurrentPage(1);
@@ -642,10 +640,21 @@ export default function ContactListView({
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 md:px-4 py-3">
-                        <span className="inline-flex items-center px-2 md:px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 whitespace-nowrap">
-                          {getContactTypeLabel(contact.contact_type)}
-                        </span>
+                      <td className="px-3 md:px-4 py-3" style={{ maxWidth: '280px' }}>
+                        <div className="flex flex-wrap gap-1">
+                          {contact.contact_types?.length > 0 ? (
+                            contact.contact_types.map((type) => (
+                              <span
+                                key={type.id}
+                                className="inline-flex items-center px-2 md:px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 whitespace-nowrap"
+                              >
+                                {type.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </div>
                       </td>
                       <td className="hidden lg:table-cell px-4 py-3">
                         <span className="text-sm text-gray-900">{contact.company_name || '-'}</span>
@@ -677,24 +686,17 @@ export default function ContactListView({
                           {channel ? channel.name : '-'}
                         </span>
                       </td>
-                      <td className="hidden xl:table-cell px-4 py-3">
-                        {contact.tags && contact.tags.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {contact.tags.slice(0, 2).map((tag) => (
-                              <TagBadge key={tag.id} tag={tag} size="xs" />
-                            ))}
-                            {contact.tags.length > 2 && (
-                              <span className="text-xs text-gray-500 px-1">
-                                +{contact.tags.length - 2}
-                              </span>
-                            )}
+                      <td className="px-3 md:px-4 py-3" style={{ maxWidth: '280px' }}>
+                        {contact.tags && contact.tags.length > 0 ? contact.tags.map((tag) => (
+                          <div key={tag.id} className="inline-flex items-center px-2 md:px-2.5 py-1 rounded-md text-xs font-medium text-gray-700 whitespace-nowrap">
+                            <TagBadge key={tag.id} tag={tag} size="xs" />
                           </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
+                        )) : (
+                          <span className="inline-flex items-center px-2 md:px-2.5 py-1 rounded-md text-xs font-medium text-gray-400 whitespace-nowrap">-</span>
                         )}
                       </td>
                       <td className="hidden lg:table-cell px-4 py-3">
-                        {contact.contact_type === 'customer' && contact.rating ? (
+                        {hasContactType(contact, 'customer') && contact.rating ? (
                           <StarRating
                             rating={contact.rating}
                             maxRating={maxRatingScale}
@@ -709,7 +711,7 @@ export default function ContactListView({
                       <td className="px-3 md:px-4 py-3">
                         <div className="flex justify-end gap-1 md:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           {/* Quick Sales Actions - Only show for customers */}
-                          {contact.contact_type === 'customer' && (
+                          {hasContactType(contact, 'customer') && (
                             <>
                               <button
                                 onClick={(e) => {
@@ -812,9 +814,20 @@ export default function ContactListView({
                       <div className="text-gray-500 text-sm mt-1 break-words">{contact.nickname}</div>
                     )}
                     <div className="flex gap-2 mt-2 flex-wrap items-center">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                        {getContactTypeLabel(contact.contact_type)}
-                      </span>
+                      {contact.contact_types?.length > 0 ? (
+                        contact.contact_types.map((type) => (
+                          <span
+                            key={type.id}
+                            className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                          >
+                            {type.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-400 border border-gray-200">
+                          No type
+                        </span>
+                      )}
                       {stage && (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 border border-gray-200">
                           <div
@@ -862,7 +875,7 @@ export default function ContactListView({
                       <span className="break-words">{contact.company_name}</span>
                     </div>
                   )}
-                  {contact.contact_type === 'customer' && contact.rating && (
+                  {hasContactType(contact, 'customer') && contact.rating && (
                     <div className="flex items-center gap-2.5 py-1">
                       <span className="text-lg">⭐</span>
                       <StarRating
@@ -886,7 +899,7 @@ export default function ContactListView({
                 )}
 
                 {/* Quick Sales Actions (only for customers) */}
-                {contact.contact_type === 'customer' && (
+                {hasContactType(contact, 'customer') && (
                   <div className="grid grid-cols-4 gap-2 mt-auto pt-2 border-b border-gray-100 pb-3 mb-3">
                     <button
                       onClick={() => handleQuickQuote(contact.id)}

@@ -27,6 +27,7 @@ export default function ContactFormDialog({
   contacts = [],
   stages = [],
   channels = [],
+  contactTypes = [],
   availableTags = [],
   onCreateTag,
   organizationSlug,
@@ -63,7 +64,7 @@ export default function ContactFormDialog({
     company_name: '',
     industry: '',
     entity_type: 'individual',
-    contact_type: 'customer',
+    contact_type_ids: [],  // NEW: array of selected type UUIDs
 
     // Contact Person (for company entities)
     contact_person_name: '',
@@ -128,6 +129,13 @@ export default function ContactFormDialog({
   useEffect(() => {
     if (contact) {
       // ONLY populate editable fields, NOT system/readonly fields
+      // Get contact_type_ids from contact.contact_types array (new format)
+      const typeIds = contact.contact_types?.map(t => t.id) || [];
+      // Fallback: if no contact_types array, try to find type by code
+      const fallbackTypeIds = typeIds.length === 0 && contact.contact_type
+        ? contactTypes.filter(t => t.code === contact.contact_type).map(t => t.id)
+        : typeIds;
+
       setFormData({
         // Personal Information
         first_name: contact.first_name || '',
@@ -142,7 +150,7 @@ export default function ContactFormDialog({
         company_name: contact.company_name || '',
         industry: contact.industry || '',
         entity_type: contact.entity_type || 'individual',
-        contact_type: contact.contact_type || 'customer',
+        contact_type_ids: fallbackTypeIds,
         // Contact Person (for company entities)
         contact_person_name: contact.contact_person_name || '',
         contact_person_phone: contact.contact_person_phone || '',
@@ -168,7 +176,11 @@ export default function ContactFormDialog({
         notes: contact.notes || '',
       });
     } else {
-      // Reset form for new contact
+      // Reset form for new contact - default to first contact type (usually 'customer')
+      const defaultTypeId = contactTypes.find(t => t.code === 'customer')?.id
+        || contactTypes[0]?.id
+        || '';
+
       setFormData({
         first_name: '',
         last_name: '',
@@ -180,7 +192,7 @@ export default function ContactFormDialog({
         company_name: '',
         industry: '',
         entity_type: 'individual',
-        contact_type: 'customer',
+        contact_type_ids: defaultTypeId ? [defaultTypeId] : [],
         contact_person_name: '',
         contact_person_phone: '',
         address_line_1: '',
@@ -198,7 +210,7 @@ export default function ContactFormDialog({
         notes: '',
       });
     }
-  }, [contact, isOpen, stages, channels]);
+  }, [contact, isOpen, stages, channels, contactTypes]);
 
   // Filter cities based on selected state and search text
   const filteredCities = useMemo(() => {
@@ -366,7 +378,14 @@ export default function ContactFormDialog({
       return;
     }
 
+    // Validate contact types
+    if (!formData.contact_type_ids || formData.contact_type_ids.length === 0) {
+      alert('Please select at least one contact type');
+      return;
+    }
+
     console.log('📋 [ContactFormDialog] Submitting form data:', formData);
+    console.log('📋 [ContactFormDialog] Contact type IDs:', formData.contact_type_ids);
     console.log('📋 [ContactFormDialog] Nickname value:', formData.nickname);
     console.log('📋 [ContactFormDialog] Avatar URL:', formData.avatar_url);
     console.log('📋 [ContactFormDialog] Selected tags:', selectedTags);
@@ -377,10 +396,20 @@ export default function ContactFormDialog({
 
       // Assign tags to the contact
       const contactId = savedContact?.id || contact?.id;
-      if (contactId && selectedTags.length >= 0) {
+      console.log('📋 [ContactFormDialog] Contact ID for tag assignment:', contactId);
+      console.log('📋 [ContactFormDialog] Number of selected tags:', selectedTags.length);
+
+      if (contactId && selectedTags.length > 0) {
         const tagIds = selectedTags.map((tag) => tag.id);
+        console.log('📋 [ContactFormDialog] Assigning tag IDs:', tagIds);
         await tagAPI.assignTagsToContact(contactId, tagIds);
         console.log('✅ [ContactFormDialog] Tags assigned successfully');
+      } else if (contactId && selectedTags.length === 0) {
+        // Clear all tags if no tags selected (assign empty array)
+        console.log('🗑️ [ContactFormDialog] Clearing all tags (no tags selected)');
+        await tagAPI.assignTagsToContact(contactId, []);
+      } else {
+        console.warn('⚠️ [ContactFormDialog] No contact ID available for tag assignment');
       }
 
       // Refresh the contacts list to show updated tags
@@ -480,21 +509,50 @@ export default function ContactFormDialog({
                     <option value="other">Other</option>
                   </select>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact type
+                    Contact types <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="contact_type"
-                    value={formData.contact_type}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                  >
-                    <option value="customer">Customer</option>
-                    <option value="supplier">Supplier</option>
-                    <option value="coi">COI</option>
-                    <option value="internal">Internal</option>
-                  </select>
+                  <div className="border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto bg-gray-50">
+                    {contactTypes.length > 0 ? (
+                      <div>
+                        {contactTypes.map((type) => (
+                          <label
+                            key={type.id}
+                            className="items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.contact_type_ids.includes(type.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData({
+                                    ...formData,
+                                    contact_type_ids: [...formData.contact_type_ids, type.id]
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    contact_type_ids: formData.contact_type_ids.filter(id => id !== type.id)
+                                  });
+                                }
+                              }}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="p-2 text-sm text-gray-900">{type.name}</span>
+                            {type.is_system && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">System</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">No contact types available</p>
+                    )}
+                  </div>
+                  {formData.contact_type_ids.length === 0 && (
+                    <p className="text-xs text-red-500 mt-1">At least one contact type is required</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -562,32 +620,35 @@ export default function ContactFormDialog({
                     <option value="company">Company</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Company name
-                  </label>
-                  <input
-                    type="text"
-                    name="company_name"
-                    value={formData.company_name}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
-                    placeholder="Acme Inc."
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Industry
-                  </label>
-                  <input
-                    type="text"
-                    name="industry"
-                    value={formData.industry}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
-                    placeholder="e.g. Technology, Finance, Manufacturing"
-                  />
-                </div>
+                {isCompanyEntity && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Company name
+                      </label>
+                      <input
+                        type="text"
+                        name="company_name"
+                        value={formData.company_name}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
+                        placeholder="Acme Inc."
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Industry
+                      </label>
+                      <input
+                        type="text"
+                        name="industry"
+                        value={formData.industry}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
+                        placeholder="e.g. Technology, Finance, Manufacturing"
+                      />
+                    </div>
+                  </>)}
               </div>
 
               {/* Contact Person Section (only for companies) */}
@@ -653,7 +714,7 @@ export default function ContactFormDialog({
                     value={formData.address_line_2}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
-                    placeholder="Apartment, Suite, etc. (optional)"
+                    placeholder="Apartment, Suite, etc."
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-4">
@@ -881,8 +942,8 @@ export default function ContactFormDialog({
               </div>
             </div>
 
-            {/* Customer Rating Section - Only for customers */}
-            {formData.contact_type === 'customer' && (
+            {/* Customer Rating Section - Only for contacts with Customer type */}
+            {contactTypes.some(t => t.code === 'customer' && formData.contact_type_ids.includes(t.id)) && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer conversion rating</h3>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

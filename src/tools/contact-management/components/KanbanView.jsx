@@ -4,9 +4,19 @@
  */
 
 import React, { useState } from 'react';
+import { hasContactType } from '../utils/contactTypeUtils';
+
 export default function KanbanView({ contacts = [], stages = [], onUpdateContact }) {
-  // Filter to show only customers
-  const customers = contacts.filter((c) => c.contact_type === 'customer');
+    // 🚨 Debug代码
+    console.log('🔍 [KanbanView] Total contacts:', contacts.length);
+
+  // Filter to show only customers (using contact_types array)
+  const customers = contacts.filter((c) => hasContactType(c, 'customer'));
+
+  console.log('🔍 [KanbanView] Filtered customers:', customers.length);
+  console.log('🔍 [KanbanView] First contact:', contacts[0]);
+  console.log('🔍 [KanbanView] First contact has contact_types?', contacts[0]?.contact_types);
+  
   const [draggedContact, setDraggedContact] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
 
@@ -30,7 +40,7 @@ export default function KanbanView({ contacts = [], stages = [], onUpdateContact
     setDragOverStage(null);
   };
 
-  const handleDrop = (e, targetStageId) => {
+  const handleDrop = async (e, targetStageId) => {
     e.preventDefault();
     setDragOverStage(null);
 
@@ -39,18 +49,16 @@ export default function KanbanView({ contacts = [], stages = [], onUpdateContact
       return;
     }
 
-    // Update contact stage - send full contact object to preserve all fields
-    onUpdateContact(draggedContact.id, {
-      ...draggedContact,
+    // Update contact stage - await the update to ensure state is updated
+    await onUpdateContact(draggedContact.id, {
       current_stage_id: targetStageId,
     });
     setDraggedContact(null);
   };
 
   const handleStageChange = async (contact, newStageId) => {
-    // Send full contact object to preserve all fields
+    // Send only the changed field for proper state update
     await onUpdateContact(contact.id, {
-      ...contact,
       current_stage_id: newStageId,
     });
   };

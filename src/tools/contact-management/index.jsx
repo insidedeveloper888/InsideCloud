@@ -8,6 +8,7 @@ import { useContacts } from './hooks/useContacts';
 import { useStages } from './hooks/useStages';
 import { useChannels } from './hooks/useChannels';
 import { useTags } from './hooks/useTags';
+import { useContactTypes } from './hooks/useContactTypes';
 import { useRealtimeSync } from './hooks/useRealtimeSync';
 import { useCurrentUser } from './hooks/useCurrentUser';
 import { useContactSettings } from './hooks/useContactSettings';
@@ -68,6 +69,14 @@ export default function ContactManagementApp({ organizationSlug }) {
     deleteTag: deleteTagOriginal,
   } = useTags(organizationSlug);
 
+  const {
+    contactTypes,
+    loading: contactTypesLoading,
+    createContactType: addContactType,
+    updateContactType,
+    deleteContactType,
+  } = useContactTypes(organizationSlug);
+
   // Wrap updateTag to also refresh contacts (so updated tag name/color shows in contact list)
   const updateTag = async (tagId, updates) => {
     await updateTagOriginal(tagId, updates);
@@ -94,7 +103,7 @@ export default function ContactManagementApp({ organizationSlug }) {
   // Setup real-time sync
   useRealtimeSync(organizationSlug);
 
-  const isLoading = contactsLoading || stagesLoading || channelsLoading || settingsLoading;
+  const isLoading = contactsLoading || stagesLoading || channelsLoading || settingsLoading || contactTypesLoading;
   const error = contactsError;
 
   if (error) {
@@ -131,6 +140,7 @@ export default function ContactManagementApp({ organizationSlug }) {
             stages={stages}
             channels={channels}
             tags={tags}
+            contactTypes={contactTypes}
             onAddContact={addContact}
             onUpdateContact={updateContact}
             onDeleteContact={deleteContact}
@@ -158,6 +168,7 @@ export default function ContactManagementApp({ organizationSlug }) {
             stages={stages}
             channels={channels}
             tags={tags}
+            contactTypes={contactTypes}
             onAddStage={addStage}
             onUpdateStage={updateStage}
             onDeleteStage={deleteStage}
@@ -167,6 +178,9 @@ export default function ContactManagementApp({ organizationSlug }) {
             onAddTag={addTag}
             onUpdateTag={updateTag}
             onDeleteTag={deleteTag}
+            onAddContactType={addContactType}
+            onUpdateContactType={updateContactType}
+            onDeleteContactType={deleteContactType}
             contactSettings={contactSettings}
             onUpdateContactSettings={updateContactSettings}
           />

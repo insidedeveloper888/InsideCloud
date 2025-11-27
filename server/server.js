@@ -1822,6 +1822,16 @@ router.post('/api/contacts/import/execute', requireProductAccess('contact_manage
 router.get('/api/contact-settings', requireProductAccess('contact_management'), contactController.getContactSettings)
 router.put('/api/contact-settings', requireProductAccess('contact_management'), contactController.updateContactSettings)
 
+// Contact Types (Many-to-Many)
+router.get('/api/contact-types', requireProductAccess('contact_management'), contactController.getContactTypes)
+router.post('/api/contact-types', requireProductAccess('contact_management'), contactController.createContactType)
+router.put('/api/contact-types/:id', requireProductAccess('contact_management'), contactController.updateContactType)
+router.delete('/api/contact-types/:id', requireProductAccess('contact_management'), contactController.deleteContactType)
+
+// Contact Type Assignments
+router.get('/api/contacts/:id/types', requireProductAccess('contact_management'), contactController.getContactTypesForContact)
+router.post('/api/contacts/:id/types', requireProductAccess('contact_management'), contactController.assignTypesToContact)
+
 // =============================================================================
 // Sales Management Routes
 // =============================================================================

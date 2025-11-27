@@ -23,12 +23,8 @@ export default function ContactCard({
         getInitialsAvatar(initials, contact.avatar_color)
       )}`;
 
-  const contactTypeLabel = {
-    customer: '客户',
-    supplier: '供应商',
-    coi: 'COI',
-    internal: '内部',
-  }[contact.contact_type];
+  // Get contact type labels from contact_types array
+  const contactTypeLabels = contact.contact_types?.map((type) => type.name) || [];
 
   const handleMenuClick = (e, action) => {
     e.stopPropagation();
@@ -48,7 +44,13 @@ export default function ContactCard({
             {contact.first_name} {contact.last_name}
           </h3>
           <div className="contact-badges">
-            <span className="badge badge-type">{contactTypeLabel}</span>
+            {contactTypeLabels.length > 0 ? (
+              contactTypeLabels.map((label, index) => (
+                <span key={index} className="badge badge-type">{label}</span>
+              ))
+            ) : (
+              <span className="badge badge-type" style={{ opacity: 0.5 }}>No type</span>
+            )}
             {stage && (
               <span
                 className="badge badge-stage"

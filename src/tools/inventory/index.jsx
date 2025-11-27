@@ -612,7 +612,7 @@ export default function InventoryProduct({ onBack }) {
           if (customersResult.status === 'fulfilled') {
             // API returns array directly, filter for customers only
             const allContacts = Array.isArray(customersResult.value) ? customersResult.value : [];
-            setCustomers(allContacts.filter(c => c.contact_type === 'customer'));
+            setCustomers(allContacts.filter(c => c.contact_types?.some(t => t.code === 'customer')));
           } else {
             console.error('Failed to load customers:', customersResult.reason);
             setError(prev => (prev ? `${prev}\n• Customers unavailable` : '• Customers unavailable'));

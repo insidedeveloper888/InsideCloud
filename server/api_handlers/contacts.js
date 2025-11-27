@@ -90,6 +90,22 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(ctx.body || ctx.response?.body || {});
     }
 
+    // Route: GET /api/contacts/:id/types
+    if (method === 'GET' && url.match(/\/contacts\/[^\/]+\/types/)) {
+      const id = url.split('/contacts/')[1]?.split('/types')[0];
+      ctx.params = { id };
+      await contactController.getContactTypesForContact(ctx);
+      return res.status(200).json(ctx.body || ctx.response?.body || {});
+    }
+
+    // Route: POST /api/contacts/:id/types
+    if (method === 'POST' && url.match(/\/contacts\/[^\/]+\/types/)) {
+      const id = url.split('/contacts/')[1]?.split('/types')[0];
+      ctx.params = { id };
+      await contactController.assignTypesToContact(ctx);
+      return res.status(200).json(ctx.body || ctx.response?.body || {});
+    }
+
     // Route: GET /api/contacts (list all)
     if (method === 'GET') {
       await contactController.getContacts(ctx);

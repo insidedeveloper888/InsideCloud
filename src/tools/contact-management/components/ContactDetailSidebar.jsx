@@ -45,13 +45,9 @@ export default function ContactDetailSidebar({
           <div className="info-row">
             <span className="label">类型:</span>
             <span className="value">
-              {contact.contact_type === 'customer'
-                ? '客户'
-                : contact.contact_type === 'supplier'
-                ? '供应商'
-                : contact.contact_type === 'coi'
-                ? 'COI'
-                : '内部'}
+              {contact.contact_types?.length > 0
+                ? contact.contact_types.map((type) => type.name).join(', ')
+                : '未设置'}
             </span>
           </div>
           {stage && (

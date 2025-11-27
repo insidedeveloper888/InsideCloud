@@ -50,10 +50,11 @@ async function getContacts(ctx) {
 
     if (error) throw error;
 
-    // Fetch tags for all contacts
+    // Fetch tags and contact_types for all contacts
     if (contacts && contacts.length > 0) {
       const contactIds = contacts.map(c => c.id);
 
+      // Fetch tag assignments
       const { data: tagAssignments } = await supabase
         .from('contact_tag_assignments')
         .select(`
@@ -66,20 +67,46 @@ async function getContacts(ctx) {
         `)
         .in('contact_id', contactIds);
 
-      // Merge tags with contacts
-      const contactsWithTags = contacts.map(contact => {
+      // Fetch contact type assignments (many-to-many)
+      const { data: typeAssignments } = await supabase
+        .from('contact_contact_types')
+        .select(`
+          contact_id,
+          contact_types (
+            id,
+            code,
+            name,
+            is_system,
+            sort_order
+          )
+        `)
+        .in('contact_id', contactIds);
+
+      // Merge tags and contact_types with contacts
+      const contactsWithRelations = contacts.map(contact => {
+        // Get tags for this contact
         const contactTags = tagAssignments
           ?.filter(assignment => assignment.contact_id === contact.id)
           ?.map(assignment => assignment.contact_tags)
           || [];
 
+        // Get contact_types for this contact (sorted by sort_order)
+        const contactTypes = typeAssignments
+          ?.filter(assignment => assignment.contact_id === contact.id)
+          ?.map(assignment => assignment.contact_types)
+          ?.filter(Boolean)
+          ?.sort((a, b) => a.sort_order - b.sort_order)
+          || [];
+
         return {
           ...contact,
-          tags: contactTags
+          tags: contactTags,
+          contact_types: contactTypes  // NEW: array of type objects
+          // contact_type TEXT field is preserved for backward compatibility
         };
       });
 
-      ctx.body = contactsWithTags;
+      ctx.body = contactsWithRelations;
     } else {
       ctx.body = contacts || [];
     }
@@ -110,20 +137,75 @@ function generateRandomAvatarColor() {
 }
 
 /**
+ * Helper function to fetch a single contact with all relationships (tags, contact_types)
+ * Used by POST and PUT endpoints to return consistent data structure
+ */
+async function getContactWithRelationships(contactId) {
+  // Fetch tag assignments
+  const { data: tagAssignments } = await supabase
+    .from('contact_tag_assignments')
+    .select(`
+      contact_id,
+      contact_tags (
+        id,
+        name,
+        color
+      )
+    `)
+    .eq('contact_id', contactId);
+
+  // Fetch contact type assignments (many-to-many)
+  const { data: typeAssignments } = await supabase
+    .from('contact_contact_types')
+    .select(`
+      contact_id,
+      contact_types (
+        id,
+        code,
+        name,
+        is_system,
+        sort_order
+      )
+    `)
+    .eq('contact_id', contactId);
+
+  // Get tags for this contact
+  const tags = tagAssignments
+    ?.map(assignment => assignment.contact_tags)
+    ?.filter(Boolean)
+    || [];
+
+  // Get contact_types for this contact (sorted by sort_order)
+  const contact_types = typeAssignments
+    ?.map(assignment => assignment.contact_types)
+    ?.filter(Boolean)
+    ?.sort((a, b) => a.sort_order - b.sort_order)
+    || [];
+
+  return { tags, contact_types };
+}
+
+/**
  * POST /api/contacts
  * Create a new contact
  */
 async function createContact(ctx) {
   try {
-    const { organization_slug, individual_id, ...contactData } = ctx.request.body;
+    const { organization_slug, individual_id, contact_type_ids, ...contactData } = ctx.request.body;
 
     console.log('=== CREATE CONTACT DEBUG ===');
     console.log('Organization slug:', organization_slug);
     console.log('Individual ID from request:', individual_id);
+    console.log('Contact type IDs:', contact_type_ids);
     console.log('Contact data received:', JSON.stringify(contactData, null, 2));
 
     if (!organization_slug) {
       return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Validate contact_type_ids if provided (must have at least one)
+    if (contact_type_ids !== undefined && Array.isArray(contact_type_ids) && contact_type_ids.length === 0) {
+      return (ctx.status = 400), (ctx.body = { error: 'At least one contact type is required' });
     }
 
     // Get organization ID
@@ -141,6 +223,10 @@ async function createContact(ctx) {
     const individualId = individual_id || null;
     console.log('Individual ID for audit:', individualId);
 
+    // Determine the contact_type TEXT field value
+    // If contact_type_ids provided, we'll update this after looking up the first type's code
+    let contactTypeText = contactData.contact_type || 'customer';
+
     // Prepare contact data with defaults for required fields
     const contactToInsert = {
       organization_id: org.id,
@@ -157,7 +243,7 @@ async function createContact(ctx) {
       company_name: contactData.company_name || null,
       industry: contactData.industry || null,
       entity_type: contactData.entity_type || 'individual',
-      contact_type: contactData.contact_type || 'customer',
+      contact_type: contactTypeText,
       // Contact Person (for company entities)
       contact_person_name: contactData.contact_person_name || null,
       contact_person_phone: contactData.contact_person_phone || null,
@@ -201,9 +287,108 @@ async function createContact(ctx) {
     }
 
     console.log('✅ Contact created successfully:', contact.id);
+
+    // === NEW: Write to contact_contact_types junction table ===
+    let assignedTypeIds = [];
+
+    if (contact_type_ids && Array.isArray(contact_type_ids) && contact_type_ids.length > 0) {
+      // Frontend sent array of type IDs (new format)
+      console.log('📝 Assigning contact types (new format):', contact_type_ids);
+
+      // Verify all type_ids belong to this organization
+      const { data: validTypes, error: typeError } = await supabase
+        .from('contact_types')
+        .select('id, code')
+        .eq('organization_id', org.id)
+        .in('id', contact_type_ids);
+
+      if (typeError) {
+        console.error('❌ Error validating contact types:', typeError);
+        throw typeError;
+      }
+
+      if (!validTypes || validTypes.length !== contact_type_ids.length) {
+        console.warn('⚠️ Some contact_type_ids are invalid');
+      }
+
+      if (validTypes && validTypes.length > 0) {
+        // Insert junction records
+        const junctionRecords = validTypes.map(type => ({
+          contact_id: contact.id,
+          contact_type_id: type.id
+        }));
+
+        const { error: junctionError } = await supabase
+          .from('contact_contact_types')
+          .insert(junctionRecords);
+
+        if (junctionError) {
+          console.error('❌ Error inserting contact types:', junctionError);
+          throw junctionError;
+        }
+
+        assignedTypeIds = validTypes.map(t => t.id);
+
+        // Update the contact_type TEXT field with first type's code (for backward compat)
+        const firstTypeCode = validTypes[0].code;
+        if (firstTypeCode && firstTypeCode !== contact.contact_type) {
+          await supabase
+            .from('contacts')
+            .update({ contact_type: firstTypeCode })
+            .eq('id', contact.id);
+          contact.contact_type = firstTypeCode;
+        }
+
+        console.log('✅ Contact types assigned:', assignedTypeIds);
+      }
+    } else {
+      // Fallback: lookup type by code for backward compatibility (old format)
+      const typeCode = contactData.contact_type || 'customer';
+      console.log('📝 Assigning contact type by code (old format):', typeCode);
+
+      const { data: contactType, error: lookupError } = await supabase
+        .from('contact_types')
+        .select('id')
+        .eq('organization_id', org.id)
+        .eq('code', typeCode)
+        .single();
+
+      if (lookupError) {
+        console.warn('⚠️ Could not find contact type by code:', typeCode, lookupError.message);
+      }
+
+      if (contactType) {
+        const { error: junctionError } = await supabase
+          .from('contact_contact_types')
+          .insert({
+            contact_id: contact.id,
+            contact_type_id: contactType.id
+          });
+
+        if (junctionError) {
+          console.error('❌ Error inserting contact type (fallback):', junctionError);
+          // Don't throw - contact was created, just junction failed
+        } else {
+          assignedTypeIds = [contactType.id];
+          console.log('✅ Contact type assigned (fallback):', contactType.id);
+        }
+      }
+    }
+
+    // Fetch relationships (tags and contact_types) to return complete contact object
+    const relationships = await getContactWithRelationships(contact.id);
+
+    // Merge relationships with contact
+    const contactWithRelationships = {
+      ...contact,
+      tags: relationships.tags,
+      contact_types: relationships.contact_types
+    };
+
+    console.log('✅ Returning contact with relationships:', JSON.stringify(contactWithRelationships, null, 2));
     console.log('=== END CREATE CONTACT DEBUG ===');
 
-    ctx.body = contact;
+    ctx.body = contactWithRelationships;
     ctx.status = 201;
   } catch (error) {
     console.error('Error creating contact:', error);
@@ -219,15 +404,21 @@ async function createContact(ctx) {
 async function updateContact(ctx) {
   try {
     const { id } = ctx.params;
-    const { organization_slug, individual_id, ...contactData } = ctx.request.body;
+    const { organization_slug, individual_id, contact_type_ids, ...contactData } = ctx.request.body;
 
     console.log('=== UPDATE CONTACT DEBUG ===');
     console.log('Contact ID:', id);
     console.log('Organization slug:', organization_slug);
+    console.log('Contact type IDs:', contact_type_ids);
     console.log('Raw contactData received:', JSON.stringify(contactData, null, 2));
 
     if (!organization_slug) {
       return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Validate contact_type_ids if provided (must have at least one)
+    if (contact_type_ids !== undefined && Array.isArray(contact_type_ids) && contact_type_ids.length === 0) {
+      return (ctx.status = 400), (ctx.body = { error: 'At least one contact type is required' });
     }
 
     // Get organization ID
@@ -291,6 +482,61 @@ async function updateContact(ctx) {
       updated_by_individual_id: individualId,
     };
 
+    // === NEW: Handle contact_type_ids if provided ===
+    if (contact_type_ids !== undefined && Array.isArray(contact_type_ids) && contact_type_ids.length > 0) {
+      console.log('📝 Updating contact types (new format):', contact_type_ids);
+
+      // Verify all type_ids belong to this organization
+      const { data: validTypes, error: typeError } = await supabase
+        .from('contact_types')
+        .select('id, code')
+        .eq('organization_id', org.id)
+        .in('id', contact_type_ids);
+
+      if (typeError) {
+        console.error('❌ Error validating contact types:', typeError);
+        throw typeError;
+      }
+
+      if (!validTypes || validTypes.length === 0) {
+        return (ctx.status = 400), (ctx.body = { error: 'Invalid contact type IDs' });
+      }
+
+      // Delete existing assignments
+      const { error: deleteError } = await supabase
+        .from('contact_contact_types')
+        .delete()
+        .eq('contact_id', id);
+
+      if (deleteError) {
+        console.error('❌ Error deleting old contact types:', deleteError);
+        throw deleteError;
+      }
+
+      // Insert new assignments
+      const junctionRecords = validTypes.map(type => ({
+        contact_id: id,
+        contact_type_id: type.id
+      }));
+
+      const { error: insertError } = await supabase
+        .from('contact_contact_types')
+        .insert(junctionRecords);
+
+      if (insertError) {
+        console.error('❌ Error inserting new contact types:', insertError);
+        throw insertError;
+      }
+
+      // Update the contact_type TEXT field with first type's code (for backward compat)
+      const firstTypeCode = validTypes[0].code;
+      if (firstTypeCode) {
+        updateData.contact_type = firstTypeCode;
+      }
+
+      console.log('✅ Contact types updated:', validTypes.map(t => t.id));
+    }
+
     console.log('Individual ID for audit (update):', individualId);
     console.log('updateData to send to Supabase:', JSON.stringify(updateData, null, 2));
 
@@ -309,9 +555,21 @@ async function updateContact(ctx) {
     }
 
     console.log('✅ Contact updated successfully:', JSON.stringify(contact, null, 2));
+
+    // Fetch relationships (tags and contact_types) to return complete contact object
+    const relationships = await getContactWithRelationships(contact.id);
+
+    // Merge relationships with contact
+    const contactWithRelationships = {
+      ...contact,
+      tags: relationships.tags,
+      contact_types: relationships.contact_types
+    };
+
+    console.log('✅ Returning contact with relationships:', JSON.stringify(contactWithRelationships, null, 2));
     console.log('=== END UPDATE CONTACT DEBUG ===');
 
-    ctx.body = contact;
+    ctx.body = contactWithRelationships;
   } catch (error) {
     console.error('Error updating contact:', error);
     ctx.status = 500;
@@ -376,6 +634,7 @@ async function deleteContact(ctx) {
 /**
  * GET /api/contact-stages
  * Fetch all custom stages for an organization
+ * UPDATED: Include stage_type and is_system fields
  */
 async function getContactStages(ctx) {
   try {
@@ -396,10 +655,10 @@ async function getContactStages(ctx) {
       return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
     }
 
-    // Fetch stages
+    // Fetch stages - Include stage_type and is_system
     const { data: stages, error } = await supabase
       .from('contact_stages')
-      .select('*')
+      .select('id, organization_id, name, color, order_index, stage_type, is_system, created_at, updated_at, created_by_individual_id')
       .eq('organization_id', org.id)
       .order('order_index', { ascending: true });
 
@@ -416,10 +675,11 @@ async function getContactStages(ctx) {
 /**
  * POST /api/contact-stages
  * Create a new contact stage
+ * UPDATED: Validate system stage constraints
  */
 async function createContactStage(ctx) {
   try {
-    const { organization_slug, ...stageData } = ctx.request.body;
+    const { organization_slug, stage_type, is_system, ...stageData } = ctx.request.body;
 
     if (!organization_slug) {
       return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
@@ -436,23 +696,59 @@ async function createContactStage(ctx) {
       return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
     }
 
+    // VALIDATION: Prevent creating duplicate system stages
+    if (is_system && stage_type) {
+      // Check if this organization already has a system stage of this type
+      const { data: existingSystemStage } = await supabase
+        .from('contact_stages')
+        .select('id, name')
+        .eq('organization_id', org.id)
+        .eq('is_system', true)
+        .eq('stage_type', stage_type)
+        .maybeSingle();
+
+      if (existingSystemStage) {
+        return (ctx.status = 409), (ctx.body = {
+          error: `System stage of type "${stage_type}" already exists: "${existingSystemStage.name}". Each organization can only have one system stage per type.`
+        });
+      }
+    }
+
+    // VALIDATION: Custom stages (non-system) cannot have stage_type
+    if (!is_system && stage_type) {
+      return (ctx.status = 400), (ctx.body = {
+        error: 'Custom stages (is_system=false) cannot have a stage_type. Only system stages can have a stage_type.'
+      });
+    }
+
     // Get current user
     const userId = ctx.session?.user?.id;
+
+    // Prepare stage data
+    const newStageData = {
+      ...stageData,
+      organization_id: org.id,
+      created_by_individual_id: userId,
+      is_system: is_system || false, // Default to false (custom stage)
+      stage_type: is_system && stage_type ? stage_type : null, // Only set if system stage
+    };
 
     // Create stage
     const { data: stage, error } = await supabase
       .from('contact_stages')
-      .insert([
-        {
-          ...stageData,
-          organization_id: org.id,
-          created_by_individual_id: userId,
-        },
-      ])
+      .insert([newStageData])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Handle unique constraint violations
+      if (error.code === '23505' && error.message.includes('idx_contact_stages_unique_system_type')) {
+        return (ctx.status = 409), (ctx.body = {
+          error: `A system stage with type "${stage_type}" already exists for this organization.`
+        });
+      }
+      throw error;
+    }
 
     ctx.body = stage;
     ctx.status = 201;
@@ -466,12 +762,13 @@ async function createContactStage(ctx) {
 /**
  * PUT /api/contact-stages/:id
  * Update a contact stage
+ * UPDATED: Prevent modifying system stage types
  */
 async function updateContactStage(ctx) {
   serverUtil.configAccessControl(ctx);
   try {
     const { id } = ctx.params;
-    const { organization_slug, ...updateData } = ctx.request.body;
+    const { organization_slug, stage_type, is_system, ...updateData } = ctx.request.body;
 
     if (!organization_slug) {
       return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
@@ -488,11 +785,51 @@ async function updateContactStage(ctx) {
       return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
     }
 
+    // Fetch existing stage to check is_system status
+    const { data: existingStage, error: fetchError } = await supabase
+      .from('contact_stages')
+      .select('id, name, is_system, stage_type')
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .single();
+
+    if (fetchError || !existingStage) {
+      return (ctx.status = 404), (ctx.body = { error: 'Stage not found' });
+    }
+
+    // PROTECTION: Cannot change stage_type of system stages
+    if (existingStage.is_system && stage_type && stage_type !== existingStage.stage_type) {
+      return (ctx.status = 403), (ctx.body = {
+        error: `Cannot modify stage_type of system stage. System stages (Lead, Won, Lost) must maintain their purpose.`
+      });
+    }
+
+    // PROTECTION: Cannot change is_system flag
+    if (is_system !== undefined && is_system !== existingStage.is_system) {
+      return (ctx.status = 403), (ctx.body = {
+        error: `Cannot change is_system flag. System stages cannot be converted to custom stages and vice versa.`
+      });
+    }
+
+    // PROTECTION: System stages can only update name, color, order_index
+    // Custom stages can update any field
+    const allowedUpdateData = { ...updateData };
+
+    if (existingStage.is_system) {
+      // For system stages, only allow updating display properties
+      const safeKeys = ['name', 'color', 'order_index'];
+      Object.keys(allowedUpdateData).forEach(key => {
+        if (!safeKeys.includes(key)) {
+          delete allowedUpdateData[key];
+        }
+      });
+    }
+
     // Update stage
     const { data: stage, error } = await supabase
       .from('contact_stages')
       .update({
-        ...updateData,
+        ...allowedUpdateData,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -513,6 +850,7 @@ async function updateContactStage(ctx) {
 /**
  * DELETE /api/contact-stages/:id
  * Delete a contact stage
+ * UPDATED: Block deletion of system stages
  */
 async function deleteContactStage(ctx) {
   try {
@@ -532,6 +870,26 @@ async function deleteContactStage(ctx) {
 
     if (!org) {
       return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Fetch existing stage to check is_system status
+    const { data: existingStage, error: fetchError } = await supabase
+      .from('contact_stages')
+      .select('id, name, is_system, stage_type')
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .single();
+
+    if (fetchError || !existingStage) {
+      return (ctx.status = 404), (ctx.body = { error: 'Stage not found' });
+    }
+
+    // PROTECTION: Cannot delete system stages
+    if (existingStage.is_system) {
+      return (ctx.status = 403), (ctx.body = {
+        error: `Cannot delete system stage "${existingStage.name}". System stages (Lead, Won, Lost) are required for analytics and cannot be removed.`,
+        stage_type: existingStage.stage_type
+      });
     }
 
     // Delete stage
@@ -1751,6 +2109,422 @@ async function updateContactSettings(ctx) {
 }
 
 // ============================================================================
+// CONTACT TYPES ENDPOINTS (Many-to-Many)
+// ============================================================================
+
+/**
+ * GET /api/contact-types
+ * Fetch all contact types for an organization (ordered by sort_order)
+ */
+async function getContactTypes(ctx) {
+  try {
+    const { organization_slug } = ctx.query;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Fetch contact types ordered by sort_order
+    const { data: contactTypes, error } = await supabase
+      .from('contact_types')
+      .select('*')
+      .eq('organization_id', org.id)
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+
+    ctx.body = contactTypes || [];
+  } catch (error) {
+    console.error('Error fetching contact types:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * POST /api/contact-types
+ * Create a new custom contact type (is_system forced to false)
+ */
+async function createContactType(ctx) {
+  try {
+    const { organization_slug, code, name, description, sort_order } = ctx.request.body;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    if (!code || !name) {
+      return (ctx.status = 400), (ctx.body = { error: 'Code and name are required' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Sanitize code: lowercase, no spaces, alphanumeric + underscore only
+    const sanitizedCode = code.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+    if (!sanitizedCode) {
+      return (ctx.status = 400), (ctx.body = { error: 'Invalid code format' });
+    }
+
+    // Check if code already exists for this organization
+    const { data: existingType } = await supabase
+      .from('contact_types')
+      .select('id')
+      .eq('organization_id', org.id)
+      .eq('code', sanitizedCode)
+      .maybeSingle();
+
+    if (existingType) {
+      return (ctx.status = 400), (ctx.body = { error: `Contact type with code "${sanitizedCode}" already exists` });
+    }
+
+    // Create contact type (is_system forced to false for user-created types)
+    const { data: contactType, error } = await supabase
+      .from('contact_types')
+      .insert([
+        {
+          organization_id: org.id,
+          code: sanitizedCode,
+          name: name.trim(),
+          description: description?.trim() || null,
+          is_system: false, // Users cannot create system types
+          sort_order: sort_order || 99, // Default to end of list
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    ctx.body = contactType;
+    ctx.status = 201;
+  } catch (error) {
+    console.error('Error creating contact type:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * PUT /api/contact-types/:id
+ * Update a contact type (protect system types: cannot change code)
+ */
+async function updateContactType(ctx) {
+  try {
+    const { id } = ctx.params;
+    const { organization_slug, code, name, description, sort_order } = ctx.request.body;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Fetch existing type to check is_system
+    const { data: existingType, error: fetchError } = await supabase
+      .from('contact_types')
+      .select('*')
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .single();
+
+    if (fetchError || !existingType) {
+      return (ctx.status = 404), (ctx.body = { error: 'Contact type not found' });
+    }
+
+    // Build update data
+    const updateData = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // System types: only allow name, description, sort_order changes
+    if (existingType.is_system) {
+      if (code && code !== existingType.code) {
+        return (ctx.status = 400), (ctx.body = { error: 'Cannot change code of system type' });
+      }
+      // Allow updating name, description, sort_order for system types
+      if (name) updateData.name = name.trim();
+      if (description !== undefined) updateData.description = description?.trim() || null;
+      if (sort_order !== undefined) updateData.sort_order = sort_order;
+    } else {
+      // Non-system types: allow all changes including code
+      if (code) {
+        const sanitizedCode = code.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        if (sanitizedCode && sanitizedCode !== existingType.code) {
+          // Check if new code already exists
+          const { data: duplicateType } = await supabase
+            .from('contact_types')
+            .select('id')
+            .eq('organization_id', org.id)
+            .eq('code', sanitizedCode)
+            .neq('id', id)
+            .maybeSingle();
+
+          if (duplicateType) {
+            return (ctx.status = 400), (ctx.body = { error: `Contact type with code "${sanitizedCode}" already exists` });
+          }
+          updateData.code = sanitizedCode;
+        }
+      }
+      if (name) updateData.name = name.trim();
+      if (description !== undefined) updateData.description = description?.trim() || null;
+      if (sort_order !== undefined) updateData.sort_order = sort_order;
+    }
+
+    // Update contact type
+    const { data: contactType, error } = await supabase
+      .from('contact_types')
+      .update(updateData)
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    ctx.body = contactType;
+  } catch (error) {
+    console.error('Error updating contact type:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * DELETE /api/contact-types/:id
+ * Delete a contact type (block if is_system=true OR if contacts are using it)
+ */
+async function deleteContactType(ctx) {
+  try {
+    const { id } = ctx.params;
+    const { organization_slug } = ctx.query;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Fetch existing type to check is_system
+    const { data: existingType, error: fetchError } = await supabase
+      .from('contact_types')
+      .select('*')
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .single();
+
+    if (fetchError || !existingType) {
+      return (ctx.status = 404), (ctx.body = { error: 'Contact type not found' });
+    }
+
+    // Block deletion of system types
+    if (existingType.is_system) {
+      return (ctx.status = 400), (ctx.body = { error: 'Cannot delete system type. System types (Customer, Supplier) are required.' });
+    }
+
+    // Check if any contacts are using this type
+    const { count, error: countError } = await supabase
+      .from('contact_contact_types')
+      .select('*', { count: 'exact', head: true })
+      .eq('contact_type_id', id);
+
+    if (countError) throw countError;
+
+    if (count > 0) {
+      return (ctx.status = 400), (ctx.body = {
+        error: `Cannot delete: ${count} contact(s) are using this type. Please reassign them first.`,
+        contacts_using: count
+      });
+    }
+
+    // Delete contact type
+    const { error } = await supabase
+      .from('contact_types')
+      .delete()
+      .eq('id', id)
+      .eq('organization_id', org.id);
+
+    if (error) throw error;
+
+    ctx.body = { message: 'Contact type deleted successfully' };
+  } catch (error) {
+    console.error('Error deleting contact type:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * GET /api/contacts/:id/types
+ * Get all types assigned to a contact
+ */
+async function getContactTypesForContact(ctx) {
+  try {
+    const { id } = ctx.params;
+    const { organization_slug } = ctx.query;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Get types with JOIN
+    const { data: assignments, error } = await supabase
+      .from('contact_contact_types')
+      .select(`
+        contact_type_id,
+        contact_types (
+          id,
+          code,
+          name,
+          description,
+          is_system,
+          sort_order
+        )
+      `)
+      .eq('contact_id', id);
+
+    if (error) throw error;
+
+    // Flatten the result and sort by sort_order
+    const types = assignments
+      .map((a) => a.contact_types)
+      .filter(Boolean)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    ctx.body = types || [];
+  } catch (error) {
+    console.error('Error fetching contact types for contact:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+/**
+ * POST /api/contacts/:id/types
+ * Assign types to a contact (replaces all existing assignments)
+ * Body: { type_ids: ['uuid1', 'uuid2', ...] }
+ */
+async function assignTypesToContact(ctx) {
+  try {
+    const { id } = ctx.params;
+    const { type_ids, organization_slug } = ctx.request.body;
+
+    if (!organization_slug) {
+      return (ctx.status = 400), (ctx.body = { error: 'Missing organization_slug' });
+    }
+
+    // Validate type_ids array
+    if (!type_ids || !Array.isArray(type_ids)) {
+      return (ctx.status = 400), (ctx.body = { error: 'type_ids must be an array' });
+    }
+
+    if (type_ids.length === 0) {
+      return (ctx.status = 400), (ctx.body = { error: 'At least one type must be assigned to a contact' });
+    }
+
+    // Get organization ID
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', organization_slug)
+      .single();
+
+    if (!org) {
+      return (ctx.status = 404), (ctx.body = { error: 'Organization not found' });
+    }
+
+    // Verify the contact exists and belongs to this organization
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', id)
+      .eq('organization_id', org.id)
+      .single();
+
+    if (contactError || !contact) {
+      return (ctx.status = 404), (ctx.body = { error: 'Contact not found' });
+    }
+
+    // Verify all type_ids belong to this organization
+    const { data: validTypes, error: typeError } = await supabase
+      .from('contact_types')
+      .select('id')
+      .eq('organization_id', org.id)
+      .in('id', type_ids);
+
+    if (typeError) throw typeError;
+
+    if (!validTypes || validTypes.length !== type_ids.length) {
+      return (ctx.status = 400), (ctx.body = { error: 'One or more type_ids are invalid' });
+    }
+
+    // Remove all existing assignments for this contact
+    const { error: deleteError } = await supabase
+      .from('contact_contact_types')
+      .delete()
+      .eq('contact_id', id);
+
+    if (deleteError) throw deleteError;
+
+    // Add new assignments
+    const assignments = type_ids.map((type_id) => ({
+      contact_id: id,
+      contact_type_id: type_id,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('contact_contact_types')
+      .insert(assignments);
+
+    if (insertError) throw insertError;
+
+    ctx.body = { success: true, assigned_types: type_ids.length };
+  } catch (error) {
+    console.error('Error assigning types to contact:', error);
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1778,6 +2552,13 @@ module.exports = {
   deleteContactTag,
   getContactTagsForContact,
   assignTagsToContact,
+  // Contact Types (Many-to-Many)
+  getContactTypes,
+  createContactType,
+  updateContactType,
+  deleteContactType,
+  getContactTypesForContact,
+  assignTypesToContact,
   // Data Quality
   getDataQualityMetrics,
   // Import

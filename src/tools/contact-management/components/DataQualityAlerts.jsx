@@ -8,7 +8,7 @@ import { AlertTriangle, Building2, TrendingDown, Users, Route } from 'lucide-rea
 
 const API_BASE = process.env.REACT_APP_API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8989');
 
-export default function DataQualityAlerts({ organizationSlug, onAlertClick }) {
+export default function DataQualityAlerts({ organizationSlug, refreshKey = 0, onAlertClick }) {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -38,7 +38,7 @@ export default function DataQualityAlerts({ organizationSlug, onAlertClick }) {
     };
 
     fetchMetrics();
-  }, [organizationSlug]);
+  }, [organizationSlug, refreshKey]);
 
   if (loading) {
     return null; // Don't show loading state for this component

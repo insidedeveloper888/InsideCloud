@@ -232,9 +232,64 @@ class TagAPI {
   }
 }
 
+class ContactTypeAPI {
+  async getContactTypes(organizationSlug) {
+    const response = await fetch(
+      `${API_BASE}/contact-types?organization_slug=${organizationSlug}`
+    );
+    if (!response.ok) throw new Error('Failed to fetch contact types');
+    return response.json();
+  }
+
+  async createContactType(organizationSlug, data) {
+    const response = await fetch(`${API_BASE}/contact-types`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        organization_slug: organizationSlug,
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create contact type');
+    }
+    return response.json();
+  }
+
+  async updateContactType(organizationSlug, typeId, data) {
+    const response = await fetch(`${API_BASE}/contact-types/${typeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        organization_slug: organizationSlug,
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to update contact type');
+    }
+    return response.json();
+  }
+
+  async deleteContactType(organizationSlug, typeId) {
+    const response = await fetch(
+      `${API_BASE}/contact-types/${typeId}?organization_slug=${organizationSlug}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to delete contact type');
+    }
+    return response.json();
+  }
+}
+
 // Export singleton instances
 export const contactAPI = new ContactAPI();
 export const stageAPI = new StageAPI();
 export const channelAPI = new ChannelAPI();
 export const organizationAPI = new OrganizationAPI();
 export const tagAPI = new TagAPI();
+export const contactTypeAPI = new ContactTypeAPI();

@@ -3,13 +3,14 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, Lock, AlertCircle } from 'lucide-react';
 import TagBadge from './TagBadge';
 
 export default function SettingsView({
   stages = [],
   channels = [],
   tags = [],
+  contactTypes = [],
   onAddStage,
   onUpdateStage,
   onDeleteStage,
@@ -19,6 +20,9 @@ export default function SettingsView({
   onAddTag,
   onUpdateTag,
   onDeleteTag,
+  onAddContactType,
+  onUpdateContactType,
+  onDeleteContactType,
   contactSettings = {},
   onUpdateContactSettings,
 }) {
@@ -33,6 +37,15 @@ export default function SettingsView({
   const [editingTagColor, setEditingTagColor] = useState('');
   const [draggedStageIndex, setDraggedStageIndex] = useState(null);
   const [editingStageColorId, setEditingStageColorId] = useState(null);
+
+  // Contact Type management state
+  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeCode, setNewTypeCode] = useState('');
+  const [newTypeDescription, setNewTypeDescription] = useState('');
+  const [editingTypeId, setEditingTypeId] = useState(null);
+  const [editingTypeName, setEditingTypeName] = useState('');
+  const [editingTypeDescription, setEditingTypeDescription] = useState('');
+  const [typeError, setTypeError] = useState('');
 
   const handleAddStage = () => {
     if (newStageName.trim()) {
@@ -89,7 +102,12 @@ export default function SettingsView({
   };
 
   // Drag and drop handlers for stages
-  const handleDragStart = (e, index) => {
+  const handleDragStart = (e, index, stage) => {
+    // PROTECTION: Prevent dragging system stages
+    if (stage?.is_system) {
+      e.preventDefault();
+      return;
+    }
     setDraggedStageIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -99,8 +117,14 @@ export default function SettingsView({
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e, dropIndex) => {
+  const handleDrop = (e, dropIndex, targetStage) => {
     e.preventDefault();
+
+    // PROTECTION: Prevent dropping onto system stages
+    if (targetStage?.is_system) {
+      setDraggedStageIndex(null);
+      return;
+    }
 
     if (draggedStageIndex === null || draggedStageIndex === dropIndex) {
       setDraggedStageIndex(null);
@@ -138,10 +162,92 @@ export default function SettingsView({
     }
   };
 
+  // Contact Type handlers
+  const handleAddContactType = async () => {
+    if (!newTypeName.trim()) return;
+
+    setTypeError('');
+    const code = newTypeCode.trim() || newTypeName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+    try {
+      await onAddContactType({
+        code: code,
+        name: newTypeName.trim(),
+        description: newTypeDescription.trim() || null,
+      });
+      setNewTypeName('');
+      setNewTypeCode('');
+      setNewTypeDescription('');
+    } catch (error) {
+      setTypeError(error.message || 'Failed to create contact type');
+    }
+  };
+
+  const handleEditContactType = (type) => {
+    setEditingTypeId(type.id);
+    setEditingTypeName(type.name);
+    setEditingTypeDescription(type.description || '');
+    setTypeError('');
+  };
+
+  const handleSaveContactType = async (typeId) => {
+    if (!editingTypeName.trim()) return;
+
+    setTypeError('');
+    try {
+      await onUpdateContactType(typeId, {
+        name: editingTypeName.trim(),
+        description: editingTypeDescription.trim() || null,
+      });
+      setEditingTypeId(null);
+      setEditingTypeName('');
+      setEditingTypeDescription('');
+    } catch (error) {
+      setTypeError(error.message || 'Failed to update contact type');
+    }
+  };
+
+  const handleCancelEditType = () => {
+    setEditingTypeId(null);
+    setEditingTypeName('');
+    setEditingTypeDescription('');
+    setTypeError('');
+  };
+
+  const handleDeleteContactType = async (type) => {
+    if (type.is_system) {
+      setTypeError('System types cannot be deleted.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${type.name}"? Contacts using this type will need to be reassigned.`)) {
+      return;
+    }
+
+    setTypeError('');
+    try {
+      await onDeleteContactType(type.id);
+    } catch (error) {
+      setTypeError(error.message || 'Cannot delete this type. It may be in use by contacts.');
+    }
+  };
+
+  // Get icon for contact type
+  const getTypeIcon = (code) => {
+    const icons = {
+      customer: '👤',
+      supplier: '🏭',
+      coi: '🤝',
+      internal: '🏢',
+    };
+    return icons[code] || '📋';
+  };
+
   const tabs = [
     { id: 0, label: 'Stage management' },
     { id: 1, label: 'Channel management' },
     { id: 2, label: 'Tag management' },
+    { id: 3, label: 'Contact type management' },
   ];
 
   return (
@@ -197,10 +303,9 @@ export default function SettingsView({
               className={`
                 px-3 md:px-4 py-2 md:py-3 font-medium text-xs md:text-sm transition-colors whitespace-nowrap
                 border-b-2 -mb-px
-                ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                ${activeTab === tab.id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
                 }
               `}
             >
@@ -222,16 +327,24 @@ export default function SettingsView({
               {[...stages].sort((a, b) => a.order_index - b.order_index).map((stage, index) => (
                 <div
                   key={stage.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
+                  draggable={!stage.is_system}
+                  onDragStart={(e) => handleDragStart(e, index, stage)}
                   onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
-                  className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg cursor-move transition-all ${
-                    draggedStageIndex === index ? 'opacity-50' : 'hover:bg-gray-50'
+                  onDrop={(e) => handleDrop(e, index, stage)}
+                  className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg transition-all ${
+                    stage.is_system
+                      ? 'cursor-default bg-gray-50'
+                      : draggedStageIndex === index
+                      ? 'opacity-50 cursor-move'
+                      : 'hover:bg-gray-50 cursor-move'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <GripVertical size={16} className="text-gray-400" />
+                    {stage.is_system ? (
+                      <Lock size={16} className="text-blue-500" title="System stage - cannot be reordered" />
+                    ) : (
+                      <GripVertical size={16} className="text-gray-400" />
+                    )}
                     <div className="relative">
                       <div
                         onClick={() => setEditingStageColorId(editingStageColorId === stage.id ? null : stage.id)}
@@ -252,17 +365,35 @@ export default function SettingsView({
                         </div>
                       )}
                     </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {stage.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">
+                        {stage.name}
+                      </span>
+                      {stage.is_system && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                          <Lock size={12} />
+                          System
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={() => {
+                      if (stage.is_system) {
+                        alert(`System stage "${stage.name}" cannot be deleted. System stages (Lead, Won, Lost) are required for analytics.`);
+                        return;
+                      }
                       if (window.confirm('Are you sure you want to delete this stage?')) {
                         onDeleteStage(stage.id);
                       }
                     }}
-                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    disabled={stage.is_system}
+                    className={`p-2 rounded-lg transition-colors ${
+                      stage.is_system
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-600 hover:text-red-600 hover:bg-red-50'
+                    }`}
+                    title={stage.is_system ? 'System stages cannot be deleted' : 'Delete stage'}
                   >
                     <Trash2 size={18} />
                   </button>
@@ -459,6 +590,152 @@ export default function SettingsView({
                 <Plus size={18} />
                 <span>Add</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Types Tab */}
+      {activeTab === 3 && (
+        <div className="space-y-4">
+          <div className="border border-gray-200 rounded-lg p-6 bg-white">
+            <h3 className="font-semibold text-gray-900 mb-2">Contact Types</h3>
+            <p className="text-sm text-gray-600 mb-4">Define contact types for your organization. System types (Customer, Supplier) cannot be deleted.</p>
+
+            {/* Error Message */}
+            {typeError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                <AlertCircle size={18} className="text-red-600 mt-0.5 shrink-0" />
+                <span className="text-sm text-red-700">{typeError}</span>
+              </div>
+            )}
+
+            {/* Contact Type List */}
+            <div className="space-y-2 mb-4">
+              {contactTypes.map((type) => (
+                <div
+                  key={type.id}
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                >
+                  {editingTypeId === type.id ? (
+                    /* Edit Mode */
+                    <>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingTypeName}
+                            onChange={(e) => setEditingTypeName(e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                            placeholder="Type name"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <button
+                          onClick={() => handleSaveContactType(type.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Save"
+                        >
+                          <Check size={18} />
+                        </button>
+                        <button
+                          onClick={handleCancelEditType}
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Cancel"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* View Mode */
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{type.name}</span>
+                            <span className="text-xs text-gray-500">({type.code})</span>
+                            {type.is_system && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                <Lock size={12} />
+                                System
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditContactType(type)}
+                          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteContactType(type)}
+                          disabled={type.is_system}
+                          className={`p-2 rounded-lg transition-colors ${type.is_system
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-600 hover:text-red-600 hover:bg-red-50'
+                            }`}
+                          title={type.is_system ? 'System types cannot be deleted' : 'Delete'}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {contactTypes.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No contact types found. Create your first custom type below.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Add Contact Type Form */}
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Add New Contact Type</h4>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Type name (e.g., Partner, Investor)"
+                    value={newTypeName}
+                    onChange={(e) => {
+                      setNewTypeName(e.target.value);
+                      // Auto-generate code from name
+                      if (!newTypeCode) {
+                        const autoCode = e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                        setNewTypeCode(autoCode);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddContactType();
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Code (auto)"
+                    value={newTypeCode}
+                    onChange={(e) => setNewTypeCode(e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''))}
+                    className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-400 text-sm"
+                  />
+                  <button
+                    onClick={handleAddContactType}
+                    disabled={!newTypeName.trim()}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={18} />
+                    <span>Add Type</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

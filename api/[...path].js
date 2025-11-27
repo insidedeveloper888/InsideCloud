@@ -33,6 +33,7 @@ const contactStages = require('../server/api_handlers/contact_stages');
 const trafficChannels = require('../server/api_handlers/traffic_channels');
 const contactTags = require('../server/api_handlers/contact_tags');
 const contactSettings = require('../server/api_handlers/contact_settings');
+const contactTypes = require('../server/api_handlers/contact_types');
 const organizationMembers = require('../server/api_handlers/organization_members');
 const products = require('../server/api_handlers/products');
 const productsDashboard = require('../server/api_handlers/products_dashboard');
@@ -72,6 +73,7 @@ const routes = {
   '/api/traffic-channels': trafficChannels,
   '/api/contact-tags': contactTags,
   '/api/contact-settings': contactSettings,
+  '/api/contact-types': contactTypes,
   '/api/organization-members': organizationMembers,
   '/api/products/dashboard': productsDashboard, // More specific route first!
   '/api/products': products,

@@ -81,6 +81,7 @@ export const MALAYSIA_CITIES = [
   { city: 'Lumut', state: 'Perak', lat: 4.2325, lng: 100.6297 },
   { city: 'Parit Buntar', state: 'Perak', lat: 5.1333, lng: 100.4833 },
   { city: 'Tanjung Malim', state: 'Perak', lat: 3.6833, lng: 101.5167 },
+  { city: 'Bidor', state: 'Perak', lat: 4.0892, lng: 101.2492 },
 
   // Perlis
   { city: 'Kangar', state: 'Perlis', lat: 6.4414, lng: 100.1986 },
@@ -116,6 +117,7 @@ export const MALAYSIA_CITIES = [
   { city: 'Kota Damansara', state: 'Selangor', lat: 3.1547, lng: 101.5892 },
   { city: 'Bangi', state: 'Selangor', lat: 2.9264, lng: 101.7731 },
   { city: 'Semenyih', state: 'Selangor', lat: 2.9500, lng: 101.8500 },
+  { city: 'Beranang', state: 'Selangor', lat: 2.8926, lng: 101.8144 },
 
   // Terengganu
   { city: 'Kuala Terengganu', state: 'Terengganu', lat: 5.3302, lng: 103.1408 },
