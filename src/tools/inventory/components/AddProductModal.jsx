@@ -92,7 +92,7 @@ export default function AddProductModal({
             placeholder="Select category..."
             allowAddNew={true}
             onAddNew={handleAddNewCategory}
-            addNewLabel="+ Add New Category..."
+            addNewLabel="Add New Category..."
           />
         </div>
 

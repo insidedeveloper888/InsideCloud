@@ -129,7 +129,7 @@ export default function CreatePOModal({
                   placeholder="Select product..."
                   allowAddNew={true}
                   onAddNew={onShowQuickAddProduct}
-                  addNewLabel="+ Create New Product"
+                  addNewLabel="Create New Product"
                 />
               </div>
               <div className="col-span-1 md:col-span-2">

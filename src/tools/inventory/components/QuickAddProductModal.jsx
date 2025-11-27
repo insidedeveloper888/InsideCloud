@@ -88,7 +88,7 @@ export default function QuickAddProductModal({
                     saveCustomCategories(updatedCategories);
                   }
                 }}
-                addNewLabel="+ Add new category..."
+                addNewLabel="Add new category..."
               />
             </div>
             <div>
