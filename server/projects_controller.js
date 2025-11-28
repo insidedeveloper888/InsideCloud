@@ -832,7 +832,7 @@ async function removeProjectMember(ctx) {
     const { error } = await supabase
       .from('project_members')
       .delete()
-      .eq('id', memberId)
+      .eq('individual_id', memberId)  // Fixed: Use individual_id instead of id
       .eq('project_id', id);
 
     if (error) throw error;
