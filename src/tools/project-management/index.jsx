@@ -1,41 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LayoutDashboard, FolderKanban, Calendar, FileJson } from 'lucide-react';
-import { ProjectManagementAPI } from './api/project-management';
+import { useProjects, useProjectStatuses, useProjectTemplates, useOrganizationMembers } from './hooks';
 import DashboardTab from './components/tabs/DashboardTab';
 import ProjectsTab from './components/tabs/ProjectsTab';
 import ScheduleTab from './components/tabs/ScheduleTab';
 import TemplatesTab from './components/tabs/TemplatesTab';
 
-const ProjectManagement = ({ organizationSlug }) => {
+const ProjectManagement = ({ organizationSlug, individualId }) => {
   // Global State
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [projects, setProjects] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Initial Data Fetch
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [projectsData, templatesData] = await Promise.all([
-        ProjectManagementAPI.getProjects(organizationSlug),
-        ProjectManagementAPI.getTemplates(organizationSlug)
-      ]);
-      setProjects(projectsData);
-      setTemplates(templatesData);
-    } catch (err) {
-      console.error("Failed to fetch project data:", err);
-      setError("Failed to load project data. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  // Use real API hooks
+  const {
+    projects,
+    isLoading: projectsLoading,
+    error: projectsError,
+    createProject,
+    updateProject,
+    deleteProject,
+    refreshProjects,
+  } = useProjects(organizationSlug, individualId);
+
+  const {
+    statuses,
+    isLoading: statusesLoading,
+    refreshStatuses,
+  } = useProjectStatuses(organizationSlug, individualId);
+
+  const {
+    templates,
+    isLoading: templatesLoading,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
+    refreshTemplates,
+  } = useProjectTemplates(organizationSlug, individualId);
+
+  const {
+    members,
+    isLoading: membersLoading,
+  } = useOrganizationMembers(organizationSlug);
+
+  // Combined loading state
+  const loading = projectsLoading || statusesLoading || templatesLoading || membersLoading;
+  const error = projectsError;
+
+  // Refresh all data
+  const fetchData = () => {
+    refreshProjects();
+    refreshStatuses();
+    refreshTemplates();
   };
-
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationSlug]);
 
   // Tab Configuration
   const tabs = [
@@ -68,21 +83,40 @@ const ProjectManagement = ({ organizationSlug }) => {
       case 'dashboard':
         return (
           <div className="p-6">
-            <DashboardTab projects={projects} />
+            <DashboardTab projects={projects} statuses={statuses} />
           </div>
         );
       case 'projects':
-        return <ProjectsTab projects={projects} templates={templates} onRefresh={fetchData} organizationSlug={organizationSlug} />;
+        return (
+          <ProjectsTab
+            projects={projects}
+            templates={templates}
+            statuses={statuses}
+            onRefresh={fetchData}
+            organizationSlug={organizationSlug}
+            individualId={individualId}
+            createProject={createProject}
+            updateProject={updateProject}
+            deleteProject={deleteProject}
+          />
+        );
       case 'schedule':
         return (
           <div className="p-6">
-            <ScheduleTab projects={projects} />
+            <ScheduleTab projects={projects} members={members} />
           </div>
         );
       case 'templates':
         return (
           <div className="p-6">
-            <TemplatesTab templates={templates} onRefresh={fetchData} />
+            <TemplatesTab
+              templates={templates}
+              onRefresh={fetchData}
+              createTemplate={createTemplate}
+              updateTemplate={updateTemplate}
+              deleteTemplate={deleteTemplate}
+              organizationSlug={organizationSlug}
+            />
           </div>
         );
       default:

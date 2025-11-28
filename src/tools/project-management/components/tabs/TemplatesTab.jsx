@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Plus, FileJson, MoreVertical, Edit2 } from 'lucide-react';
 import TemplateBuilderModal from '../modals/TemplateBuilderModal';
 
-const TemplatesTab = ({ templates, onRefresh }) => {
+const TemplatesTab = ({ templates, onRefresh, createTemplate, updateTemplate, deleteTemplate, organizationSlug }) => {
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
 
@@ -41,6 +41,17 @@ const TemplatesTab = ({ templates, onRefresh }) => {
                     <h3 className="text-gray-900 font-medium">Create New Template</h3>
                     <p className="text-sm text-gray-500 mt-1">Define custom fields and workflows</p>
                 </button>
+
+                {/* Empty State Message */}
+                {templates.length === 0 && (
+                    <div className="col-span-1 md:col-span-1 lg:col-span-2 flex items-center justify-center p-8 bg-gray-50 rounded-xl border border-gray-200">
+                        <div className="text-center">
+                            <FileJson className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                            <p className="text-gray-500 text-sm">No templates created yet.</p>
+                            <p className="text-gray-400 text-xs mt-1">Templates let you standardize project fields.</p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Template Cards */}
                 {templates.map((template) => (
@@ -95,6 +106,8 @@ const TemplatesTab = ({ templates, onRefresh }) => {
                         setIsBuilderOpen(false);
                         if (onRefresh) onRefresh();
                     }}
+                    createTemplate={createTemplate}
+                    updateTemplate={updateTemplate}
                 />
             )}
         </div>

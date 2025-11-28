@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, GripVertical } from 'lucide-react';
-import { ProjectManagementAPI } from '../../api/project-management';
 
 const FIELD_TYPES = [
     { value: 'text', label: 'Text Input' },
@@ -9,7 +8,7 @@ const FIELD_TYPES = [
     { value: 'progress', label: 'Progress Bar' },
 ];
 
-const TemplateBuilderModal = ({ isOpen, onClose, template, onSave }) => {
+const TemplateBuilderModal = ({ isOpen, onClose, template, onSave, createTemplate, updateTemplate }) => {
     const [name, setName] = useState('');
     const [fields, setFields] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -54,14 +53,24 @@ const TemplateBuilderModal = ({ isOpen, onClose, template, onSave }) => {
             if (!name.trim()) throw new Error("Template name is required");
             if (fields.length === 0) throw new Error("At least one field is required");
 
+            const validFields = fields.filter(f => f.label && f.key);
+            if (validFields.length === 0) throw new Error("At least one valid field is required");
+
             const templateData = {
-                name,
-                fields: fields.filter(f => f.label && f.key) // Filter out empty fields
+                name: name.trim(),
+                fields: validFields
             };
 
-            await ProjectManagementAPI.createTemplate(templateData);
+            if (template && template.id) {
+                // Update existing template
+                await updateTemplate(template.id, templateData);
+            } else {
+                // Create new template
+                await createTemplate(templateData);
+            }
             onSave();
         } catch (error) {
+            console.error('[TemplateBuilderModal] Save error:', error);
             alert(error.message);
         } finally {
             setSaving(false);

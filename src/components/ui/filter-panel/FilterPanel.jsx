@@ -6,8 +6,8 @@
  *
  * Features:
  * - Mobile: Full-height drawer with backdrop overlay
- * - Desktop: Static sidebar with border
- * - Body scroll lock on mobile when open
+ * - Desktop: Static sidebar with border (or overlay if overlay=true)
+ * - Body scroll lock on mobile when open (or always if overlay=true)
  * - Escape key to close
  * - Clear all filters button
  *
@@ -18,6 +18,7 @@
  *   onClearAll={handleClearFilters}
  *   hasActiveFilters={activeFilterCount > 0}
  *   title="Filters"
+ *   overlay={true} // Always render as slide-out drawer with backdrop
  * >
  *   <FilterSection title="Status" defaultExpanded>
  *     <CheckboxFilter ... />
@@ -40,10 +41,12 @@ export default function FilterPanel({
   position = 'right', // 'left' or 'right'
   width = 256, // default w-64 = 256px
   showCloseButton = true, // show close button in header (always on mobile, configurable on desktop)
+  overlay = false, // if true, always render as fixed drawer with backdrop on all screen sizes
 }) {
-  // Prevent body scroll when mobile drawer is open
+  // Prevent body scroll when drawer is open (mobile or overlay mode)
   useEffect(() => {
-    if (isOpen && typeof window !== 'undefined' && window.innerWidth < 768) {
+    const shouldLockScroll = isOpen && (overlay || (typeof window !== 'undefined' && window.innerWidth < 768));
+    if (shouldLockScroll) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -51,7 +54,7 @@ export default function FilterPanel({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, overlay]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -68,29 +71,32 @@ export default function FilterPanel({
 
   return (
     <>
-      {/* Mobile: Overlay backdrop */}
+      {/* Overlay backdrop - shown on mobile or when overlay=true */}
       <div
-        className={`fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity ${
+        className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity ${
+          overlay ? '' : 'md:hidden'
+        } ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Filter Panel - Mobile: Drawer, Desktop: Sidebar */}
+      {/* Filter Panel - Mobile: Drawer, Desktop: Sidebar (or Drawer if overlay=true) */}
       <div
         className={`
-          fixed md:relative top-0 h-full w-[85%] max-w-sm md:max-w-none
-          bg-white flex flex-col
-          z-50 md:z-auto
+          ${overlay ? 'fixed' : 'fixed md:relative'} top-0 h-full w-[85%] max-w-sm ${overlay ? '' : 'md:max-w-none'}
+          bg-white text-gray-900 flex flex-col
+          ${overlay ? 'z-50' : 'z-50 md:z-auto'}
           transform transition-transform duration-300 ease-in-out
-          ${position === 'left' ? 'left-0 md:border-r' : 'right-0 md:border-l'}
+          ${position === 'left' ? 'left-0' : 'right-0'}
+          ${!overlay && (position === 'left' ? 'md:border-r' : 'md:border-l')}
           ${position === 'left'
-            ? (isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0')
-            : (isOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0')
+            ? (isOpen ? 'translate-x-0' : `-translate-x-full ${overlay ? '' : 'md:translate-x-0'}`)
+            : (isOpen ? 'translate-x-0' : `translate-x-full ${overlay ? '' : 'md:translate-x-0'}`)
           }
           border-gray-200
-          ${shadows.dropdown} md:shadow-none
+          ${shadows.dropdown} ${overlay ? '' : 'md:shadow-none'}
           ${className}
         `}
         style={{ width: typeof width === 'number' ? `${width}px` : width }}

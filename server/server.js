@@ -1760,6 +1760,82 @@ router.post('/api/strategic_map_v2/batch', async (ctx) => {
 })
 
 // ============================================================================
+// Project Management Routes
+// ============================================================================
+
+const projectsController = require('./projects_controller')
+
+// CORS preflight for projects
+router.options('/api/projects', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/projects/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/project-statuses', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/project-statuses/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/project-templates', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/project-templates/:id', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/projects/:id/members', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.options('/api/projects/:id/members/:memberId', async (ctx) => {
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+
+// Projects
+router.get('/api/projects', requireProductAccess('project_management'), projectsController.getProjects)
+router.get('/api/projects/:id', requireProductAccess('project_management'), projectsController.getProject)
+router.post('/api/projects', requireProductAccess('project_management'), projectsController.createProject)
+router.put('/api/projects/:id', requireProductAccess('project_management'), projectsController.updateProject)
+router.delete('/api/projects/:id', requireProductAccess('project_management'), projectsController.deleteProject)
+
+// Project Statuses
+router.get('/api/project-statuses', requireProductAccess('project_management'), projectsController.getProjectStatuses)
+router.post('/api/project-statuses', requireProductAccess('project_management'), projectsController.createProjectStatus)
+router.put('/api/project-statuses/:id', requireProductAccess('project_management'), projectsController.updateProjectStatus)
+router.delete('/api/project-statuses/:id', requireProductAccess('project_management'), projectsController.deleteProjectStatus)
+
+// Project Templates
+router.get('/api/project-templates', requireProductAccess('project_management'), projectsController.getProjectTemplates)
+router.post('/api/project-templates', requireProductAccess('project_management'), projectsController.createProjectTemplate)
+router.put('/api/project-templates/:id', requireProductAccess('project_management'), projectsController.updateProjectTemplate)
+router.delete('/api/project-templates/:id', requireProductAccess('project_management'), projectsController.deleteProjectTemplate)
+
+// Project Members
+router.get('/api/projects/:id/members', requireProductAccess('project_management'), projectsController.getProjectMembers)
+router.post('/api/projects/:id/members', requireProductAccess('project_management'), projectsController.addProjectMember)
+router.delete('/api/projects/:id/members/:memberId', requireProductAccess('project_management'), projectsController.removeProjectMember)
+
+// Organization Members for Project Management (shared with contact management)
+// This allows project management to access org members for team assignment
+router.options('/api/project-organization-members', async (ctx) => {
+    const serverUtil = require('./server_util');
+    serverUtil.configAccessControl(ctx);
+    ctx.status = 200;
+})
+router.get('/api/project-organization-members', requireProductAccess('project_management'), async (ctx) => {
+    const contactController = require('./contact_management_controller');
+    await contactController.getOrganizationMembers(ctx);
+})
+
+// ============================================================================
 // Contact Management Routes
 // ============================================================================
 

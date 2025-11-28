@@ -93,6 +93,7 @@ export function SearchableSelect({
   optionClassName = '',
   minDropdownWidth = 300,
   maxDropdownHeight = 320,
+  maxHeight = null, // Alternative to maxDropdownHeight (can be string like "200px")
 
   // Accessibility
   name = '',
@@ -244,7 +245,7 @@ export function SearchableSelect({
       default:
         break;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, highlightedIndex, filteredOptions, creatable, searchTerm, onCreate]);
 
   // Handle option selection
@@ -356,7 +357,7 @@ export function SearchableSelect({
           `}
           style={{
             minWidth: minDropdownWidth,
-            maxHeight: maxDropdownHeight,
+            maxHeight: maxHeight || maxDropdownHeight,
           }}
           role="listbox"
         >
@@ -387,7 +388,11 @@ export function SearchableSelect({
           <div
             ref={optionsRef}
             className="overflow-y-auto p-1"
-            style={{ maxHeight: maxDropdownHeight - (searchable ? 60 : 0) }}
+            style={{
+              maxHeight: maxHeight
+                ? (typeof maxHeight === 'string' ? `calc(${maxHeight} - ${searchable ? 60 : 0}px)` : maxHeight - (searchable ? 60 : 0))
+                : maxDropdownHeight - (searchable ? 60 : 0)
+            }}
           >
             {filteredOptions.length === 0 ? (
               // Empty state

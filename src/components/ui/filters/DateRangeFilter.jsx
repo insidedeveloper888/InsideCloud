@@ -43,7 +43,7 @@ export default function DateRangeFilter({
           type="date"
           value={fromDate || ''}
           onChange={(e) => onFromDateChange(e.target.value || null)}
-          className="flex-1 text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
@@ -57,7 +57,7 @@ export default function DateRangeFilter({
           value={toDate || ''}
           onChange={(e) => onToDateChange(e.target.value || null)}
           min={fromDate || undefined}
-          className="flex-1 text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
     </div>

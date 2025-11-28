@@ -1,22 +1,42 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Plus, Calendar, LayoutGrid, List, Kanban, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, Plus, Calendar, LayoutGrid, List, Kanban, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Building2, Users, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AddProjectModal from '../modals/AddProjectModal';
 import ProjectDetailModal from '../modals/ProjectDetailModal';
 import FilterPanel from '../FilterPanel';
+import { useOrganizationMembers, useCustomers } from '../../hooks';
 
-const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
+const ProjectsTab = ({
+    projects,
+    templates,
+    statuses = [],
+    onRefresh,
+    organizationSlug,
+    individualId,
+    createProject,
+    updateProject,
+    deleteProject,
+}) => {
     const [viewMode, setViewMode] = useState('table'); // 'table', 'grid', 'kanban'
+    const [visibilityView, setVisibilityView] = useState('organization'); // 'organization', 'team', 'personal'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+    // Fetch organization members and customers for filtering
+    const { members: orgMembers } = useOrganizationMembers(organizationSlug);
+    const { customers } = useCustomers(organizationSlug);
 
     // Filter State
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({
         status: [],
-        templates: []
+        templates: [],
+        members: [],
+        customers: [],
+        dueDateFrom: '',
+        dueDateTo: '',
     });
 
     // Sorting State
@@ -32,29 +52,73 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
         return template ? template.name : 'Unknown Template';
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'completed': return 'bg-green-100 text-green-700 border-green-200';
-            case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
-        }
+    // Get status info from statuses array (uses status_id from project)
+    const getStatusInfo = (statusId) => {
+        const status = statuses.find(s => s.id === statusId);
+        return status || { name: 'Unknown', color: '#6B7280' };
+    };
+
+    // Generate status badge style from status color
+    const getStatusStyle = (statusId) => {
+        const status = getStatusInfo(statusId);
+        const color = status.color || '#6B7280';
+        return {
+            backgroundColor: `${color}20`,
+            color: color,
+            borderColor: `${color}40`,
+        };
     };
 
     // --- Logic ---
 
+    // Helper to get customer display name
+    const getCustomerDisplayName = (project) => {
+        if (!project.customer) return '';
+        const c = project.customer;
+        return c.company_name || `${c.first_name || ''} ${c.last_name || ''}`.trim();
+    };
+
     // 1. Filter
     const filteredProjects = useMemo(() => {
         return projects.filter(project => {
+            // Visibility filter
+            if (visibilityView === 'personal') {
+                // Only projects owned by the current user
+                if (project.owner_id !== individualId) return false;
+            } else if (visibilityView === 'team') {
+                // Projects owned by current user OR where current user is a member
+                const isOwner = project.owner_id === individualId;
+                const isMember = project.members?.some(m => m.individual_id === individualId);
+                if (!isOwner && !isMember) return false;
+            }
+            // 'organization' shows all projects (no filter)
+
+            const customerName = getCustomerDisplayName(project);
             const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                project.client.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = filters.status.length === 0 || filters.status.includes(project.status);
+                customerName.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = filters.status.length === 0 || filters.status.includes(project.status_id);
             const matchesTemplate = filters.templates.length === 0 || filters.templates.includes(project.template_id);
 
-            return matchesSearch && matchesStatus && matchesTemplate;
+            // Member filter: check if any selected member is assigned to the project
+            const matchesMembers = filters.members.length === 0 ||
+                project.members?.some(m => filters.members.includes(m.individual_id));
+
+            // Customer filter
+            const matchesCustomer = filters.customers.length === 0 ||
+                filters.customers.includes(project.customer_contact_id);
+
+            // Date range filter
+            let matchesDueDate = true;
+            if (filters.dueDateFrom && project.due_date) {
+                matchesDueDate = matchesDueDate && project.due_date >= filters.dueDateFrom;
+            }
+            if (filters.dueDateTo && project.due_date) {
+                matchesDueDate = matchesDueDate && project.due_date <= filters.dueDateTo;
+            }
+
+            return matchesSearch && matchesStatus && matchesTemplate && matchesMembers && matchesCustomer && matchesDueDate;
         });
-    }, [projects, searchTerm, filters]);
+    }, [projects, searchTerm, filters, visibilityView, individualId]);
 
     // 2. Sort
     const sortedProjects = useMemo(() => {
@@ -101,7 +165,14 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
     const handleFilterChange = (key, value) => {
         setCurrentPage(1); // Reset to page 1 on filter change
         if (key === 'clear') {
-            setFilters({ status: [], templates: [] });
+            setFilters({
+                status: [],
+                templates: [],
+                members: [],
+                customers: [],
+                dueDateFrom: '',
+                dueDateTo: '',
+            });
         } else {
             setFilters(prev => ({ ...prev, [key]: value }));
         }
@@ -161,7 +232,7 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                                             </div>
                                             <div>
                                                 <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">{project.name}</div>
-                                                <div className="text-xs text-gray-500">{project.client}</div>
+                                                <div className="text-xs text-gray-500">{getCustomerDisplayName(project) || 'No customer'}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -169,20 +240,34 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                                         {getTemplateName(project.template_id)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2.5 py-1 inline-flex text-xs leading-4 font-medium rounded-full border ${getStatusColor(project.status)}`}>
-                                            {project.status}
+                                        <span
+                                            className="px-2.5 py-1 inline-flex text-xs leading-4 font-medium rounded-full border"
+                                            style={getStatusStyle(project.status_id)}
+                                        >
+                                            {getStatusInfo(project.status_id).name}
                                         </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {project.budget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(project.budget) : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {project.due_date || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex -space-x-2">
-                                            {project.assigned_staff?.map((id, i) => (
-                                                <div key={i} className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-medium text-gray-600">
-                                                    {id}
+                                            {project.members?.slice(0, 3).map((member, i) => (
+                                                <div key={i} className="w-7 h-7 rounded-full bg-purple-100 border-2 border-white flex items-center justify-center text-[10px] font-medium text-purple-600" title={member.individual?.display_name || 'Unknown'}>
+                                                    {member.individual?.display_name?.charAt(0) || '?'}
                                                 </div>
                                             ))}
+                                            {project.members?.length > 3 && (
+                                                <div className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-medium text-gray-600">
+                                                    +{project.members.length - 3}
+                                                </div>
+                                            )}
+                                            {(!project.members || project.members.length === 0) && (
+                                                <span className="text-xs text-gray-400">—</span>
+                                            )}
                                         </div>
                                     </td>
                                 </motion.tr>
@@ -197,21 +282,25 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                     <div>
                         <p className="text-sm text-gray-700">
-                            Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, sortedProjects.length)}</span> of <span className="font-medium">{sortedProjects.length}</span> results
+                            {sortedProjects.length === 0 ? (
+                                'Showing 0 results'
+                            ) : (
+                                <>Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, sortedProjects.length)}</span> of <span className="font-medium">{sortedProjects.length}</span> results</>
+                            )}
                         </p>
                     </div>
                     <div>
                         <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
+                                disabled={currentPage === 1 || sortedProjects.length === 0}
                                 className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="sr-only">Previous</span>
                                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                             </button>
                             {/* Simple Page Numbers */}
-                            {[...Array(totalPages)].map((_, i) => (
+                            {totalPages > 0 && [...Array(totalPages)].map((_, i) => (
                                 <button
                                     key={i}
                                     onClick={() => setCurrentPage(i + 1)}
@@ -225,7 +314,7 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                             ))}
                             <button
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
+                                disabled={currentPage === totalPages || totalPages === 0 || sortedProjects.length === 0}
                                 className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="sr-only">Next</span>
@@ -255,13 +344,16 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                                 {project.name.charAt(0)}
                             </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-md border ${getStatusColor(project.status)}`}>
-                                {project.status}
+                            <span
+                                className="px-2 py-1 text-xs font-medium rounded-md border"
+                                style={getStatusStyle(project.status_id)}
+                            >
+                                {getStatusInfo(project.status_id).name}
                             </span>
                         </div>
 
                         <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors truncate">{project.name}</h3>
-                        <p className="text-sm text-gray-500 mb-4 truncate">{project.client}</p>
+                        <p className="text-sm text-gray-500 mb-4 truncate">{getCustomerDisplayName(project) || 'No customer'}</p>
 
                         <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-100">
                             <div className="flex items-center">
@@ -269,11 +361,16 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                                 {project.due_date || 'No date'}
                             </div>
                             <div className="flex -space-x-1.5">
-                                {project.assigned_staff?.slice(0, 3).map((id, i) => (
-                                    <div key={i} className="w-5 h-5 rounded-full bg-gray-100 border border-white flex items-center justify-center text-[9px]">
-                                        {id}
+                                {project.members?.slice(0, 3).map((member, i) => (
+                                    <div key={i} className="w-5 h-5 rounded-full bg-purple-100 border border-white flex items-center justify-center text-[9px] text-purple-600" title={member.individual?.display_name || 'Unknown'}>
+                                        {member.individual?.display_name?.charAt(0) || '?'}
                                     </div>
                                 ))}
+                                {project.members?.length > 3 && (
+                                    <div className="w-5 h-5 rounded-full bg-gray-100 border border-white flex items-center justify-center text-[9px]">
+                                        +{project.members.length - 3}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </motion.div>
@@ -283,28 +380,28 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
     );
 
     const KanbanView = () => {
-        const columns = [
-            { id: 'pending', label: 'Pending', color: 'bg-yellow-500' },
-            { id: 'active', label: 'In Progress', color: 'bg-blue-500' },
-            { id: 'completed', label: 'Completed', color: 'bg-green-500' },
-        ];
+        // Use dynamic statuses from API, sorted by sort_order
+        const sortedStatuses = [...statuses].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
         return (
             <div className="flex h-[calc(100vh-220px)] overflow-x-auto p-6 space-x-6">
-                {columns.map(col => (
-                    <div key={col.id} className="flex-shrink-0 w-80 flex flex-col bg-gray-50 rounded-xl border border-gray-200 max-h-full">
+                {sortedStatuses.map(status => (
+                    <div key={status.id} className="flex-shrink-0 w-80 flex flex-col bg-gray-50 rounded-xl border border-gray-200 max-h-full">
                         <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-gray-50 rounded-t-xl z-10">
                             <div className="flex items-center space-x-2">
-                                <div className={`w-2 h-2 rounded-full ${col.color}`}></div>
-                                <h3 className="font-semibold text-gray-700">{col.label}</h3>
+                                <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: status.color || '#6B7280' }}
+                                ></div>
+                                <h3 className="font-semibold text-gray-700">{status.name}</h3>
                             </div>
                             <span className="bg-white px-2 py-0.5 rounded-full text-xs font-medium text-gray-500 border border-gray-200">
-                                {filteredProjects.filter(p => p.status === col.id).length}
+                                {filteredProjects.filter(p => p.status_id === status.id).length}
                             </span>
                         </div>
 
                         <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-                            {filteredProjects.filter(p => p.status === col.id).map(project => (
+                            {filteredProjects.filter(p => p.status_id === status.id).map(project => (
                                 <motion.div
                                     key={project.id}
                                     layoutId={`kanban-${project.id}`}
@@ -317,13 +414,13 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                                         </span>
                                     </div>
                                     <h4 className="text-sm font-semibold text-gray-900 mb-1 group-hover:text-blue-600">{project.name}</h4>
-                                    <p className="text-xs text-gray-500 mb-3">{project.client}</p>
+                                    <p className="text-xs text-gray-500 mb-3">{getCustomerDisplayName(project) || 'No customer'}</p>
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex -space-x-1">
-                                            {project.assigned_staff?.slice(0, 2).map((id, i) => (
+                                            {project.members?.slice(0, 2).map((member, i) => (
                                                 <div key={i} className="w-5 h-5 rounded-full bg-gray-100 border border-white flex items-center justify-center text-[9px]">
-                                                    {id}
+                                                    {member.individual?.display_name?.charAt(0) || '?'}
                                                 </div>
                                             ))}
                                         </div>
@@ -351,6 +448,9 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                 filters={filters}
                 onFilterChange={handleFilterChange}
                 templates={templates}
+                statuses={statuses}
+                members={orgMembers}
+                customers={customers}
             />
 
             {/* Toolbar - Sticky with Offset to avoid overlapping main header */}
@@ -363,22 +463,59 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                             placeholder="Search projects..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                         />
                     </div>
 
                     <button
                         onClick={() => setIsFilterOpen(true)}
-                        className={`flex items-center px-3 py-2 rounded-lg border transition-colors relative ${(filters.status.length > 0 || filters.templates.length > 0)
-                            ? 'bg-blue-50 border-blue-200 text-blue-600'
-                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        className={`flex items-center px-3 py-2 rounded-lg border transition-colors relative ${(filters.status.length > 0 || filters.templates.length > 0 || filters.members.length > 0 || filters.customers.length > 0 || filters.dueDateFrom || filters.dueDateTo)
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                             }`}
                     >
                         <Filter className="w-4 h-4 mr-2" />
                         <span className="text-sm font-medium">Filter</span>
-                        {(filters.status.length > 0 || filters.templates.length > 0) && (
+                        {(filters.status.length > 0 || filters.templates.length > 0 || filters.members.length > 0 || filters.customers.length > 0 || filters.dueDateFrom || filters.dueDateTo) && (
                             <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full border-2 border-white"></span>
                         )}
+                    </button>
+                </div>
+
+                {/* Visibility Toggle */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                        onClick={() => setVisibilityView('organization')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${visibilityView === 'organization'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        title="All organization projects"
+                    >
+                        <Building2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">All</span>
+                    </button>
+                    <button
+                        onClick={() => setVisibilityView('team')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${visibilityView === 'team'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        title="Projects you own or are a member of"
+                    >
+                        <Users className="w-4 h-4" />
+                        <span className="hidden sm:inline">Team</span>
+                    </button>
+                    <button
+                        onClick={() => setVisibilityView('personal')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${visibilityView === 'personal'
+                                ? 'bg-white text-blue-600 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        title="Projects you own"
+                    >
+                        <User className="w-4 h-4" />
+                        <span className="hidden sm:inline">My</span>
                     </button>
                 </div>
 
@@ -428,7 +565,10 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 templates={templates}
+                statuses={statuses}
                 organizationSlug={organizationSlug}
+                individualId={individualId}
+                createProject={createProject}
                 onSave={() => {
                     setIsAddModalOpen(false);
                     if (onRefresh) onRefresh();
@@ -440,6 +580,11 @@ const ProjectsTab = ({ projects, templates, onRefresh, organizationSlug }) => {
                 onClose={() => setSelectedProject(null)}
                 project={selectedProject}
                 templates={templates}
+                statuses={statuses}
+                organizationSlug={organizationSlug}
+                individualId={individualId}
+                updateProject={updateProject}
+                deleteProject={deleteProject}
                 onSave={() => {
                     setSelectedProject(null);
                     if (onRefresh) onRefresh();

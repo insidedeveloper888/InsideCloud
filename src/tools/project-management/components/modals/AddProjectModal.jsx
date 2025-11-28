@@ -1,37 +1,84 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
-import { ProjectManagementAPI } from '../../api/project-management';
+import { X, Check, Building2, Users, User } from 'lucide-react';
 import { DynamicFieldRenderer } from '../DynamicFieldRenderer';
+import { SearchableSelect } from '../../../../components/ui/searchable-select';
+import { useCustomers, useOrganizationMembers } from '../../hooks';
 
-const AddProjectModal = ({ isOpen, onClose, templates, onSave, organizationSlug }) => {
+const AddProjectModal = ({
+    isOpen,
+    onClose,
+    templates,
+    statuses = [],
+    onSave,
+    organizationSlug,
+    individualId,
+    createProject,
+}) => {
     const [step, setStep] = useState(1); // 1: Select Template, 2: Fill Details
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [formData, setFormData] = useState({
         name: '',
-        client: '',
+        customer_contact_id: null,
+        status_id: null,
+        visibility: 'organization', // 'organization', 'team', 'personal'
         budget: '',
         start_date: '',
         due_date: '',
+        progress_current: 0,
+        progress_total: 100,
+        progress_unit: '%',
         custom_data: {}
     });
     const [saving, setSaving] = useState(false);
+    const [selectedMembers, setSelectedMembers] = useState([]);
+
+    // Fetch customers for SearchableSelect
+    const { customers, isLoading: customersLoading, getCustomerDisplayName } = useCustomers(organizationSlug);
+
+    // Fetch organization members for team assignment
+    const { members: orgMembers, isLoading: membersLoading } = useOrganizationMembers(organizationSlug);
+
+    // Get default status (first status or one marked as default)
+    const getDefaultStatusId = () => {
+        const defaultStatus = statuses.find(s => s.is_default);
+        return defaultStatus?.id || statuses[0]?.id || null;
+    };
 
     // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
             setStep(1);
             setSelectedTemplateId('');
+            setSelectedMembers([]);
             setFormData({
                 name: '',
-                client: '',
+                customer_contact_id: null,
+                status_id: getDefaultStatusId(),
+                visibility: 'organization',
                 budget: '',
                 start_date: '',
                 due_date: '',
+                progress_current: 0,
+                progress_total: 100,
+                progress_unit: '%',
                 custom_data: {}
             });
         }
-    }, [isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, statuses]);
+
+    // Team member handlers
+    const handleAddMember = (memberId) => {
+        const member = orgMembers.find(m => m.id === memberId);
+        if (member && !selectedMembers.some(m => m.id === memberId)) {
+            setSelectedMembers(prev => [...prev, member]);
+        }
+    };
+
+    const handleRemoveMember = (memberId) => {
+        setSelectedMembers(prev => prev.filter(m => m.id !== memberId));
+    };
 
     const handleTemplateSelect = (templateId) => {
         setSelectedTemplateId(templateId);
@@ -52,17 +99,28 @@ const AddProjectModal = ({ isOpen, onClose, templates, onSave, organizationSlug 
         e.preventDefault();
         setSaving(true);
         try {
-            if (!formData.name || !formData.client) {
-                throw new Error("Project Name and Client are required");
+            if (!formData.name) {
+                throw new Error("Project Name is required");
             }
 
             const projectPayload = {
-                ...formData,
+                name: formData.name,
+                customer_contact_id: formData.customer_contact_id,
+                status_id: formData.status_id,
+                visibility: formData.visibility || 'organization',
+                budget: formData.budget ? parseFloat(formData.budget) : null,
+                start_date: formData.start_date || null,
+                due_date: formData.due_date || null,
                 template_id: selectedTemplateId,
-                status: 'active'
+                custom_data: formData.custom_data,
+                progress_current: parseInt(formData.progress_current) || 0,
+                progress_total: parseInt(formData.progress_total) || 100,
+                progress_unit: formData.progress_unit || '%',
+                // Backend expects members: [{ individual_id, role }]
+                members: selectedMembers.map(m => ({ individual_id: m.id, role: 'member' })),
             };
 
-            await ProjectManagementAPI.createProject(organizationSlug, projectPayload);
+            await createProject(projectPayload);
             onSave();
         } catch (error) {
             alert(error.message);
@@ -143,15 +201,103 @@ const AddProjectModal = ({ isOpen, onClose, templates, onSave, organizationSlug 
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={formData.client}
-                                                onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                                                placeholder="Client Name"
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+                                            <SearchableSelect
+                                                value={formData.customer_contact_id}
+                                                onChange={(value) => setFormData({ ...formData, customer_contact_id: value })}
+                                                options={customers}
+                                                getOptionValue={(c) => c.id}
+                                                getOptionLabel={(c) => getCustomerDisplayName(c)}
+                                                placeholder="Select customer..."
+                                                searchPlaceholder="Search customers..."
+                                                searchKeys={['first_name', 'last_name', 'company_name', 'email']}
+                                                clearable={true}
+                                                loading={customersLoading}
+                                                renderOption={(customer) => (
+                                                    <div>
+                                                        <div className="font-medium text-gray-900">
+                                                            {getCustomerDisplayName(customer)}
+                                                        </div>
+                                                        {customer.email && (
+                                                            <div className="text-xs text-gray-500">{customer.email}</div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                            <SearchableSelect
+                                                value={formData.status_id}
+                                                onChange={(value) => setFormData({ ...formData, status_id: value })}
+                                                options={statuses}
+                                                getOptionValue={(s) => s.id}
+                                                getOptionLabel={(s) => s.name}
+                                                placeholder="Select status..."
+                                                searchable={false}
+                                                renderOption={(status) => (
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: status.color || '#6B7280' }}
+                                                        />
+                                                        <span className="text-gray-900">{status.name}</span>
+                                                    </div>
+                                                )}
+                                                renderSelected={(status) => (
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: status.color || '#6B7280' }}
+                                                        />
+                                                        <span className="text-gray-900">{status.name}</span>
+                                                    </div>
+                                                )}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+                                            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, visibility: 'organization' })}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-1 justify-center ${
+                                                        formData.visibility === 'organization'
+                                                            ? 'bg-white text-blue-600 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                    }`}
+                                                    title="Visible to entire organization"
+                                                >
+                                                    <Building2 className="w-3.5 h-3.5" />
+                                                    <span>All</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, visibility: 'team' })}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-1 justify-center ${
+                                                        formData.visibility === 'team'
+                                                            ? 'bg-white text-blue-600 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                    }`}
+                                                    title="Visible to assigned team members"
+                                                >
+                                                    <Users className="w-3.5 h-3.5" />
+                                                    <span>Team</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, visibility: 'personal' })}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-1 justify-center ${
+                                                        formData.visibility === 'personal'
+                                                            ? 'bg-white text-blue-600 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                    }`}
+                                                    title="Only visible to you"
+                                                >
+                                                    <User className="w-3.5 h-3.5" />
+                                                    <span>Private</span>
+                                                </button>
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Budget</label>
@@ -184,6 +330,125 @@ const AddProjectModal = ({ isOpen, onClose, templates, onSave, organizationSlug 
                                                 value={formData.due_date}
                                                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Team Assignment */}
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-sm font-medium text-gray-900 uppercase tracking-wider">
+                                            Assigned Team
+                                            <span className="text-gray-400 text-xs font-normal ml-2">(Optional)</span>
+                                        </h4>
+                                    </div>
+
+                                    {/* Selected Members */}
+                                    {selectedMembers.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                            {selectedMembers.map(member => (
+                                                <div
+                                                    key={member.id}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg"
+                                                >
+                                                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">
+                                                        {member.display_name?.charAt(0).toUpperCase() || 'U'}
+                                                    </div>
+                                                    <span className="text-sm text-gray-900">{member.display_name || member.email}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveMember(member.id)}
+                                                        className="text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Add Member Dropdown */}
+                                    <SearchableSelect
+                                        value={null}
+                                        onChange={handleAddMember}
+                                        options={orgMembers.filter(m => !selectedMembers.some(sm => sm.id === m.id))}
+                                        getOptionValue={(m) => m.id}
+                                        getOptionLabel={(m) => m.display_name || m.email}
+                                        placeholder="Add team member..."
+                                        searchPlaceholder="Search members..."
+                                        searchKeys={['display_name', 'email']}
+                                        loading={membersLoading}
+                                        renderOption={(member) => (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-[10px]">
+                                                    {member.display_name?.charAt(0) || '?'}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-gray-900">{member.display_name}</div>
+                                                    {member.email && (
+                                                        <div className="text-xs text-gray-500">{member.email}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    />
+                                </div>
+
+                                {/* Progress Tracking */}
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                    <h4 className="text-sm font-medium text-gray-900 uppercase tracking-wider mb-4">Progress Tracking</h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Current</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={formData.progress_current}
+                                                onChange={(e) => setFormData({ ...formData, progress_current: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={formData.progress_total}
+                                                onChange={(e) => setFormData({ ...formData, progress_total: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                                                placeholder="100"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                                            <select
+                                                value={formData.progress_unit}
+                                                onChange={(e) => setFormData({ ...formData, progress_unit: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                                            >
+                                                <option value="%">Percentage (%)</option>
+                                                <option value="tasks">Tasks</option>
+                                                <option value="hours">Hours</option>
+                                                <option value="units">Units</option>
+                                                <option value="phases">Phases</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {/* Progress Preview */}
+                                    <div className="mt-4">
+                                        <div className="flex justify-between text-sm text-gray-600 mb-1">
+                                            <span>Progress</span>
+                                            <span>
+                                                {formData.progress_current} / {formData.progress_total} {formData.progress_unit}
+                                                {' '}({formData.progress_total > 0 ? Math.round((formData.progress_current / formData.progress_total) * 100) : 0}%)
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div
+                                                className="bg-blue-600 h-2 rounded-full transition-all"
+                                                style={{ width: `${formData.progress_total > 0 ? Math.min(100, (formData.progress_current / formData.progress_total) * 100) : 0}%` }}
                                             />
                                         </div>
                                     </div>

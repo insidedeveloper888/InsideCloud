@@ -86,7 +86,7 @@ export default function CheckboxFilter({
             {renderOption ? (
               renderOption(option)
             ) : (
-              <span className="text-sm text-gray-700">{optionLabel}</span>
+              <span className="text-sm text-gray-900">{optionLabel}</span>
             )}
           </label>
         );

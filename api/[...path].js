@@ -49,6 +49,10 @@ const integrations = require('../server/api_handlers/integrations');
 const templates = require('../server/api_handlers/templates');
 const pdfGeneration = require('../server/api_handlers/pdf_generation');
 const healthLark = require('../server/api_handlers/health_lark');
+const projects = require('../server/api_handlers/projects');
+const projectStatuses = require('../server/api_handlers/project_statuses');
+const projectTemplates = require('../server/api_handlers/project_templates');
+const projectOrganizationMembers = require('../server/api_handlers/project_organization_members');
 
 /**
  * Route mapping: path -> handler
@@ -99,6 +103,10 @@ const routes = {
   '/api/templates': templates,
   '/api/documents/pdf/generate': pdfGeneration,
   '/api/health/lark': healthLark,
+  '/api/projects': projects,
+  '/api/project-statuses': projectStatuses,
+  '/api/project-templates': projectTemplates,
+  '/api/project-organization-members': projectOrganizationMembers,
 };
 
 /**
