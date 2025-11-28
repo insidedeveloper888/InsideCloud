@@ -1,20 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Users, Calendar } from 'lucide-react';
 
+// Constants defined outside component to avoid recreation on each render
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 const ScheduleTab = ({ projects, members = [] }) => {
     // Week offset state for navigation (0 = current week, -1 = last week, 1 = next week)
     const [weekOffset, setWeekOffset] = useState(0);
 
     // Get current week dates based on offset
-    const today = new Date();
+    // today is intentionally recreated each render to ensure "Today" button works correctly
+    const today = useMemo(() => new Date(), []);
+
     const startOfWeek = useMemo(() => {
         const start = new Date(today);
         start.setDate(today.getDate() - today.getDay() + 1 + (weekOffset * 7)); // Monday + offset
         return start;
-    }, [weekOffset]);
+    }, [weekOffset, today]);
 
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const dates = useMemo(() => days.map((_, i) => {
+    const dates = useMemo(() => DAYS.map((_, i) => {
         const date = new Date(startOfWeek);
         date.setDate(startOfWeek.getDate() + i);
         return date;
@@ -165,7 +169,7 @@ const ScheduleTab = ({ projects, members = [] }) => {
                         <div className="p-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
                             Staff
                         </div>
-                        {days.map((day, i) => {
+                        {DAYS.map((day, i) => {
                             const isToday = dates[i].toDateString() === today.toDateString();
                             return (
                                 <div key={day} className={`p-3 text-center border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-100' : ''}`}>
@@ -192,7 +196,7 @@ const ScheduleTab = ({ projects, members = [] }) => {
                             </div>
 
                             {/* Day Cells - Show actual assignments or dash for empty */}
-                            {days.map((day, i) => {
+                            {DAYS.map((day, i) => {
                                 const dayAssignments = memberAssignments[member.id]?.[i] || [];
                                 const isToday = dates[i].toDateString() === today.toDateString();
 
