@@ -19,38 +19,19 @@ import {
   DateRangeFilter,
   NumberRangeFilter,
 } from '../../../components/ui/filters';
-
-// Static options
-const STOCK_STATUS_OPTIONS = [
-  { id: 'normal', label: 'Normal' },
-  { id: 'low_stock', label: 'Low Stock' },
-  { id: 'out_of_stock', label: 'Out of Stock' },
-  { id: 'no_stock', label: 'Unstocked' },
-];
-
-const MOVEMENT_TYPE_OPTIONS = [
-  { id: 'stock_in', label: 'Stock In' },
-  { id: 'stock_out', label: 'Stock Out' },
-];
-
-const ITEM_TYPE_OPTIONS = [
-  { id: 'selling', label: 'Selling Items' },
-  { id: 'spare', label: 'Non-Selling' },
-];
-
-const PO_STATUS_OPTIONS = [
-  { id: 'draft', label: 'Draft' },
-  { id: 'ordered', label: 'Ordered' },
-  { id: 'in_transit', label: 'In Transit' },
-  { id: 'received', label: 'Received' },
-];
-
-const DO_STATUS_OPTIONS = [
-  { id: 'draft', label: 'Draft' },
-  { id: 'confirmed', label: 'Confirmed' },
-  { id: 'dispatched', label: 'Dispatched' },
-  { id: 'delivered', label: 'Delivered' },
-];
+import {
+  STOCK_STATUS_OPTIONS,
+  MOVEMENT_TYPE_OPTIONS,
+  ITEM_TYPE_OPTIONS,
+  PO_STATUS_OPTIONS,
+  DO_STATUS_OPTIONS,
+} from '../utils/filterConstants';
+import {
+  hasActiveFilters as checkActiveFilters,
+  getEmptyFilters,
+  getVisibleSections,
+} from '../utils/filterHelpers';
+import { useFilterOptions } from '../hooks/useFilterOptions';
 
 export default function InventoryFilterPanel({
   isOpen,
@@ -67,150 +48,24 @@ export default function InventoryFilterPanel({
   states = [],
 }) {
   // Helper to update a single filter field
-  const updateFilter = (key, value) => {
-    onFiltersChange({
-      ...filters,
-      [key]: value,
-    });
-  };
+  const updateFilter = (key, value) => onFiltersChange({ ...filters, [key]: value });
 
-  // Check if any filters are active
-  const hasActiveFilters = useMemo(() => {
-    return (
-      filters.categories?.length > 0 ||
-      filters.locations?.length > 0 ||
-      filters.suppliers?.length > 0 ||
-      filters.stockStatuses?.length > 0 ||
-      filters.showInactive ||
-      filters.minQuantity != null ||
-      filters.maxQuantity != null ||
-      filters.movementTypes?.length > 0 ||
-      filters.movementDateFrom ||
-      filters.movementDateTo ||
-      filters.users?.length > 0 ||
-      filters.poStatuses?.length > 0 ||
-      filters.managedBy?.length > 0 ||
-      filters.poOrderDateFrom ||
-      filters.poOrderDateTo ||
-      filters.poExpectedDeliveryFrom ||
-      filters.poExpectedDeliveryTo ||
-      filters.doStatuses?.length > 0 ||
-      filters.customers?.length > 0 ||
-      filters.createdBy?.length > 0 ||
-      filters.doOrderDateFrom ||
-      filters.doOrderDateTo ||
-      filters.states?.length > 0 ||
-      filters.itemType != null
-    );
-  }, [filters]);
+  // Check if any filters are active and clear all helper
+  const hasActiveFilters = useMemo(() => checkActiveFilters(filters), [filters]);
+  const handleClearAll = () => onFiltersChange(getEmptyFilters());
 
-  // Clear all filters
-  const handleClearAll = () => {
-    onFiltersChange({
-      categories: [],
-      locations: [],
-      suppliers: [],
-      stockStatuses: [],
-      showInactive: false,
-      minQuantity: null,
-      maxQuantity: null,
-      movementTypes: [],
-      movementDateFrom: '',
-      movementDateTo: '',
-      users: [],
-      products: [],
-      poStatuses: [],
-      managedBy: [],
-      poOrderDateFrom: '',
-      poOrderDateTo: '',
-      poExpectedDeliveryFrom: '',
-      poExpectedDeliveryTo: '',
-      doStatuses: [],
-      customers: [],
-      createdBy: [],
-      doOrderDateFrom: '',
-      doOrderDateTo: '',
-      states: [],
-      itemType: null,
-    });
-  };
-
-  // Transform categories array (strings) to option objects
-  const categoryOptions = useMemo(
-    () => categories.map((cat) => ({ id: cat, label: cat })),
-    [categories]
-  );
-
-  // Transform states array (strings) to option objects
-  const stateOptions = useMemo(
-    () => states.map((s) => ({ id: s, label: s })),
-    [states]
-  );
-
-  // Transform locations to include label key
-  const locationOptions = useMemo(
-    () => locations.map((loc) => ({ ...loc, label: loc.name })),
-    [locations]
-  );
-
-  // Transform suppliers to include label key
-  const supplierOptions = useMemo(
-    () =>
-      suppliers.map((sup) => ({
-        ...sup,
-        label:
-          sup.name ||
-          sup.company_name ||
-          `${sup.first_name || ''} ${sup.last_name || ''}`.trim() ||
-          'Unknown',
-      })),
-    [suppliers]
-  );
-
-  // Transform users to include label key
-  const userOptions = useMemo(
-    () =>
-      users.map((user) => ({
-        ...user,
-        label: user.display_name || user.email || 'Unknown',
-      })),
-    [users]
-  );
-
-  // Transform customers to include label key
-  const customerOptions = useMemo(
-    () =>
-      customers.map((cust) => ({
-        ...cust,
-        label:
-          cust.company_name ||
-          `${cust.first_name || ''} ${cust.last_name || ''}`.trim() ||
-          'Unknown',
-      })),
-    [customers]
-  );
+  // Transform data to filter options
+  const {
+    categoryOptions,
+    stateOptions,
+    locationOptions,
+    supplierOptions,
+    userOptions,
+    customerOptions,
+  } = useFilterOptions({ categories, states, locations, suppliers, users, customers });
 
   // Determine which sections to show based on tab
-  const showSection = {
-    itemType: currentTab === 'products',
-    category: ['overview', 'products'].includes(currentTab),
-    location: ['overview', 'movements', 'purchase-orders', 'delivery-orders'].includes(currentTab),
-    stockStatus: currentTab === 'overview',
-    quantityRange: currentTab === 'overview',
-    movementType: currentTab === 'movements',
-    movementDate: currentTab === 'movements',
-    operator: currentTab === 'movements',
-    supplier: currentTab === 'purchase-orders',
-    poStatus: currentTab === 'purchase-orders',
-    poOrderDate: currentTab === 'purchase-orders',
-    poExpectedDelivery: currentTab === 'purchase-orders',
-    managedBy: currentTab === 'purchase-orders',
-    doStatus: currentTab === 'delivery-orders',
-    doOrderDate: currentTab === 'delivery-orders',
-    customer: currentTab === 'delivery-orders',
-    createdBy: currentTab === 'delivery-orders',
-    state: currentTab === 'suppliers',
-  };
+  const showSection = useMemo(() => getVisibleSections(currentTab), [currentTab]);
 
   return (
     <FilterPanel

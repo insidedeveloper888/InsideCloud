@@ -1,285 +1,152 @@
-# .clinerules - Project Context for Claude Code
+# .clinerules - Core Principles (Foundation Layer)
 
-## Project Identity
-Multi-tenant SaaS ERP system for Malaysian SMEs, integrated with Lark (Feishu) platform.
-Supports 6 core business modules with data-driven automation and reporting.
-
-## Tech Stack
-- **Frontend**: React 18 + Tailwind CSS 3.4 + shadcn/ui
-- **Backend**: Koa 2 (dev on port 8989) + Vercel Serverless (prod)
-- **Database**: Supabase (PostgreSQL + Realtime)
-- **Authentication**: Lark OAuth 2.0 + JSAPI
-- **Deployment**: Vercel (production) + localhost (development)
-
-## Architecture Principles (NEVER VIOLATE)
-
-### 1. Multi-Tenant Isolation
-- ALL database tables MUST have `organization_id` or `tenant_id` field
-- ALL queries MUST filter by organization/tenant
-- Organization context stored in localStorage: `organization_slug`
-- Backend validates organization exists before processing requests
-
-### 2. Module Independence with Event System
-- 6 modules: Strategic Map, Contact Management, Sales Management, Inventory, Integrations, Document Parser
-- Modules communicate via event system (NOT direct calls)
-- Each module has dedicated controller, API handlers, and frontend tool directory
-
-### 3. Dual Deployment Architecture
-**CRITICAL**: When adding new API endpoints, implement in BOTH places:
-
-**Development (Koa - server/server.js):**
-```javascript
-// STEP 1: Always add OPTIONS handler for CORS preflight
-router.options('/api/new-endpoint', async (ctx) => {
-  serverUtil.configAccessControl(ctx);
-  ctx.status = 200;
-});
-
-// STEP 2: Add actual route
-router.get('/api/new-endpoint', async (ctx) => {
-  serverUtil.configAccessControl(ctx);
-  const param = ctx.query.param;
-  // ... implementation
-  ctx.body = { code: 0, data: result };
-});
-```
-
-**Production (Vercel - api/[...path].js + handler):**
-```javascript
-// Create handler: server/api_handlers/new_endpoint.js
-module.exports = async function handler(req, res) {
-  if (handleCors(req, res)) return;
-  const param = req.query.param;
-  // ... same implementation logic
-  res.status(200).json({ code: 0, data: result });
-};
-
-// Register in api/[...path].js
-const routes = { '/api/new-endpoint': newEndpoint };
-```
-
-### 4. React Router + Product Access Control
-When adding new product route:
-1. Add route to `src/App.js`: `<Route path="/new_product" element={<Home />} />`
-2. Add to access control in `src/pages/home/index.js`:
-   ```javascript
-   if (!isAdmin && activeView !== 'dashboard' &&
-       activeView !== 'new_product') {
-     setActiveView('dashboard');
-   }
-   ```
-
-## UI Component Guidelines
-
-### MANDATORY: Use Shared Components
-Before creating ANY new UI component, check `src/components/ui/` for existing components:
-
-| Component | File | Status | Use For |
-|-----------|------|--------|---------|
-| Button | `button.jsx` | ✅ Ready | All buttons |
-| Card | `card.jsx` | ✅ Ready | Content containers |
-| Tabs | `tabs.jsx` | ✅ Ready | Tab navigation |
-| Avatar | `avatar.jsx` | ✅ Ready | User avatars |
-| MemberSelect | `member-select.jsx` | ✅ Ready | Team member dropdowns |
-| Pagination | `pagination.jsx` | ✅ Ready | List pagination |
-| ConfirmDialog | `confirm-dialog.jsx` | ✅ Ready | Delete/dangerous action confirmations |
-| SearchableSelect | `searchable-select.jsx` | ✅ Ready | Dropdown select with search, keyboard nav |
-
-### MANDATORY: Use Design Tokens
-Import from `src/lib/design-tokens.js` for consistent styling:
-- `buttonStyles` - All button variants
-- `badgeStyles` - Status badges
-- `colors` - Color palette
-- `radius` - Border radius
-- `typography` - Text styles
-
-### Creating New Components
-1. First check if similar component exists in `src/components/ui/`
-2. If creating new, place in `src/components/ui/` (NOT in tool-specific folders)
-3. Use design tokens, not hardcoded Tailwind classes
-4. Add to `src/components/ui/index.js` exports
-5. Document in `docs/design-system/README.md`
-
-### DO NOT:
-- ❌ Create duplicate components in tool folders
-- ❌ Use different button styles across tools
-- ❌ Hardcode colors (use design tokens)
-- ❌ Create tool-specific Modal/Dialog/Select components
-
-### DO:
-- ✅ Import from `@/components/ui/` or `src/components/ui/`
-- ✅ Extend shared components with props if needed
-- ✅ Follow existing patterns in inventory-management (best reference)
-
-## 6 Core Modules (See /docs/agents/ for details)
-
-### 1. Strategic Map (战略地图)
-- **Purpose**: 5-year planning with goal cascading (yearly → monthly → weekly → daily)
-- **Status**: ✅ Production Ready (v2.2.0)
-- **Files**: `src/tools/strategic-map/`, `server/strategic_map_controller.js`
-- **Database**: Cascade triggers auto-create monthly/weekly/daily goals
-- **Features**: Supabase Realtime collaboration, optimistic updates
-
-### 2. Contact Management (名单管理)
-- **Purpose**: CRM for customers, suppliers, COI, internal contacts
-- **Status**: ✅ Production Ready (v1.0.0)
-- **Files**: `src/tools/contact-management/`, `server/contact_management_controller.js`
-- **Features**: Configurable rating (3-10 stars), pipeline stages, traffic channels, tags
-
-### 3. Sales Management (销售管理)
-- **Purpose**: Document workflow (Quotation → Sales Order → Delivery Order → Invoice)
-- **Status**: ✅ Production Ready (v1.0.0)
-- **Files**: `src/tools/sales-management/`, `server/*_controller.js` (quotation, sales_order, delivery_order, invoice, template, pdf_generator)
-- **Features**: Visual PDF template builder, auto-fill conversion, payment tracking
-
-### 4. Inventory Management (仓库管理)
-- **Purpose**: Multi-location stock tracking, purchase orders, suppliers
-- **Status**: ✅ Production Ready (v1.0.0)
-- **Files**: `src/tools/inventory/`, `server/inventory_controller.js`
-- **Features**: Stock movements (IN/OUT), low stock alerts, batch recording
-
-### 5. Integrations (集成)
-- **Purpose**: Third-party software connections (accounting, social platforms)
-- **Status**: 🚧 In Development (Backend Only)
-- **Files**: `server/integrations_controller.js`
-- **Note**: Frontend `src/tools/integrations/` not yet created
-- **Features**: OAuth flows, data sync, webhook handlers
-
-### 6. Document Parser (文档解析器)
-- **Purpose**: Parse accounting software exports (SQL Accounting, Autocount)
-- **Status**: ✅ Production Ready (v1.0.0)
-- **Files**: `src/tools/document-parser/`
-- **Features**: Pure frontend, no backend/database, Excel/CSV support
-
-## Critical File Locations
-
-### Backend
-- **Main Server**: `server/server.js` (Koa routes for dev)
-- **Vercel Router**: `api/[...path].js` (unified router for prod)
-- **API Handlers**: `server/api_handlers/` (one file per endpoint)
-- **Controllers**: `server/*_controller.js` (business logic)
-- **Database Client**: `server/supabase_client.js`
-- **Organization Helper**: `server/organization_helper.js` (multi-tenant utilities)
-
-### Frontend
-- **Entry Point**: `src/pages/home/index.js` (dashboard + product routing)
-- **Tools Directory**: `src/tools/` (one folder per product)
-- **Shared Components**: `src/components/ui/` (shadcn/ui), `src/components/layout/`
-- **Organization Context**: `src/contexts/OrganizationContext.jsx`
-- **Authentication**: `src/utils/auth_access_util.js`
-
-### Configuration
-- **CLAUDE.md**: Comprehensive project documentation (READ THIS FIRST)
-- **ARCHITECTURE.md**: Architecture decisions, UI/UX standards
-- **package.json**: Scripts for dev/build/deploy
-
-### Database
-- **Migrations**: `docs/migrations/` (SQL schema changes)
-- **Schemas**: `docs/sql-scripts/` (complete table definitions per module)
-
-## Common Mistakes to Avoid
-
-### ❌ Mistake 1: Forgetting CORS Preflight Handler
-**Symptom**: CORS error in browser, "No 'Access-Control-Allow-Origin' header"
-**Fix**: Always add OPTIONS handler before GET/POST/etc
-
-### ❌ Mistake 2: Adding Route but Forgetting Access Control
-**Symptom**: URL changes, then immediately redirects to dashboard
-**Fix**: Update both `App.js` routes and `Home` component access control
-
-### ❌ Mistake 3: Direct Module-to-Module Calls
-**Symptom**: Tight coupling, difficult to refactor
-**Fix**: Use event system (eventBus.emit/on)
-
-### ❌ Mistake 4: Missing Tenant Filter in Queries
-**Symptom**: Users see data from other organizations
-**Fix**: ALWAYS filter by `organization_id` or `tenant_id`
-
-### ❌ Mistake 5: Using localStorage for Critical State
-**Symptom**: Data lost on logout, not synced across devices
-**Fix**: Store in Supabase, use localStorage only for UX preferences
-
-## Development Workflow
-
-### Starting Development Server
-```bash
-# ALWAYS use this command to avoid port conflicts
-pkill -f "server/server.js"; pkill -f "react-scripts"; npm run start
-```
-
-### Adding New Product/Module
-1. Create tool directory: `src/tools/new-module/`
-2. Create controller: `server/new_module_controller.js`
-3. Create API handlers: `server/api_handlers/new_module.js`
-4. Add routes to `server/server.js` (Koa)
-5. Add handler to `api/[...path].js` (Vercel)
-6. Add route to `src/App.js`
-7. Add access control to `src/pages/home/index.js`
-8. Create agent file: `/docs/agents/new-module-agent.md`
-
-### Debugging Checklist
-1. **CORS errors**: Check OPTIONS handler exists
-2. **Tenant data leakage**: Verify organization_id filter in all queries
-3. **API not found in dev**: Check Koa route in `server/server.js`
-4. **API not found in prod**: Check handler registered in `api/[...path].js`
-5. **Navigation not working**: Check both App.js route and Home access control
-
-## Database Patterns
-
-### Multi-Tenant Table Structure
-```sql
-CREATE TABLE example_table (
-  id UUID PRIMARY KEY,
-  organization_id UUID NOT NULL REFERENCES organizations(id),
-  -- other fields
-  CONSTRAINT unique_per_org UNIQUE (organization_id, unique_field)
-);
-```
-
-### Row-Level Security (RLS)
-```sql
-CREATE POLICY tenant_isolation ON example_table
-  FOR ALL USING (
-    organization_id = current_setting('app.current_organization_id')::UUID
-  );
-```
-
-## MCP Servers Required
-
-### 1. Supabase MCP
-**Purpose**: Direct database schema access
-**Installation**: See claude_desktop_config.json
-**Benefit**: Claude Code can query table structures without asking you
-
-### 2. Filesystem MCP
-**Purpose**: Project structure navigation
-**Installation**: Pre-configured
-**Benefit**: Claude Code can explore directories without explicit file paths
-
-## Quick Reference
-
-- **API Base URL (Dev)**: `http://localhost:8989/api/*`
-- **API Base URL (Prod)**: `https://your-domain.vercel.app/api/*`
-- **Frontend Dev Server**: `http://localhost:3000`
-- **Lark OAuth Redirect**: Same as frontend URL
-- **Session Cookie Name**: `lk_token`
-- **Organization Slug Key**: `organization_slug` (localStorage)
-
-## When Claude Code "Forgets"
-
-If Claude Code seems to forget project context:
-1. Explicitly say: "Read .clinerules first"
-2. Reference specific agent: "Act as Sales Management Agent (see /docs/agents/sales-agent.md)"
-3. Check context window: If conversation too long, start new session and re-read .clinerules
-
-## Documentation Priority
-
-1. **CLAUDE.md** - Read this for operational commands and workflows
-2. **ARCHITECTURE.md** - Read this for design decisions and standards
-3. **/docs/agents/** - Read relevant agent file for module-specific work
-4. **/docs/[module]/*** - Read for detailed implementation guides
+> **READ THIS FIRST** before any coding task. For detailed patterns, see `/docs/patterns/`.
 
 ---
 
-Last Updated: 2025-11-26
-Project Version: Strategic Map v2.2.0, Sales v1.0.0, Contact v1.0.0, Inventory v1.0.0
+## 🎯 Project Identity
+
+Multi-tenant SaaS ERP for Malaysian SMEs on Lark platform.
+**6 Core Modules**: Strategic Map, Contact Mgmt, Sales Mgmt, Inventory, Integrations, Document Parser.
+
+**Tech Stack**: React 18 + Tailwind CSS + shadcn/ui | Koa 2 (dev) + Vercel (prod) | Supabase (PostgreSQL)
+
+---
+
+## 🚫 NEVER VIOLATE (Critical Rules)
+
+### 1. Multi-Tenant Isolation ⚠️ DATA SECURITY
+```
+❌ VIOLATION = Data leak between organizations
+```
+
+**MUST DO:**
+- ALL tables: Include `organization_id` or `tenant_id` field
+- ALL queries: Filter by `organization_id` (no exceptions)
+- Backend: Validate organization exists before any operation
+
+**Pattern**: See `/docs/patterns/multi-tenant-queries.md`
+
+---
+
+### 2. Dual Deployment Architecture ⚠️ DEV/PROD PARITY
+
+**CRITICAL**: When adding API endpoint, implement in **BOTH** places:
+
+| Environment | File | Pattern |
+|-------------|------|---------|
+| **Dev** | `server/server.js` | Koa router |
+| **Prod** | `server/api_handlers/{name}.js` + `api/[...path].js` | Vercel handler |
+
+**Common Mistake**: Implementing only in one place → Works in dev, breaks in prod (or vice versa)
+
+**Checklist**:
+- [ ] Add OPTIONS handler for CORS preflight (both Koa + Vercel)
+- [ ] Implement same business logic in both files
+- [ ] Test in both `localhost:8989` and Vercel deployment
+
+**Pattern**: See `/docs/patterns/api-design.md` for templates
+
+---
+
+### 3. Component Reuse First ⚠️ NO DUPLICATION
+
+**BEFORE creating ANY component**, check `src/components/ui/`:
+- Button, Card, Tabs, Avatar, Pagination, ConfirmDialog, SearchableSelect, MemberSelect
+
+**Rule**: If component exists, USE IT. Don't create duplicates in tool folders.
+
+**Pattern**: See `/docs/design-system/component-library.md`
+
+---
+
+### 4. Router + Access Control Pattern ⚠️ NAVIGATION
+
+When adding new product/module route:
+
+**2-Step Checklist**:
+1. Add route: `src/App.js` → `<Route path="/new_product" element={<Home />} />`
+2. Add access control: `src/pages/home/index.js` → Allow in `activeView` check
+
+**Failure symptom**: URL changes but immediately redirects to dashboard
+
+**Pattern**: See `/docs/patterns/routing.md`
+
+---
+
+## 🔌 MCP Integration (Model Context Protocol)
+
+**Available MCP Servers** for enhanced capabilities:
+
+### 1. Supabase MCP ✅
+```
+Direct database schema access, query generation, migration helpers
+```
+**Use when**: Need to check table structure, generate complex queries, validate schema
+
+### 2. Playwright MCP ✅
+```
+Browser automation, E2E testing, UI verification
+```
+**Use when**: Testing workflows, validating UI interactions, debugging frontend
+
+### 3. Filesystem MCP ✅
+```
+Enhanced file navigation, bulk operations, project structure analysis
+```
+**Use when**: Finding files across large codebase, batch file operations
+
+**Example Usage**:
+```
+"Use Supabase MCP to show me the schema for sales_orders table"
+"Use Playwright MCP to test the contact form submission workflow"
+"Use Filesystem MCP to find all components using Button"
+```
+
+---
+
+## 📖 Knowledge Base (Read as Needed)
+
+| I want to... | Read this first |
+|--------------|-----------------|
+| Add new API endpoint | `/docs/patterns/api-design.md` |
+| Add new module/product | `/docs/tasks/add-new-module.md` |
+| Create database table | `/docs/patterns/database-schema.md` |
+| Build UI component | `/docs/design-system/component-library.md` |
+| Fix CORS error | `/docs/troubleshooting/cors-errors.md` |
+| Fix data leak bug | `/docs/troubleshooting/multi-tenant-isolation.md` |
+| Debug navigation | `/docs/troubleshooting/routing-issues.md` |
+| Understand module X | `/docs/agents/{module}-agent.md` |
+
+---
+
+## 🆘 Quick Diagnostics
+
+**Symptom → Cause → Fix**:
+- `CORS error in browser` → Missing OPTIONS handler → Add `router.options()` in both Koa + Vercel
+- `URL changes, then redirects` → Missing access control → Update `src/pages/home/index.js`
+- `Users see other org's data` → Missing tenant filter → Add `.eq('organization_id', orgId)`
+- `API 404 in dev` → Route not in `server/server.js` → Add Koa route
+- `API 404 in prod` → Route not registered → Add to `api/[...path].js`
+
+---
+
+## 📚 Documentation Hierarchy
+
+```
+Level 0: .clinerules (THIS FILE) ← Read first
+  ↓
+Level 1: /docs/patterns/ ← Implementation patterns (API, DB, UI)
+  ↓
+Level 2: /docs/agents/ ← Module-specific rules (sales-agent.md, etc.)
+  ↓
+Level 3: /docs/tasks/ ← Step-by-step guides (add-module.md, etc.)
+  ↓
+Level 4: CLAUDE.md, ARCHITECTURE.md ← Comprehensive reference
+```
+
+**When Claude Code "forgets"**: Start new session, say "Read .clinerules first"
+
+---
+
+Last Updated: 2025-11-28 | Version: 2.0 (Refactored for clarity)

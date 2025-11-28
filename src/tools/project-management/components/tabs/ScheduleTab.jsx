@@ -128,34 +128,34 @@ const ScheduleTab = ({ projects, members = [] }) => {
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {/* Calendar Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-[89px] sm:top-[0px] z-20 bg-white">
-                <h2 className="text-lg font-bold text-gray-900">Staff Schedule</h2>
-                <div className="flex items-center space-x-3">
+            <div className="px-3 md:px-6 py-2 md:py-4 border-b border-gray-200 flex flex-row justify-between items-center gap-2 md:gap-3 sticky top-[89px] sm:top-[0px] z-20 bg-white">
+                <h2 className="text-sm md:text-lg font-bold text-gray-900 shrink-0">Schedule</h2>
+                <div className="flex items-center space-x-1.5 md:space-x-3 flex-1 justify-end">
                     {/* Today button - only show if not on current week */}
                     {weekOffset !== 0 && (
                         <button
                             onClick={goToCurrentWeek}
-                            className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors flex items-center"
+                            className="px-2 md:px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors flex items-center shrink-0"
                         >
-                            <Calendar className="w-3 h-3 mr-1" />
-                            Today
+                            <Calendar className="w-3 h-3 md:mr-1" />
+                            <span className="hidden md:inline">Today</span>
                         </button>
                     )}
-                    <span className="text-sm font-medium text-gray-600 min-w-[160px] text-center">{weekRange}</span>
-                    <div className="flex space-x-1">
+                    <span className="text-xs md:text-sm font-medium text-gray-600 text-center">{weekRange}</span>
+                    <div className="flex space-x-1 shrink-0">
                         <button
                             onClick={goToPreviousWeek}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-1 md:p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Previous week"
                         >
-                            <ChevronLeft className="w-5 h-5 text-gray-500" />
+                            <ChevronLeft className="w-4 md:w-5 h-4 md:h-5 text-gray-500" />
                         </button>
                         <button
                             onClick={goToNextWeek}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-1 md:p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Next week"
                         >
-                            <ChevronRight className="w-5 h-5 text-gray-500" />
+                            <ChevronRight className="w-4 md:w-5 h-4 md:h-5 text-gray-500" />
                         </button>
                     </div>
                 </div>
@@ -163,18 +163,18 @@ const ScheduleTab = ({ projects, members = [] }) => {
 
             {/* Calendar Grid */}
             <div className="overflow-x-auto">
-                <div className="min-w-[700px]">
+                <div className="min-w-[600px]">
                     {/* Days Header - using fixed widths */}
-                    <div className="grid grid-cols-[180px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
-                        <div className="p-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
+                    <div className="grid grid-cols-[100px_repeat(7,1fr)] md:grid-cols-[140px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
+                        <div className="p-2 md:p-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
                             Staff
                         </div>
                         {DAYS.map((day, i) => {
                             const isToday = dates[i].toDateString() === today.toDateString();
                             return (
-                                <div key={day} className={`p-3 text-center border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-100' : ''}`}>
-                                    <div className={`text-xs font-medium uppercase ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day}</div>
-                                    <div className={`text-sm font-bold mt-0.5 ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>{dates[i].getDate()}</div>
+                                <div key={day} className={`p-1.5 md:p-3 text-center border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-100' : ''}`}>
+                                    <div className={`text-[10px] md:text-xs font-medium uppercase ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day}</div>
+                                    <div className={`text-xs md:text-sm font-bold mt-0.5 ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>{dates[i].getDate()}</div>
                                 </div>
                             );
                         })}
@@ -184,13 +184,13 @@ const ScheduleTab = ({ projects, members = [] }) => {
                     {members.map((member, rowIndex) => (
                         <div
                             key={member.id}
-                            className={`grid grid-cols-[180px_repeat(7,1fr)] border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors ${rowIndex % 2 === 1 ? 'bg-gray-50/50' : ''}`}
+                            className={`grid grid-cols-[100px_repeat(7,1fr)] md:grid-cols-[140px_repeat(7,1fr)] border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors ${rowIndex % 2 === 1 ? 'bg-gray-50/50' : ''}`}
                         >
-                            <div className="p-2 border-r border-gray-200 flex items-center" title={member.display_name || member.email}>
-                                <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs mr-2 flex-shrink-0">
+                            <div className="p-1.5 md:p-2 border-r border-gray-200 flex items-center" title={member.display_name || member.email}>
+                                <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-[10px] md:text-xs mr-1.5 md:mr-2 flex-shrink-0">
                                     {getInitials(member)}
                                 </div>
-                                <span className="text-xs font-medium text-gray-900 truncate">
+                                <span className="text-[10px] md:text-xs font-medium text-gray-900 truncate">
                                     {getShortDisplayName(member)}
                                 </span>
                             </div>
@@ -201,9 +201,9 @@ const ScheduleTab = ({ projects, members = [] }) => {
                                 const isToday = dates[i].toDateString() === today.toDateString();
 
                                 return (
-                                    <div key={`${member.id}-${day}`} className={`p-1.5 border-r border-gray-200 last:border-r-0 min-h-[60px] ${isToday ? 'bg-blue-50' : ''}`}>
+                                    <div key={`${member.id}-${day}`} className={`p-1 md:p-1.5 border-r border-gray-200 last:border-r-0 min-h-[50px] md:min-h-[60px] ${isToday ? 'bg-blue-50' : ''}`}>
                                         {dayAssignments.length === 0 ? (
-                                            <div className="flex items-center justify-center h-full text-gray-300 text-sm">
+                                            <div className="flex items-center justify-center h-full text-gray-300 text-xs md:text-sm">
                                                 -
                                             </div>
                                         ) : (
@@ -211,21 +211,21 @@ const ScheduleTab = ({ projects, members = [] }) => {
                                                 {dayAssignments.slice(0, 2).map((project, idx) => (
                                                     <div
                                                         key={`${project.id}-${idx}`}
-                                                        className="mb-1 border rounded p-1 text-xs cursor-pointer hover:opacity-80 transition-colors"
+                                                        className="mb-0.5 md:mb-1 border rounded p-0.5 md:p-1 text-xs cursor-pointer hover:opacity-80 transition-colors"
                                                         style={{
                                                             backgroundColor: `${project.status?.color}15` || '#EFF6FF',
                                                             borderColor: project.status?.color || '#BFDBFE'
                                                         }}
                                                         title={`${project.name}${project.customer ? ` - ${project.customer.company_name || project.customer.first_name}` : ''}`}
                                                     >
-                                                        <div className="font-semibold truncate text-[10px]" style={{ color: project.status?.color || '#1E40AF' }}>
+                                                        <div className="font-semibold truncate text-[9px] md:text-[10px]" style={{ color: project.status?.color || '#1E40AF' }}>
                                                             {project.name}
                                                         </div>
                                                     </div>
                                                 ))}
                                                 {dayAssignments.length > 2 && (
-                                                    <div className="text-[10px] text-gray-400 pl-0.5">
-                                                        +{dayAssignments.length - 2} more
+                                                    <div className="text-[9px] md:text-[10px] text-gray-400 pl-0.5">
+                                                        +{dayAssignments.length - 2}
                                                     </div>
                                                 )}
                                             </>

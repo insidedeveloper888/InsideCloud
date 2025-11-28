@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, Plus, Calendar, LayoutGrid, List, Kanban, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Building2, Users, User } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Filter, Plus, Calendar, LayoutGrid, List, Kanban, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Building2, Users, User, Grid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AddProjectModal from '../modals/AddProjectModal';
 import ProjectDetailModal from '../modals/ProjectDetailModal';
@@ -18,11 +18,35 @@ const ProjectsTab = ({
     updateProject,
     deleteProject,
 }) => {
-    const [viewMode, setViewMode] = useState('table'); // 'table', 'grid', 'kanban'
+    // Default view mode based on screen size
+    const [viewMode, setViewMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.innerWidth >= 768 ? 'table' : 'card';
+        }
+        return 'table';
+    }); // 'table', 'card', 'grid', 'kanban'
     const [visibilityView, setVisibilityView] = useState('organization'); // 'organization', 'team', 'personal'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+    // Window resize handler for responsive view mode
+    useEffect(() => {
+        const handleResize = () => {
+            const userPreference = localStorage.getItem('projectViewMode');
+            if (!userPreference) {
+                setViewMode(window.innerWidth >= 768 ? 'table' : 'card');
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // View mode change handler with localStorage persistence
+    const handleViewModeChange = (mode) => {
+        setViewMode(mode);
+        localStorage.setItem('projectViewMode', mode);
+    };
 
     // Fetch organization members and customers for filtering
     const { members: orgMembers } = useOrganizationMembers(organizationSlug);
@@ -327,6 +351,142 @@ const ProjectsTab = ({
         </div>
     );
 
+    const CardView = () => (
+        <div className="px-4 md:px-6 py-4">
+            {paginatedProjects.length === 0 ? (
+                <div className="text-center py-12">
+                    <p className="text-gray-500 text-sm">No projects found.</p>
+                </div>
+            ) : (
+                <>
+                    <div className="space-y-3 md:space-y-4">
+                        <AnimatePresence>
+                            {paginatedProjects.map((project) => (
+                                <motion.div
+                                    key={project.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    onClick={() => setSelectedProject(project)}
+                                    className="border border-gray-200 rounded-lg p-4 md:p-5 hover:shadow-md active:shadow-lg transition-all bg-white cursor-pointer"
+                                >
+                                    {/* Project Name and Status */}
+                                    <div className="flex items-start justify-between gap-3 mb-3">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-base md:text-lg font-semibold text-gray-900 break-words mb-1">
+                                                {project.name}
+                                            </h3>
+                                            <p className="text-sm text-gray-500">
+                                                {getTemplateName(project.template_id)}
+                                            </p>
+                                        </div>
+                                        <span
+                                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border shrink-0"
+                                            style={getStatusStyle(project.status_id)}
+                                        >
+                                            {getStatusInfo(project.status_id).name}
+                                        </span>
+                                    </div>
+
+                                    {/* Customer */}
+                                    {project.customer && (
+                                        <div className="mb-3 pb-3 border-b border-gray-100">
+                                            <p className="text-sm text-gray-600">
+                                                <span className="font-medium text-gray-700">Customer:</span>{' '}
+                                                {getCustomerDisplayName(project)}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Details Grid */}
+                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                        {project.budget && (
+                                            <div>
+                                                <p className="text-xs text-gray-500 mb-1">Budget</p>
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    RM {parseFloat(project.budget).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {project.due_date && (
+                                            <div>
+                                                <p className="text-xs text-gray-500 mb-1">Due Date</p>
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {new Date(project.due_date).toLocaleDateString('en-MY')}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Team Members */}
+                                    {project.members && project.members.length > 0 && (
+                                        <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                                            <p className="text-xs text-gray-500">Team:</p>
+                                            <div className="flex -space-x-2">
+                                                {project.members.slice(0, 3).map((member, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="w-7 h-7 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center"
+                                                        title={member.individual?.name || 'Member'}
+                                                    >
+                                                        <span className="text-xs font-medium text-blue-700">
+                                                            {(member.individual?.name || 'M').charAt(0).toUpperCase()}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {project.members.length > 3 && (
+                                                    <div className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
+                                                        <span className="text-xs font-medium text-gray-600">
+                                                            +{project.members.length - 3}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="mt-6 flex justify-center">
+                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronLeft className="h-5 w-5" />
+                                </button>
+                                {[...Array(totalPages)].map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setCurrentPage(i + 1)}
+                                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === i + 1
+                                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronRight className="h-5 w-5" />
+                                </button>
+                            </nav>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+
     const GridView = () => (
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <AnimatePresence>
@@ -521,21 +681,28 @@ const ProjectsTab = ({
 
                 <div className="flex items-center space-x-2 bg-gray-100 p-1 rounded-lg">
                     <button
-                        onClick={() => setViewMode('table')}
+                        onClick={() => handleViewModeChange('table')}
                         className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         title="List View"
                     >
                         <List className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={() => setViewMode('grid')}
+                        onClick={() => handleViewModeChange('card')}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'card' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        title="Card View"
+                    >
+                        <Grid className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => handleViewModeChange('grid')}
                         className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         title="Grid View"
                     >
                         <LayoutGrid className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={() => setViewMode('kanban')}
+                        onClick={() => handleViewModeChange('kanban')}
                         className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
                         title="Kanban View"
                     >
@@ -556,6 +723,7 @@ const ProjectsTab = ({
             {/* Content Area */}
             <div className="flex-1 bg-gray-50/30">
                 {viewMode === 'table' && <TableView />}
+                {viewMode === 'card' && <CardView />}
                 {viewMode === 'grid' && <GridView />}
                 {viewMode === 'kanban' && <KanbanView />}
             </div>
