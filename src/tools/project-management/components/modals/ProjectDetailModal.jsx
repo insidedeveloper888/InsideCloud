@@ -183,7 +183,7 @@ const ProjectDetailModal = ({
                                     </span>
                                 )}
                             </div>
-                            <p className="text-sm text-gray-500 mt-2">
+                            <div className="text-sm text-gray-500 mt-2">
                                 {isEditing ? (
                                     <div className="w-64">
                                         <SearchableSelect
@@ -212,7 +212,7 @@ const ProjectDetailModal = ({
                                 ) : (
                                     <>Customer: {formData.customer ? getCustomerDisplayName(formData.customer) : 'None'}</>
                                 )}
-                            </p>
+                            </div>
                         </div>
                         <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
                             {!isEditing ? (

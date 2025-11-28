@@ -101,7 +101,7 @@ const ProjectsTab = ({
 
             // Member filter: check if any selected member is assigned to the project
             const matchesMembers = filters.members.length === 0 ||
-                project.members?.some(m => filters.members.includes(m.individual_id));
+                project.members?.some(m => filters.members.includes(m.individual?.id));
 
             // Customer filter
             const matchesCustomer = filters.customers.length === 0 ||
@@ -470,8 +470,8 @@ const ProjectsTab = ({
                     <button
                         onClick={() => setIsFilterOpen(true)}
                         className={`flex items-center px-3 py-2 rounded-lg border transition-colors relative ${(filters.status.length > 0 || filters.templates.length > 0 || filters.members.length > 0 || filters.customers.length > 0 || filters.dueDateFrom || filters.dueDateTo)
-                                ? 'bg-blue-50 border-blue-200 text-blue-600'
-                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                            ? 'bg-blue-50 border-blue-200 text-blue-600'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                             }`}
                     >
                         <Filter className="w-4 h-4 mr-2" />
@@ -487,8 +487,8 @@ const ProjectsTab = ({
                     <button
                         onClick={() => setVisibilityView('organization')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${visibilityView === 'organization'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
                             }`}
                         title="All organization projects"
                     >
@@ -498,8 +498,8 @@ const ProjectsTab = ({
                     <button
                         onClick={() => setVisibilityView('team')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${visibilityView === 'team'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
                             }`}
                         title="Projects you own or are a member of"
                     >
@@ -509,8 +509,8 @@ const ProjectsTab = ({
                     <button
                         onClick={() => setVisibilityView('personal')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${visibilityView === 'personal'
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
                             }`}
                         title="Projects you own"
                     >
