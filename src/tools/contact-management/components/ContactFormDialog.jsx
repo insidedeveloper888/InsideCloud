@@ -31,7 +31,7 @@ export default function ContactFormDialog({
   availableTags = [],
   onCreateTag,
   organizationSlug,
-  maxRatingScale = 10,
+  maxRatingScale = 5,
 }) {
   // Fetch organization members for assignment dropdowns
   const { members } = useOrganizationMembers(organizationSlug);

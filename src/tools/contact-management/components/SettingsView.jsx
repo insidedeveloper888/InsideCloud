@@ -23,11 +23,8 @@ export default function SettingsView({
   onAddContactType,
   onUpdateContactType,
   onDeleteContactType,
-  contactSettings = {},
-  onUpdateContactSettings,
 }) {
   const [activeTab, setActiveTab] = useState(0);
-  const [selectedRatingScale, setSelectedRatingScale] = useState(contactSettings?.max_rating_scale || 10);
   const [newStageName, setNewStageName] = useState('');
   const [newChannelName, setNewChannelName] = useState('');
   const [newTagName, setNewTagName] = useState('');
@@ -149,19 +146,6 @@ export default function SettingsView({
     setEditingStageColorId(null);
   };
 
-  const handleRatingScaleChange = async (scale) => {
-    setSelectedRatingScale(scale);
-    if (onUpdateContactSettings) {
-      try {
-        await onUpdateContactSettings({ max_rating_scale: parseInt(scale) });
-      } catch (error) {
-        console.error('Failed to update rating scale:', error);
-        // Revert on error
-        setSelectedRatingScale(contactSettings?.max_rating_scale || 10);
-      }
-    }
-  };
-
   // Contact Type handlers
   const handleAddContactType = async () => {
     if (!newTypeName.trim()) return;
@@ -242,45 +226,6 @@ export default function SettingsView({
   return (
     <div className="space-y-4 md:space-y-6">
       <h2 className="text-lg md:text-xl font-semibold text-gray-900">⚙️ Settings</h2>
-
-      {/* General Settings */}
-      <div className="border border-gray-200 rounded-lg p-4 md:p-6 bg-white">
-        <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">General Settings</h3>
-        <p className="text-xs md:text-sm text-gray-600 mb-4">Configure general contact management settings</p>
-
-        <div className="space-y-4">
-          {/* Rating Scale Configuration */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Customer Rating Scale
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
-              Choose how many stars you want to use for customer conversion probability ratings (3-10 stars)
-            </p>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <select
-                value={selectedRatingScale}
-                onChange={(e) => handleRatingScaleChange(e.target.value)}
-                className="w-full sm:flex-1 px-3 py-2.5 md:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-sm"
-              >
-                <option value="3">3-star rating (Low, Medium, High)</option>
-                <option value="4">4-star rating</option>
-                <option value="5">5-star rating (Standard)</option>
-                <option value="6">6-star rating</option>
-                <option value="7">7-star rating</option>
-                <option value="8">8-star rating</option>
-                <option value="9">9-star rating</option>
-                <option value="10">10-star rating (Detailed)</option>
-              </select>
-              <div className="flex items-center justify-center px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg sm:shrink-0">
-                <span className="text-xs md:text-sm text-blue-900 font-medium whitespace-nowrap">
-                  Current: <span className="font-bold">{selectedRatingScale}</span> stars
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Tabs - Responsive with horizontal scroll on mobile */}
       <div className="border-b border-gray-200">

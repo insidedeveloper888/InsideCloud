@@ -11,7 +11,6 @@ import { useTags } from './hooks/useTags';
 import { useContactTypes } from './hooks/useContactTypes';
 import { useRealtimeSync } from './hooks/useRealtimeSync';
 import { useCurrentUser } from './hooks/useCurrentUser';
-import { useContactSettings } from './hooks/useContactSettings';
 import ContactListView from './components/ContactListView';
 import DashboardView from './components/DashboardView';
 import KanbanView from './components/KanbanView';
@@ -25,6 +24,9 @@ const TABS = {
   MAP: 3,
   SETTINGS: 4,
 };
+
+// Fixed rating scale for all organizations
+const MAX_RATING_SCALE = 5;
 
 export default function ContactManagementApp({ organizationSlug }) {
   const [activeTab, setActiveTab] = useState(TABS.LIST);
@@ -91,19 +93,10 @@ export default function ContactManagementApp({ organizationSlug }) {
     await refreshContacts();
   };
 
-  // Fetch contact settings (rating scale, etc.)
-  const {
-    settings: contactSettings,
-    loading: settingsLoading,
-    updateSettings: updateContactSettings,
-  } = useContactSettings(organizationSlug);
-
-  const maxRatingScale = contactSettings?.max_rating_scale || 10;
-
   // Setup real-time sync
   useRealtimeSync(organizationSlug);
 
-  const isLoading = contactsLoading || stagesLoading || channelsLoading || settingsLoading || contactTypesLoading;
+  const isLoading = contactsLoading || stagesLoading || channelsLoading || contactTypesLoading;
   const error = contactsError;
 
   if (error) {
@@ -147,7 +140,7 @@ export default function ContactManagementApp({ organizationSlug }) {
             onRefresh={refreshContacts}
             onCreateTag={addTag}
             organizationSlug={organizationSlug}
-            maxRatingScale={maxRatingScale}
+            maxRatingScale={MAX_RATING_SCALE}
           />
         );
       case TABS.DASHBOARD:
@@ -181,8 +174,6 @@ export default function ContactManagementApp({ organizationSlug }) {
             onAddContactType={addContactType}
             onUpdateContactType={updateContactType}
             onDeleteContactType={deleteContactType}
-            contactSettings={contactSettings}
-            onUpdateContactSettings={updateContactSettings}
           />
         );
       default:
